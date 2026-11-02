@@ -5,7 +5,8 @@
 // =============================================================================
 
 import { S } from '../core/fighter.js';
-import { drawWeapon, drawFist } from './weaponArt.js';
+import { drawWeapon, drawFist, weaponSprite } from './weaponArt.js';
+import { line, disc, px, PX } from './pixel.js';
 
 const SWING = {
   slash: [1.9, -0.6], 'slash-wide': [1.7, -0.9], overhead: [2.4, -0.9], 'overhead-big': [2.7, -1.15],
@@ -178,97 +179,114 @@ function attackPose(p, f, weaponId) {
   p.hand2 = [p.hand[0] - 6, p.hand[1] - 4];
 }
 
-/**
- * 캐릭터 그리기 (ctx 는 화면 좌표계)
- */
-export function drawFighter(ctx, f, sx, sy, colors, frame, opts = {}) {
-  const pose = computePose(f, frame);
-  ctx.save();
-  ctx.translate(sx, sy);
-  ctx.scale(f.facing, -1); // 로컬: 전방 +x, 위 +y
-  if (pose.spin) { ctx.translate(30, 12); ctx.rotate(pose.spin); }
-
-  const hip = [0, 56 - pose.crouch];
-  const shoulder = [hip[0] + Math.sin(pose.lean) * 40, hip[1] + Math.cos(pose.lean) * 40];
-  const head = [shoulder[0] + Math.sin(pose.lean) * 18, shoulder[1] + Math.cos(pose.lean) * 18];
-
-  // 손 위치는 어깨 기준으로 보정 (기울기만큼 이동)
-  const dx = shoulder[0], dy = shoulder[1] - 96;
-  const hand = [pose.hand[0] + dx, pose.hand[1] + dy];
-  const hand2 = [pose.hand2[0] + dx, pose.hand2[1] + dy];
-
-  const body = opts.tint ?? colors.body;
-  const limb = colors.limb;
-  ctx.lineCap = 'round';
-  ctx.lineJoin = 'round';
-
-  // 뒷다리 / 뒷팔
-  const legTuck = pose.tuck * 24;
-  drawLimb(ctx, hip, [-pose.legSpread - pose.stride * 0.5 - legTuck * 0.3, legTuck], limb, 11, -1);
-  drawLimb(ctx, shoulder, hand2, limb, 9, 1);
-  if (pose.extraFist) {
-    const ef = [pose.extraFist[0] + dx, pose.extraFist[1] + dy];
-    drawLimb(ctx, shoulder, ef, limb, 9, 1);
-    ctx.save(); ctx.translate(ef[0], ef[1]); drawFist(ctx, colors.weapon, 1); ctx.restore();
-  }
-
-  // 몸통
-  ctx.strokeStyle = body;
-  ctx.lineWidth = 20;
-  ctx.beginPath(); ctx.moveTo(hip[0], hip[1]); ctx.lineTo(shoulder[0], shoulder[1]); ctx.stroke();
-  // 허리띠 (팀 색)
-  ctx.strokeStyle = colors.accent;
-  ctx.lineWidth = 5;
-  ctx.beginPath(); ctx.moveTo(hip[0] - 10, hip[1] + 4); ctx.lineTo(hip[0] + 10, hip[1] + 4); ctx.stroke();
-
-  // 앞다리
-  drawLimb(ctx, hip, [pose.legSpread + pose.stride * 0.5 + legTuck * 0.2, legTuck * 0.7], body, 12, -1);
-
-  // 머리
-  ctx.fillStyle = body;
-  ctx.beginPath(); ctx.arc(head[0], head[1], 13, 0, Math.PI * 2); ctx.fill();
-  // 머리띠 (팀 색, 뒤로 휘날림)
-  ctx.strokeStyle = colors.accent;
-  ctx.lineWidth = 4;
-  ctx.beginPath();
-  ctx.moveTo(head[0] - 12, head[1] + 3); ctx.lineTo(head[0] + 12, head[1] + 3);
-  const wave = Math.sin(frame * 0.25 + f.id) * 4;
-  ctx.moveTo(head[0] - 11, head[1] + 3);
-  ctx.quadraticCurveTo(head[0] - 22, head[1] + 6 + wave, head[0] - 30, head[1] + wave);
-  ctx.stroke();
-  // 눈 (방향 표시)
-  ctx.fillStyle = colors.eye;
-  ctx.fillRect(head[0] + 5, head[1] + 2, 5, 3);
-
-  // 무기 + 앞팔
-  if (f.weapon.id !== 'knuckle') {
-    ctx.save();
-    ctx.translate(hand[0], hand[1]);
-    ctx.rotate(pose.wAngle);
-    if (opts.trail) { ctx.shadowColor = colors.weapon; ctx.shadowBlur = 16; }
-    drawWeapon(ctx, f.weapon.id, colors.weapon);
-    ctx.restore();
-  }
-  drawLimb(ctx, shoulder, hand, body, 10, 1);
-  if (f.weapon.id === 'knuckle') {
-    ctx.save(); ctx.translate(hand[0], hand[1]); drawFist(ctx, colors.weapon, 1.15); ctx.restore();
-  } else {
-    ctx.fillStyle = limb;
-    ctx.beginPath(); ctx.arc(hand[0], hand[1], 5, 0, Math.PI * 2); ctx.fill();
-  }
-
-  ctx.restore();
-  return pose;
-}
-
-/** 관절 하나를 굽힌 팔/다리 (bend: 1 팔꿈치 아래, -1 무릎 앞) */
-function drawLimb(ctx, a, b, color, width, bend) {
+/** 무릎/팔꿈치가 굽은 관절 위치 (로컬 좌표) */
+function joint(a, b, bend) {
   const mx = (a[0] + b[0]) / 2, my = (a[1] + b[1]) / 2;
   const len = Math.hypot(b[0] - a[0], b[1] - a[1]);
   const k = Math.max(0, 30 - len * 0.35) * (bend > 0 ? -0.6 : 0.9);
   const nx = -(b[1] - a[1]) / (len || 1), ny = (b[0] - a[0]) / (len || 1);
-  const jx = mx + nx * k * (bend > 0 ? 1 : -1), jy = my + ny * k * (bend > 0 ? 1 : -1);
-  ctx.strokeStyle = color;
-  ctx.lineWidth = width;
-  ctx.beginPath(); ctx.moveTo(a[0], a[1]); ctx.lineTo(jx, jy); ctx.lineTo(b[0], b[1]); ctx.stroke();
+  const sgn = bend > 0 ? 1 : -1;
+  return [mx + nx * k * sgn, my + ny * k * sgn];
+}
+
+/**
+ * 픽셀 캐릭터 그리기
+ * @param ctx 아트(저해상도) 캔버스 컨텍스트
+ * @param ax, ay 발밑 위치 (아트 좌표)
+ * @param pal {body, dark, light, accent, skin, hair, outline, weapon}
+ * @returns {hand:[x,y], wAngle, pose} 무기 궤적 계산용
+ */
+export function drawFighter(ctx, f, ax, ay, pal, frame, opts = {}) {
+  const pose = computePose(f, frame);
+  const facing = f.facing;
+  const spin = pose.spin || 0;
+  const cs = Math.cos(spin), sn = Math.sin(spin);
+  // 로컬(월드 단위, 위 +) → 아트 좌표
+  const P = ([lx, ly]) => {
+    let x = lx, y = ly;
+    if (spin) { const rx = x * cs - y * sn, ry = x * sn + y * cs; x = rx + 30; y = ry + 12; }
+    return [ax + (facing * x) / PX, ay - y / PX];
+  };
+
+  const hip = [0, 56 - pose.crouch];
+  const shoulder = [hip[0] + Math.sin(pose.lean) * 40, hip[1] + Math.cos(pose.lean) * 40];
+  const head = [shoulder[0] + Math.sin(pose.lean) * 17, shoulder[1] + Math.cos(pose.lean) * 17];
+  const dx = shoulder[0], dy = shoulder[1] - 96;
+  const hand = [pose.hand[0] + dx, pose.hand[1] + dy];
+  const hand2 = [pose.hand2[0] + dx, pose.hand2[1] + dy];
+  const tuck = pose.tuck * 24;
+  const footB = [-pose.legSpread - pose.stride * 0.5 - tuck * 0.3, tuck];
+  const footF = [pose.legSpread + pose.stride * 0.5 + tuck * 0.2, tuck * 0.7];
+  const kneeB = joint(hip, footB, -1), kneeF = joint(hip, footF, -1);
+  const elbB = joint(shoulder, hand2, 1), elbF = joint(shoulder, hand, 1);
+  const extra = pose.extraFist ? [pose.extraFist[0] + dx, pose.extraFist[1] + dy] : null;
+  const elbX = extra ? joint(shoulder, extra, 1) : null;
+
+  const tint = opts.tint;
+  const C = tint ? { body: tint, dark: tint, light: tint, accent: tint, skin: tint, hair: tint } : pal;
+  const O = opts.silhouette ? null : pal.outline;
+
+  const seg = (pts, c, w) => { for (let i = 1; i < pts.length; i++) { const a = P(pts[i - 1]), b = P(pts[i]); line(ctx, a[0], a[1], b[0], b[1], c, w); } };
+  const parts = [
+    // [점들, 색, 두께] — 뒤에서 앞 순서
+    [[hip, kneeB, footB], C.dark, 3],
+    [[shoulder, elbB, hand2], C.dark, 2],
+    ...(extra ? [[[shoulder, elbX, extra], C.dark, 2]] : []),
+    [[hip, shoulder], C.body, 5],
+    [[hip, kneeF, footF], C.body, 3],
+  ];
+  const hd = P(head);
+
+  // 1) 외곽선
+  if (O) {
+    for (const [pts, , w] of parts) seg(pts, O, w + 2);
+    seg([shoulder, elbF, hand], O, 4);
+    disc(ctx, hd[0], hd[1], 5, O);
+  }
+  // 2) 몸
+  for (const [pts, c, w] of parts) seg(pts, c, w);
+  // 몸통 밝은 면 / 허리띠
+  const sh = P(shoulder), hp = P(hip);
+  line(ctx, sh[0] + facing, sh[1] + 1, hp[0] + facing, hp[1] - 1, C.light, 1);
+  const belt = P([hip[0], hip[1] + 4]);
+  line(ctx, belt[0] - 2, belt[1], belt[0] + 2, belt[1], C.accent, 1);
+  // 신발
+  for (const ft of [footB, footF]) { const p = P(ft); line(ctx, p[0], p[1], p[0] + facing * 2, p[1], O ?? C.dark, 1); }
+  // 머리
+  disc(ctx, hd[0], hd[1], 4, C.skin);
+  line(ctx, hd[0] - 4, hd[1] - 3, hd[0] + 4, hd[1] - 3, C.hair, 1);
+  line(ctx, hd[0] - 4, hd[1] - 4, hd[0] + 3, hd[1] - 4, C.hair, 1);
+  px(ctx, hd[0] - facing * 4, hd[1] - 2, C.hair);
+  // 머리띠 + 휘날리는 끈
+  line(ctx, hd[0] - 4, hd[1] - 1, hd[0] + 4, hd[1] - 1, C.accent, 1);
+  const wave = Math.round(Math.sin(frame * 0.25 + f.id * 2));
+  line(ctx, hd[0] - facing * 5, hd[1] - 1, hd[0] - facing * 8, hd[1] + wave, C.accent, 1);
+  px(ctx, hd[0] - facing * 9, hd[1] + 1 + wave, C.accent);
+  // 눈
+  if (!tint) px(ctx, hd[0] + facing * 2, hd[1], pal.outline);
+
+  // 3) 무기 + 앞팔
+  const hA = P(hand);
+  if (f.weapon.id !== 'knuckle') {
+    let ang = pose.wAngle;
+    if (spin) ang += spin;
+    if (!opts.silhouette) drawWeapon(ctx, f.weapon.id, pal.weapon, hA[0], hA[1], ang, facing);
+  }
+  seg([shoulder, elbF, hand], C.body, 2);
+  if (f.weapon.id === 'knuckle') {
+    if (!opts.silhouette) {
+      drawFist(ctx, pal.weapon, hA[0], hA[1], facing);
+      if (extra) { const e = P(extra); drawFist(ctx, pal.weapon, e[0], e[1], facing); }
+    }
+  } else {
+    px(ctx, hA[0], hA[1], C.skin);
+  }
+  return { hand: hA, wAngle: pose.wAngle + spin, pose };
+}
+
+/** 무기 끝(칼끝) 아트 좌표 — 휘두르기 궤적용 */
+export function weaponTip(f, hand, wAngle) {
+  const s = weaponSprite(f.weapon.id, '#fff');
+  const len = f.weapon.id === 'knuckle' ? 3 : s.w - s.pivot[0] - 2;
+  return [hand[0] + f.facing * Math.cos(wAngle) * len, hand[1] - Math.sin(wAngle) * len];
 }
