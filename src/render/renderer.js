@@ -114,26 +114,29 @@ export class Renderer {
       switch (e.type) {
         case 'hit': {
           const big = e.kind === 'heavy' || e.kind === 'plunge' || e.kind === 'ultimate';
-          fx.sparks(x, y, UI.paper, big ? 14 : 8, big ? 2.6 : 1.8, { dir: dir > 0 ? 0 : Math.PI, spread: 1.8 });
-          fx.sparks(x, y, '#f08a3c', big ? 8 : 4, big ? 2 : 1.4);
-          fx.ring(x, y, UI.paper, big ? 12 : 7, 8);
+          // 베기 자국 + 별 섬광 + 공격 방향으로 튀는 파편 (원형 링은 제거)
+          fx.hitImpact(x, y, dir, e.kind === 'ultimate' ? 3 : big ? 2 : 1, '#f08a3c');
+          fx.sparks(x, y, '#ffd08a', big ? 7 : 4, big ? 2.4 : 1.7, { dir: dir > 0 ? 0 : Math.PI, spread: 1.2, life: 10 });
           fx.addShake(big ? 1 : 0);
           if (e.kind === 'ultimate') { fx.text('궁극기 적중', x, y - 22, UI.gold, 3); fx.screenFlash('#f08a3c', 0.18); }
           break;
         }
-        case 'parry':
-          fx.sparks(x, y, '#bfe0ea', 8, 1.6, { dir: dir > 0 ? Math.PI : 0, spread: 2 });
-          fx.ring(x, y, UI.cyan, 9, 10);
-          fx.text('패링', x, y - 16, '#bfe0ea', 1, 32);
+        case 'parry': {
+          // 일반 가드: 방패 호 + 뒤로 튕기는 불꽃 (글자 없음)
+          const face = D ? D.facing : -dir;
+          fx.guardImpact(x, y, face, UI.cyan, 1);
+          fx.sparks(x, y, '#bfe0ea', 5, 1.5, { dir: dir > 0 ? Math.PI : 0, spread: 1.4, life: 10, gravity: 0.15 });
           break;
-        case 'perfect':
-          fx.sparks(x, y, UI.gold, 20, 2.6, { life: 22 });
-          fx.ring(x, y, UI.gold, 24, 18);
-          fx.ring(x, y, UI.paper, 13, 12);
-          fx.text('완벽패링!', x, y - 24, UI.gold, 3, 60);
-          fx.screenFlash('#f6e2a0', 0.22);
+        }
+        case 'perfect': {
+          const face = D ? D.facing : -dir;
+          fx.guardImpact(x, y, face, UI.gold, 2, true);
+          fx.sparks(x, y, UI.gold, 12, 2.4, { life: 18 });
+          fx.text('완벽패링', x, y - 26, UI.gold, 2, 45);
+          fx.screenFlash('#f6e2a0', 0.16);
           fx.addShake(1);
           break;
+        }
         case 'guardBreak':
           fx.sparks(x, y, UI.purple, 20, 2.6, { size: 2, life: 26 });
           fx.ring(x, y, UI.purple, 22, 18);

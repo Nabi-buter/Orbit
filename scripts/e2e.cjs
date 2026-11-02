@@ -69,7 +69,7 @@ function assert(c, msg) { if (!c) throw new Error('E2E 실패: ' + msg); console
       await wait(1700);
       await page.keyboard.down('KeyD'); await wait(400); await page.keyboard.up('KeyD');
       await key('KeyJ'); await wait(250); await key('KeyK'); await wait(500);
-      await key('KeyL'); await wait(300); await key('KeyW'); await wait(400);
+      await key('ShiftLeft'); await wait(300); await key('KeyW'); await wait(400);
       if (id === 'longsword') await shot(page, '03-battle');
     }
 
