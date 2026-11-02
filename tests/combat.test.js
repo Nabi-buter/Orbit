@@ -46,15 +46,15 @@ test('중거리에서는 약공격이 헛치고 강공격이 적중한다 (빠�
   assert.ok(b.hp < B.fighter.maxHp);
 });
 
-test('헛친 약공격은 후딜레이 중 강공격에 반격당한다', () => {
-  const m = setup({ distance: 170 });
+test('헛친 약공격은 후딜레이 중 반격당한다 (읽고 내민 강공이 후딜에 들어감)', () => {
+  const m = setup({ distance: 165 });
   const [a, b] = m.fighters;
-  tap(m, 0, 'light'); // 닿지 않는 거리
-  run(m, 6);
-  // 이제 P1 이 후딜레이 중. P1 을 향해 P2 가 강공
-  m.step([I(), I({ heavy: true })]);
-  run(m, 20);
-  assert.ok(a.hp < B.fighter.maxHp, '후딜레이를 반격당함');
+  // A 는 닿지 않는 약공을 헛치고, B 는 그걸 읽고 사거리가 긴 강공을 동시에 시작
+  m.step([I({ light: true }), I({ heavy: true })]);
+  const ev = run(m, 40);
+  assert.ok(ev.some((e) => e.type === 'hit' && e.attacker === 1), '강공이 후딜레이에 적중');
+  assert.ok(!ev.some((e) => e.type === 'hit' && e.attacker === 0), '헛친 약공은 닿지 않음');
+  assert.ok(a.weapon.light.duration - a.weapon.light.hits[0].to >= 12, '약공 후딜 최소 12f');
 });
 
 test('약공/강공을 자유롭게 연결할 수 있다 (접촉 후 캔슬)', () => {

@@ -75,15 +75,26 @@ export function variant(base, { name, motion, dmg = 1, guard = dmg, startup = 0,
 }
 
 /**
- * 무기 무게감(템포) 적용: 발생·판정·후딜·연결 시점·이동 구간을 k배로 늘린다.
- * 이동 거리는 유지(속도 ÷ k). 피격/가드 경직은 늘리지 않는다 → 콤보 사이 대응 틈은 더 커진다.
+ * 무기 무게감(템포) 적용.
+ * k: 전체 배율(공격 시간). shape: {windup, recovery} — 예비 동작 / 후딜레이 구간에 추가로 곱하는 배율.
+ * 모티브(Dueling Grounds)처럼 "예비 동작은 길고 읽히게, 후딜은 짧게" 를 만든다.
+ * 이동 거리는 유지(속도 재계산). 피격/가드 경직은 늘리지 않는다 → 콤보 사이 대응 틈은 더 커진다.
  */
-export function tempo(def, k) {
-  if (k === 1) return def;
-  const s = (v) => Math.round(v * k);
+export function tempo(def, k, shape = {}) {
+  const w = shape.windup ?? 1, r = shape.recovery ?? 1;
+  if (k === 1 && w === 1 && r === 1) return def;
+  const f0 = def.hits[0].from;
+  const lastTo = Math.max(...def.hits.map((h) => h.to));
+  // 원래 프레임 → 새 프레임 (구간별 배율)
+  const map = (t) => {
+    if (t <= f0) return t * k * w;
+    if (t <= lastTo) return f0 * k * w + (t - f0) * k;
+    return f0 * k * w + (lastTo - f0) * k + (t - lastTo) * k * r;
+  };
+  const s = (t) => Math.round(map(t));
   return {
     ...def,
-    duration: s(def.duration),
+    duration: Math.max(s(def.duration), s(lastTo) + 2),
     cancelFrom: def.cancelFrom == null ? null : s(def.cancelFrom),
     moves: def.moves.map((m) => {
       const from = s(m.from), to = Math.max(from, s(m.to));

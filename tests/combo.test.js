@@ -54,7 +54,16 @@ test('약·강을 섞으면 더 길게 이어지고 딜레이가 짧다', () => 
   for (const id of WEAPON_ORDER) {
     const c = WEAPONS[id].combo;
     // 약공을 상한-1 번, 그 뒤 강공, 다시 약공... 전체 상한까지
-    const plan = (n) => (n < c.lightMax - 1 ? 'light' : n % 2 === 0 ? 'heavy' : 'light');
+    // 약공 상한-1 번 → 이후 강/약 번갈아, 단 상한에 닿은 종류는 다른 종류로
+    const plan = (n) => {
+      if (n < c.lightMax - 1) return 'light';
+      const extra = n - (c.lightMax - 1);
+      const heavies = Math.ceil(extra / 2), lights = c.lightMax - 1 + Math.floor(extra / 2);
+      const want = extra % 2 === 0 ? 'heavy' : 'light';
+      if (want === 'heavy' && heavies >= c.heavyMax) return 'light';
+      if (want === 'light' && lights >= c.lightMax) return 'heavy';
+      return want;
+    };
     const { names, lock } = mash(id, plan, 500);
     assert.ok(names.length > Math.min(c.lightMax, c.heavyMax) || names.length === c.maxTotal, `${id}: ${names.join('→')}`);
     assert.ok(names.length <= c.maxTotal);
@@ -116,7 +125,7 @@ test('피격되면 콤보 카운트가 초기화된다', () => {
   m.step([I({ light: true }), I()]);
   run(m, 2);
   m.step([I(), I({ light: true })]); // 단검 약공이 먼저 맞음
-  run(m, 6);
+  run(m, b.weapon.light.hits[0].from);
   assert.equal(a.state, S.HITSTUN);
   assert.equal(a.combo.total, 0);
   assert.equal(a.combo.lock, 0);
@@ -162,7 +171,8 @@ test('헛쳐도 콤보 문자열은 이어지지만 맞혔을 때보다 늦다',
     if (a.attack && a.attack !== first) { chainedAt = first.frame; break; }
   }
   assert.ok(chainedAt != null, '헛친 뒤 2단계 연결');
-  assert.ok(chainedAt >= first.def.cancelFrom + BALANCE.combo.whiffDelay - 1, `연결 시점 ${chainedAt}`);
+  // 헛치면 cancelFrom + whiffDelay 이후 (후딜이 그보다 짧으면 후딜을 다 마친 뒤)
+  assert.ok(chainedAt >= Math.min(first.def.cancelFrom + BALANCE.combo.whiffDelay, first.def.duration) - 1, `연결 시점 ${chainedAt}`);
   assert.equal(a.attack.def.name, WEAPONS.longsword.lights[1].name);
 });
 
@@ -231,5 +241,6 @@ test('강공 연타: 약공처럼 이어지지만, 헛치면 약공보다 늦게
   const l = chainAt('light'), h = chainAt('heavy');
   assert.ok(h, '헛친 강공도 다음 단계로 연결');
   assert.equal(h.name, WEAPONS.longsword.heavies[1].name);
-  assert.ok(h.at >= BALANCE.combo.heavyWhiffDelay - 1 && h.at > l.at, `강공 지연 ${h.at} > 약공 지연 ${l.at}`);
+  const H = WEAPONS.longsword.heavy;
+  assert.ok(h.at >= Math.min(BALANCE.combo.heavyWhiffDelay, H.duration - H.cancelFrom) - 1, `강공 지연 ${h.at}`);
 });

@@ -56,6 +56,8 @@ console.log(`시작  편차 ${(spread(rates) * 100).toFixed(1)}%p  | ${show(rate
 let best = { spread: spread(rates), knobs: clone(KNOBS), rates };
 
 let gain = 1; // 나빠지면 절반으로 줄이는 보폭
+// 공격 시간은 모티브 고증으로 정한 예측값의 ±10% 안에서만 조정 (무기 성격 유지)
+const SPEED_ANCHOR = Object.fromEntries(WEAPON_ORDER.map((id) => [id, KNOBS[id].speed]));
 
 function step(phase) {
   for (const id of WEAPON_ORDER) {
@@ -64,9 +66,9 @@ function step(phase) {
     // 변수를 하나씩 바꾸고, 무기 정체성 규칙을 깨는 변수만 되돌린다
     const tries = phase === 1
       ? [
-        (kn) => { kn.speed = r2(clamp(kn.speed * (1 + 0.25 * gain * err), 1.0, 1.6)); },
-        (kn) => { kn.damage = r2(clamp(kn.damage * (1 - 0.6 * gain * err), 0.75, 1.3)); },
-        (kn) => { kn.reach = r2(clamp(kn.reach * (1 - 0.25 * gain * err), 0.85, 1.15)); },
+        (kn) => { kn.speed = r2(clamp(kn.speed * (1 + 0.15 * gain * err), SPEED_ANCHOR[id] * 0.9, SPEED_ANCHOR[id] * 1.1)); },
+        (kn) => { kn.damage = r2(clamp(kn.damage * (1 - 0.6 * gain * err), 0.7, 1.35)); },
+        (kn) => { kn.reach = r2(clamp(kn.reach * (1 - 0.25 * gain * err), 0.85, 1.2)); },
         (kn) => {
           const minTotal = Math.max(kn.combo.lightMax, kn.combo.heavyMax);
           if (err < -0.1) kn.combo.maxTotal = Math.min(kn.combo.maxTotal + 1, kn.combo.lightMax + kn.combo.heavyMax);

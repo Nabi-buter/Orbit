@@ -102,9 +102,13 @@ export function processInput(f, opp, input, frame) {
   const dirHeld = heldDir(input);
 
   // --- 가드 입력 시각 기록 (완벽패링 판정용) ---
-  if (pressed.guard) {
+  // 패링 시도: 공격·대시·점프 중에는 시작되지 않는다 (피격 경직 중 입력은 허용: 풀리는 순간 막기)
+  const busy = f.state === S.ATTACK || f.state === S.SPECIAL || f.state === S.ULTIMATE ||
+    f.state === S.DASH || f.state === S.JUMP || f.state === S.PLUNGE;
+  if (pressed.guard && f.parry.lock <= 0 && !busy) {
     f.prevGuardPress = f.guardPress;
     f.guardPress = frame;
+    startParryAttempt(f, frame);
   }
 
   // --- 선입력 버퍼 ---
@@ -151,6 +155,13 @@ export function processInput(f, opp, input, frame) {
   }
 
   const free = isFree(f);
+
+  // 헛패링 경직: 아무것도 할 수 없다 (가드 포함)
+  if (f.parry.lock > 0 && free) {
+    f.state = S.IDLE;
+    f.vx = 0;
+    return;
+  }
 
   // --- 약/강공격 (자유 상태 또는 접촉 후 연결 구간) ---
   const chaining = canChain(f);
@@ -208,6 +219,28 @@ export function processInput(f, opp, input, frame) {
   } else {
     f.state = S.IDLE;
     f.vx = 0;
+  }
+}
+
+/** 패링 시도 시작: 연속 시도면 단계가 올라가 판정이 짧아진다 */
+export function startParryAttempt(f, frame) {
+  const P = B.guard.parry;
+  const p = f.parry;
+  const chained = frame - p.lastAttempt <= P.chainFrames;
+  p.tier = chained ? Math.min(p.tier + 1, P.window.length - 1) : 0;
+  p.start = frame;
+  p.window = P.window[p.tier];
+  p.resolved = false;
+  p.lastAttempt = frame;
+}
+
+/** 프레임 끝: 패링 판정이 끝났는데 맞지 않았고 버튼도 뗐으면 헛패링 경직 */
+export function tickParry(f, frame) {
+  const p = f.parry;
+  if (p.lock > 0) p.lock--;
+  if (!p.resolved && frame - p.start >= p.window - 1) {
+    p.resolved = true;
+    if (!f.prevInput.guard) { p.lock = p.lockMax = B.guard.parry.recovery[p.tier]; }
   }
 }
 

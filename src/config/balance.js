@@ -20,6 +20,10 @@ export const STAGE = {
 };
 
 export const BALANCE = {
+  // 공격 리듬 (모든 무기 공통): 예비 동작 ×windup, 후딜 ×recovery (무기별 공격 시간 배율과 곱해짐)
+  // 모티브처럼 "읽히는 예비 동작 + 짧은 후딜" → 연타보다 읽기·패링 중심의 흐름
+  timing: { windup: 1.45, recovery: 0.8 },   // [TEMP]
+
   fighter: {
     maxHp: 1200,          // [TEMP] 밸런스: 1000→1200 (경기 시간 확보, 가드/궁극기 활용 기회 증가)
     maxStamina: 100,
@@ -67,8 +71,12 @@ export const BALANCE = {
   guard: {
     // 가드 버튼을 누르고 있는 것만으로는 게이지가 소모되지 않는다.
     normalParryDamageRate: 0.5,   // 일반 패링: 원래 피해의 50%
-    perfectWindow: 6,             // [TEMP] 가드 입력 후 이 프레임 이내 피격 → 완벽패링 (7→6, 공격이 느려진 만큼 정확도 요구)
-    perfectRearm: 24,             // [TEMP] 연타 방지: 직전 가드 입력과 최소 간격 (22→24)
+    // 완벽패링 (모티브: Dueling Grounds 의 패링 단계)
+    // 가드를 누른 순간부터 window[단계] 프레임 안에 맞으면 완벽패링.
+    // chainFrames 안에 다시 누르면 단계가 올라가 판정이 짧아지고(14→10→8),
+    // 판정 안에 맞지 않았는데 버튼을 떼고 있으면(=막기로 넘어가지 않음) 헛패링 경직 recovery[단계](6→12→18) 동안 아무것도 못 한다.
+    parry: { window: [14, 10, 8], recovery: [6, 12, 18], chainFrames: 60 },
+    parryPostureDamage: 18,       // [TEMP] 완벽패링 성공 시 공격자의 가드(자세) 게이지 감소 → 0이면 가드 브레이크
     perfectDamageRatio: 1 / 50,   // [TEMP] 완벽패링 피해 = 최대 체력의 1/50
     perfectGuardCost: 6,          // [TEMP] 완벽패링 시 가드 게이지 소모
     perfectStun: 38,              // [TEMP] 완벽패링당한 공격자의 행동 불가 시간 (느려진 반격에 맞춰 28→42)

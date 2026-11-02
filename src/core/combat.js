@@ -47,9 +47,8 @@ export function collectHits(attacker, defender) {
 
 /** 완벽패링 판정: 가드 중 + 최근 가드 입력 + 연타 방지 조건 */
 export function isPerfectTiming(defender, frame) {
-  const sincePress = frame - defender.guardPress;
-  const gap = defender.guardPress - defender.prevGuardPress;
-  return sincePress >= 0 && sincePress <= B.guard.perfectWindow && gap >= B.guard.perfectRearm;
+  const p = defender.parry;
+  return !p.resolved && frame - p.start >= 0 && frame - p.start < p.window;
 }
 
 function facesAttacker(defender, attacker) {
@@ -139,11 +138,17 @@ function resolve(A, D, hit, kind, frame) {
     D.state = S.GUARD;
     D.timer = 0;
     // 공격자는 공격이 끊기고 잠시 행동 불가
+    D.parry.resolved = true;
+    D.parry.tier = -1; // 성공하면 연속 시도 단계 초기화
     interrupt(A);
     if (A.y > 0) { A.vy = Math.min(A.vy, 0); }
     A.state = S.PARRIED;
     A.timer = G.perfectStun;
     A.vx = 0;
+    // 공격자의 자세(가드) 게이지 감소 → 무너지면 가드 브레이크 (피니셔 허용)
+    A.guard -= G.parryPostureDamage;
+    A.lastGuardUse = frame;
+    if (A.guard <= 0) triggerGuardBreak(A);
     gainUlt(D, B.ultGain.perfectParry);
     gainUlt(A, B.ultGain.perfectParried);
     D.stats.perfects++;

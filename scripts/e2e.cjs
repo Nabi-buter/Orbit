@@ -41,7 +41,8 @@ function assert(c, msg) { if (!c) throw new Error('E2E 실패: ' + msg); console
     await shot(page, '01-title');
 
     // 조작법 (마우스)
-    await clickArt(213, 177);
+    const helpBtn = await page.evaluate(() => { const b = window.__game.screen.buttons[2]; return [b.x + 10, b.y + 6]; });
+    await clickArt(helpBtn[0], helpBtn[1]);
     assert(await scene() === 'help', '조작법 화면 (마우스 클릭)');
     await key('Escape');
     assert(await scene() === 'title', '조작법 → 타이틀');

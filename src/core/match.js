@@ -7,7 +7,7 @@
 import { BALANCE, STAGE, FPS } from '../config/balance.js';
 import { getWeapon, DEFAULT_WEAPON } from '../config/weapons.js';
 import { createFighter, S, EMPTY_INPUT } from './fighter.js';
-import { processInput, tickBuffer } from './actions.js';
+import { processInput, tickBuffer, tickParry } from './actions.js';
 import { integrate, resolveBodies, updateFacing, advanceTimers } from './physics.js';
 import { collectHits, applyHits } from './combat.js';
 
@@ -49,6 +49,7 @@ export class Match {
 
     for (const f of this.fighters) {
       advanceTimers(f, frame);
+      tickParry(f, frame);
       tickBuffer(f);
     }
 

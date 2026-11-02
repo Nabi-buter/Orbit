@@ -57,7 +57,9 @@ export function createFighter({ id, x, facing, weapon }) {
     lastGuardUse: -9999,
 
     guardPress: -9999,      // 최근 가드 입력 프레임
-    prevGuardPress: -9999,  // 그 이전 가드 입력 프레임 (연타 방지)
+    prevGuardPress: -9999,  // 그 이전 가드 입력 프레임
+    // 패링 시도 상태: 시작 프레임, 판정 길이, 단계(연속 시도), 헛패링 경직
+    parry: { start: -9999, window: 0, tier: -1, lastAttempt: -9999, resolved: true, lock: 0, lockMax: 1 },
 
     prevInput: { ...EMPTY_INPUT },
     buffer: null,           // 선입력 {action, dir, frames}

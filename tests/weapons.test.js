@@ -109,7 +109,7 @@ test('모든 무기: 적중·연결·일반 패링·완벽패링·가드 브레�
     [a, b] = m.fighters;
     run(m, 30, I(), I({ guard: true }));
     m.step([I({ heavy: true }), I({ guard: true })]);
-    const ev = run(m, 40, I(), I({ guard: true }));
+    const ev = run(m, WEAPONS[id].heavy.duration + 5, I(), I({ guard: true }));
     const parry = ev.find((e) => e.type === 'parry');
     assert.ok(parry, `${id} 일반 패링`);
     const firstHit = WEAPONS[id].heavy.hits[0];

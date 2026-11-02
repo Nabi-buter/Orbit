@@ -72,14 +72,15 @@ function plunge({ damage, guardDamage, landingLag, fallSpeed = 16, w = 80 }) {
 // 조정 근거와 결과는 docs/BALANCE.md, 자동 탐색 도구는 scripts/tune.js.
 // =============================================================================
 export const KNOBS = {
-  // scripts/tune.js 자동 탐색 결과 (강공 콤보 추가 후, 새 시드 검증 승률 48~54%)
+  // 공격 시간(speed)은 모티브(Dueling Grounds) 무기 성격에 맞춘 약공 발동 목표에서 예측 → 테스트(scripts/tune.js, ±10% 안)로 조정
+  // 새 시드 검증 승률 48~53%
   // 규칙: 모든 무기 강공 콤보 ≥ 2, 강공 콤보 < 약공 콤보
-  longsword: { combo: { lightMax: 3, heavyMax: 2, maxTotal: 4 }, reach: 0.99, damage: 0.96, speed: 1.27, hp: 1, guardTaken: 1 },
-  greatsword: { combo: { lightMax: 3, heavyMax: 2, maxTotal: 4 }, reach: 0.95, damage: 0.87, speed: 1.43, hp: 1, guardTaken: 1 },
-  dagger: { combo: { lightMax: 3, heavyMax: 2, maxTotal: 5 }, reach: 1.04, damage: 1.08, speed: 1.1, hp: 1, guardTaken: 1 },
-  axe: { combo: { lightMax: 3, heavyMax: 2, maxTotal: 4 }, reach: 1.01, damage: 1.01, speed: 1.4, hp: 1, guardTaken: 1 },
-  spear: { combo: { lightMax: 3, heavyMax: 2, maxTotal: 3 }, reach: 0.97, damage: 0.95, speed: 1.28, hp: 1, guardTaken: 1 },
-  knuckle: { combo: { lightMax: 5, heavyMax: 3, maxTotal: 7 }, reach: 1.05, damage: 1.14, speed: 1.09, hp: 1.07, guardTaken: 0.91 },
+  longsword: { combo: { lightMax: 3, heavyMax: 2, maxTotal: 4 }, reach: 0.98, damage: 0.95, speed: 1.39, hp: 1, guardTaken: 1 },
+  greatsword: { combo: { lightMax: 3, heavyMax: 2, maxTotal: 3 }, reach: 0.91, damage: 0.77, speed: 1.26, hp: 1, guardTaken: 1 },
+  dagger: { combo: { lightMax: 3, heavyMax: 2, maxTotal: 5 }, reach: 1.07, damage: 1.16, speed: 1.58, hp: 1, guardTaken: 1 },
+  axe: { combo: { lightMax: 3, heavyMax: 2, maxTotal: 3 }, reach: 1.01, damage: 1.01, speed: 1.49, hp: 1, guardTaken: 1 },
+  spear: { combo: { lightMax: 3, heavyMax: 2, maxTotal: 3 }, reach: 0.9, damage: 0.78, speed: 1.05, hp: 1, guardTaken: 1 },
+  knuckle: { combo: { lightMax: 5, heavyMax: 3, maxTotal: 8 }, reach: 1.16, damage: 1.23, speed: 1.51, hp: 1.07, guardTaken: 0.91 },
 };
 
 const DEFS = {
@@ -88,7 +89,7 @@ const DEFS = {
   // ---------------------------------------------------------------------------
   longsword: {
     name: '장검',
-    desc: '속도·위력·사거리가 균형 잡힌 기본 무기. 처음 시작하기 좋다.',
+    desc: '어느 거리에서도 무난하다. 패링하고 바로 받아치기 좋다.',
     color: '#9fd3ff',
     mods: { walkScale: 1, backWalkScale: 1, dashCostScale: 1 },
     lightSteps: [
@@ -125,7 +126,7 @@ const DEFS = {
   // ---------------------------------------------------------------------------
   greatsword: {
     name: '대검',
-    desc: '느리지만 한 방이 무겁다. 넓은 범위의 강공격으로 거리를 지배한다.',
+    desc: '휘두르기 전에 다 보이지만 맞으면 크게 아프다.',
     color: '#ffb36b',
     mods: { walkScale: 0.85, backWalkScale: 0.85, dashCostScale: 1.1 },
     lightSteps: [
@@ -162,7 +163,7 @@ const DEFS = {
   // ---------------------------------------------------------------------------
   dagger: {
     name: '단검',
-    desc: '매우 빠른 찌르기로 빈틈을 파고든다. 사거리가 짧다.',
+    desc: '짧고 빠르다. 붙어서 틈을 찌른다.',
     color: '#b8ffb0',
     mods: { walkScale: 1.15, backWalkScale: 1.08, dashCostScale: 0.8, dashScale: 1.2 },
     lightSteps: [
@@ -199,7 +200,7 @@ const DEFS = {
   // ---------------------------------------------------------------------------
   axe: {
     name: '도끼',
-    desc: '가드 게이지를 크게 깎는 강타로 방어를 무너뜨린다.',
+    desc: '막는 상대의 자세를 무너뜨린다. 가드만 하면 깨진다.',
     color: '#ff8b8b',
     mods: { walkScale: 0.95, backWalkScale: 0.9, dashCostScale: 1 },
     lightSteps: [
@@ -236,7 +237,7 @@ const DEFS = {
   // ---------------------------------------------------------------------------
   spear: {
     name: '창',
-    desc: '가장 긴 사거리. 거리를 유지하며 찌르기로 견제한다. 품에 파고들면 약하다.',
+    desc: '가장 멀리서 찌른다. 품으로 파고들면 곤란하다.',
     color: '#d6a8ff',
     mods: { walkScale: 0.9, backWalkScale: 1.0, dashCostScale: 1.1 },
     lightSteps: [
@@ -273,7 +274,7 @@ const DEFS = {
   // ---------------------------------------------------------------------------
   knuckle: {
     name: '너클',
-    desc: '초근접 연타. 한 대는 약하지만 끊임없이 몰아친다.',
+    desc: '한 대는 가볍지만 쉬지 않고 이어진다. 붙어야 산다.',
     color: '#ffe36b',
     mods: { walkScale: 1.25, backWalkScale: 1.05, dashCostScale: 0.7, dashScale: 1.35 },
     lightSteps: [
@@ -381,7 +382,7 @@ export function finalizeTiming() {
 export function buildWeapon(id, kn = KNOBS[id]) {
   const w = DEFS[id];
   const k = kn.speed ?? 1;
-  const tune = (d) => tempo(scaleDef(d, kn), k);
+  const tune = (d) => tempo(scaleDef(d, kn), k, BALANCE.timing);
   const lights = buildSteps(w.light, w.lightSteps ?? [], FIRST_NAMES[id][0], kn.combo.lightMax).map(tune);
   const heavies = buildSteps(w.heavy, w.heavySteps ?? [], FIRST_NAMES[id][1], kn.combo.heavyMax).map(tune);
   enforceGaps([...lights, ...heavies]);

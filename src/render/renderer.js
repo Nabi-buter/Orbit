@@ -24,16 +24,17 @@ export const TEAM = [
 ];
 
 export const UI = {
-  ink: '#140f1e',
-  paper: '#efe3c4',
-  dim: '#8f86a6',
-  panel: '#221a33',
-  panel2: '#2e2445',
-  gold: '#f0c75e',
-  red: '#d9554a',
+  // 훈련장 팔레트: 콘크리트 회색 + 안전 노랑 + 홀로그램 청록
+  ink: '#12141a',
+  paper: '#eceef2',
+  dim: '#8a909e',
+  panel: '#1b1f28',
+  panel2: '#262b36',
+  gold: '#f2c14e',
+  red: '#e0564b',
   green: '#7fc47a',
-  cyan: '#6fb7c9',
-  purple: '#9b6bd3',
+  cyan: '#4fd1c1',
+  purple: '#a77bdc',
 };
 
 /** 이벤트별 히트스톱(프레임). 양쪽 동일하게 멈춤 → 공정 */
@@ -268,7 +269,7 @@ export class Renderer {
 
     // 가드: 전방 방패 호
     if (f.state === S.GUARD || f.state === S.BLOCKSTUN) {
-      const fresh = match.frame - f.guardPress <= BALANCE.guard.perfectWindow && f.guardPress - f.prevGuardPress >= BALANCE.guard.perfectRearm;
+      const fresh = !f.parry.resolved && match.frame - f.parry.start < f.parry.window;
       const low = f.guard / BALANCE.fighter.maxGuard < 0.3;
       const c = fresh ? UI.gold : low ? UI.red : UI.cyan;
       const cx = x + f.facing * 5, cy = y - 20;
@@ -329,21 +330,16 @@ export class Renderer {
   drawBackground(ctx) {
     if (!this.bg) this.bg = buildBackground();
     ctx.drawImage(this.bg, 0, 0);
-    for (const wx of [STAGE.leftWall - 40, STAGE.rightWall + 40]) {
-      const x = AX(wx), y = 92;
-      const f = (this.time >> 2) % 3;
-      rect(ctx, x - 1, y - 2 - f, 3, 3 + f, '#f08a3c');
-      rect(ctx, x, y - 4 - f, 1, 2, '#f6d36b');
-      px(ctx, x + (f === 1 ? 1 : -1), y - 5 - f, '#f6d36b');
-    }
-    if (this.time % 40 < 20) { px(ctx, 88, 30, UI.paper); px(ctx, 300, 18, UI.paper); }
+    // 천장 조명 미세한 깜빡임 + 홀로그램 표지 스캔선
+    if (this.time % 180 < 3) { ctx.globalAlpha = 0.25; rect(ctx, 96, 30, 22, 1, '#000'); ctx.globalAlpha = 1; }
+    const scan = (this.time >> 1) % 18;
+    ctx.globalAlpha = 0.5; rect(ctx, 178, 70 + scan, 72, 1, UI.cyan); ctx.globalAlpha = 1;
   }
 
   // ---------------------------------------------------------------------------
   // HUD (도트)
   // ---------------------------------------------------------------------------
   drawHud(ctx, match, opts) {
-    const F = BALANCE.fighter;
     match.fighters.forEach((f, i) => {
       if (f.hp < this.hpTrail[i]) {
         if (this.hpTrailDelay[i] > 0) this.hpTrailDelay[i]--;
@@ -352,60 +348,84 @@ export class Renderer {
       if (f.flash && match.frame - f.flash.frame === 0) this.hpTrailDelay[i] = 30;
 
       const left = i === 0;
-      const X = left ? 8 : PW - 8;
+      const X = left ? 10 : PW - 10;
       const s = left ? 1 : -1;
-      const name = opts.names?.[i] ?? `P${i + 1}`;
-      const nw = text(ctx, name, X, 6, TEAM[i].ui, { size: 11, align: left ? 'left' : 'right', shadow: UI.ink });
-      text(ctx, f.weapon.name, X + s * (nw + 5), 6, f.weapon.color, { size: 10, align: left ? 'left' : 'right', shadow: UI.ink });
-
-      bar(ctx, X, 19, 150, 7, s, [
-        { v: Math.min(this.hpTrail[i], f.maxHp) / f.maxHp, c: UI.paper },
-        { v: f.hp / f.maxHp, c: f.hp / f.maxHp < 0.25 ? UI.red : TEAM[i].main },
-      ]);
-      const sta = f.stamina / F.maxStamina;
       const al = left ? 'left' : 'right';
-      bar(ctx, X, 31, 90, 3, s, [{ v: sta, c: sta < 0.22 ? '#a58a3a' : UI.gold }]);
-      text(ctx, 'ST', X + s * 95, 29, UI.dim, { align: al });
+      const name = opts.names?.[i] ?? `P${i + 1}`;
+      // 이름 · 무기
+      const nw = text(ctx, name, X, 7, UI.paper, { size: 11, align: al, shadow: UI.ink });
+      text(ctx, f.weapon.name, X + s * (nw + 6), 7, TEAM[i].ui, { size: 11, align: al, shadow: UI.ink });
+      // 체력: 10% 눈금
+      const W = 150;
+      const x0 = left ? X : X - W;
+      rect(ctx, x0 - 1, 20, W + 2, 8, UI.ink);
+      rect(ctx, x0, 21, W, 6, '#30343f');
+      const tr = Math.round(Math.min(1, this.hpTrail[i] / f.maxHp) * W);
+      const hp = Math.round(Math.max(0, f.hp / f.maxHp) * W);
+      rect(ctx, left ? x0 : x0 + W - tr, 21, tr, 6, '#d9d2c3');
+      rect(ctx, left ? x0 : x0 + W - hp, 21, hp, 6, f.hp / f.maxHp < 0.25 ? UI.red : TEAM[i].main);
+      ctx.globalAlpha = 0.35; rect(ctx, left ? x0 : x0 + W - hp, 21, hp, 1, '#fff'); ctx.globalAlpha = 1;
+      for (let k = 1; k < 10; k++) rect(ctx, x0 + Math.round((W * k) / 10), 21, 1, 6, 'rgba(18,20,26,0.55)');
+      // 자세(가드) 게이지: 노랑, 낮으면 빨강, 무너지면 BREAK
       const broken = f.state === S.GUARD_BREAK || f.state === S.KNOCKBACK;
-      const g = f.guard / F.maxGuard;
-      bar(ctx, X, 40, 90, 3, s, [{ v: broken ? 0 : g, c: broken ? UI.purple : g < 0.3 && this.time % 20 < 10 ? UI.red : UI.cyan }], 4);
-      text(ctx, broken ? 'BREAK' : 'GD', X + s * 95, 38, broken ? UI.purple : UI.dim, { align: al });
-      const u = f.ult / F.maxUlt;
-      bar(ctx, X, 49, 110, 4, s, [{ v: u, c: u >= 1 ? (this.time % 16 < 8 ? '#f6b26b' : UI.gold) : UI.purple }], 4);
-      text(ctx, u >= 1 ? 'ULT READY' : `ULT ${Math.floor(u * 100)}%`, X + s * 115, 48, u >= 1 ? UI.gold : UI.dim, { align: al });
-      // PvE: AI 분석 표시 (CPU 쪽)
-      if (opts.ai && i === 1) {
-        text(ctx, `분석: ${opts.ai.style}${opts.ai.predict ? ` · 예상: ${opts.ai.predict}` : ''}`, X, 70, UI.dim, { size: 11, align: al, shadow: UI.ink });
+      const g = broken ? 0 : f.guard / BALANCE.fighter.maxGuard;
+      const GW = 100, gx = left ? X : X - GW;
+      rect(ctx, gx - 1, 30, GW + 2, 4, UI.ink);
+      rect(ctx, gx, 31, GW, 2, '#30343f');
+      const gl = Math.round(g * GW);
+      rect(ctx, left ? gx : gx + GW - gl, 31, gl, 2, g < 0.3 ? (this.time % 20 < 10 ? UI.red : '#f08a3c') : UI.gold);
+      if (broken) text(ctx, 'BREAK', X + s * (GW + 6), 29, UI.red, { align: al });
+      // 스태미나: 아주 얇게
+      const sw = Math.round((f.stamina / BALANCE.fighter.maxStamina) * 60);
+      rect(ctx, left ? X : X - 60, 36, 60, 1, '#30343f');
+      rect(ctx, left ? X : X - sw, 36, sw, 1, f.stamina < 22 ? '#8a7a40' : '#c9cdd6');
+      // 궁극기: 마름모 4칸 (25%씩)
+      const u = f.ult / BALANCE.fighter.maxUlt;
+      for (let k = 0; k < 4; k++) {
+        const cx = (left ? X + 156 + k * 7 : X - 156 - k * 7);
+        const fill = u >= (k + 1) / 4;
+        const c = fill ? (u >= 1 && this.time % 16 < 8 ? '#fff4c8' : UI.gold) : '#3a3f4b';
+        rect(ctx, cx - 1, 22, 3, 1, c); rect(ctx, cx - 2, 23, 5, 2, c); rect(ctx, cx - 1, 25, 3, 1, c);
       }
-      // 콤보 단계 / 숨 고르기 (HUD 아래)
+      // 콤보 단계 / 숨 고르기
       const c = f.combo;
       if (f.state === S.ATTACK && c.total > 0 && f.attack.def.name) {
         const max = f.weapon.combo[c.lastType === 'heavy' ? 'heavyMax' : 'lightMax'];
         const n = c[c.lastType];
-        text(ctx, `${f.attack.def.name} ${n}/${max}`, X, 58, n >= max ? '#f6b26b' : UI.paper, { size: 11, align: al, shadow: UI.ink });
+        text(ctx, `${f.attack.def.name} ${n}/${max}`, X, 41, n >= max ? '#f6b26b' : UI.paper, { size: 11, align: al, shadow: UI.ink });
       } else if (c.lock > 0 && f.state !== S.KO) {
-        text(ctx, '숨 고르기', X, 58, '#c9c1dc', { size: 11, align: al, shadow: UI.ink });
+        text(ctx, '숨 고르기', X, 41, UI.dim, { size: 11, align: al, shadow: UI.ink });
+      } else if (f.parry.lock > 0) {
+        text(ctx, '헛패링', X, 41, UI.dim, { size: 11, align: al, shadow: UI.ink });
+      }
+      if (opts.ai && i === 1 && this.showBoxes) {
+        text(ctx, `AI 분석: ${opts.ai.style}${opts.ai.predict ? ` · 예상 ${opts.ai.predict}` : ''}`, X, 54, UI.dim, { size: 11, align: al, shadow: UI.ink });
       }
     });
 
+    // 시간
     const t = Math.ceil(match.timeLeft / 60);
-    panel(ctx, PW / 2 - 14, 5, 28, 20, { fill: UI.panel, border: UI.paper, shadow: UI.ink });
-    text(ctx, String(t).padStart(2, '0'), PW / 2, 9, t <= 10 ? UI.red : UI.paper, { scale: 2, align: 'center' });
-
-    text(ctx, opts.net ? 'ESC 메뉴 · M 소리' : 'ESC 일시정지 · F2 판정 · M 소리', PW / 2, PH - 11, UI.dim, { size: 9, align: 'center' });
+    text(ctx, String(t).padStart(2, '0'), PW / 2, 12, t <= 10 ? UI.red : UI.paper, { scale: 2, align: 'center', shadow: UI.ink });
+    // 조작 안내는 시작 후 잠깐만
+    if (match.frame < 300) {
+      ctx.globalAlpha = Math.min(1, (300 - match.frame) / 60);
+      text(ctx, opts.net ? 'ESC 메뉴' : 'ESC 일시정지 · F2 판정 표시', PW / 2, 46, UI.dim, { size: 11, align: 'center', shadow: UI.ink });
+      ctx.globalAlpha = 1;
+    }
     if (opts.net) {
-      text(ctx, opts.net.text, PW / 2, 29, UI.cyan, { size: 9, align: 'center', shadow: UI.ink });
+      text(ctx, opts.net.text, PW / 2, 31, UI.cyan, { size: 11, align: 'center', shadow: UI.ink });
       if (opts.net.waiting) text(ctx, '상대 입력을 기다리는 중…', PW / 2, 70, UI.gold, { size: 12, align: 'center', shadow: UI.ink });
-      if (opts.net.desync) text(ctx, '동기화 오류 감지', PW / 2, 40, UI.red, { size: 10, align: 'center', shadow: UI.ink });
+      if (opts.net.desync) text(ctx, '동기화 오류 감지', PW / 2, 44, UI.red, { size: 11, align: 'center', shadow: UI.ink });
     }
   }
 
   drawIntro(ctx, intro) {
     const str = intro.text;
-    rect(ctx, 0, 96, PW, 34, UI.ink);
-    rect(ctx, 0, 97, PW, 1, UI.paper);
-    rect(ctx, 0, 128, PW, 1, UI.paper);
-    text(ctx, str, PW / 2, 103, str === 'FIGHT!' ? UI.gold : UI.paper, { scale: 3, align: 'center' });
+    const fight = str === 'FIGHT!';
+    ctx.globalAlpha = 0.6; rect(ctx, 0, 104, PW, 22, UI.ink); ctx.globalAlpha = 1;
+    rect(ctx, PW / 2 - 60, 104, 120, 1, fight ? UI.gold : UI.dim);
+    rect(ctx, PW / 2 - 60, 125, 120, 1, fight ? UI.gold : UI.dim);
+    text(ctx, fight ? 'FIGHT' : 'READY', PW / 2, 108, fight ? UI.gold : UI.paper, { scale: 2, align: 'center', shadow: UI.ink });
   }
 }
 
@@ -425,49 +445,49 @@ function bar(ctx, X, y, w, h, s, layers, segments = 0) {
 
 export function buildBackground() {
   const { canvas, ctx: g } = createArtCanvas();
-  const bands = ['#1d1830', '#251d3d', '#2f2349', '#3b2a55', '#4d335f', '#5f3d66'];
-  const bandH = 22;
-  for (let i = 0; i < bands.length; i++) {
-    rect(g, 0, i * bandH, PW, bandH, bands[i]);
-    if (i > 0) for (let x = 0; x < PW; x += 2) { px(g, x + (i % 2), i * bandH, bands[i - 1]); px(g, x + 1 - (i % 2), i * bandH + 1, bands[i - 1]); }
+  // 천장
+  rect(g, 0, 0, PW, 26, '#181b23');
+  for (let x = 0; x < PW; x += 32) rect(g, x, 0, 2, 26, '#20242e');
+  // 매달린 조명 (가로 형광등)
+  for (const lx of [40, 96, 170, 250, 330, 390]) {
+    rect(g, lx + 10, 18, 1, 12, '#2a2f3a');
+    rect(g, lx, 30, 22, 2, '#dfe8f0');
+    g.globalAlpha = 0.08; rect(g, lx - 10, 32, 42, 40, '#dfe8f0'); g.globalAlpha = 1;
   }
-  rect(g, 0, bands.length * bandH, PW, PH, bands.at(-1));
-  let seed = 11;
-  const rnd = () => ((seed = (seed * 16807) % 2147483647) / 2147483647);
-  for (let i = 0; i < 60; i++) px(g, Math.floor(rnd() * PW), Math.floor(rnd() * 90), rnd() < 0.3 ? '#efe3c4' : '#8f86a6');
-  disc(g, 330, 48, 14, '#efe3c4');
-  disc(g, 335, 44, 3, '#d8c9a6'); disc(g, 326, 54, 2, '#d8c9a6'); disc(g, 338, 55, 1, '#d8c9a6');
-  const mountain = (base, amp, color, step, phase) => {
-    for (let x = 0; x < PW; x += step) {
-      const h = Math.round((Math.abs(Math.sin(x * 0.013 + phase)) * amp + Math.abs(Math.sin(x * 0.041 + phase)) * amp * 0.35) / 2) * 2;
-      rect(g, x, base - h, step, PH, color);
-    }
-  };
-  mountain(150, 46, '#2a2142', 3, 1.2);
-  mountain(172, 28, '#211a35', 2, 4.1);
-  for (let x = 0; x < PW; x += 1) {
-    const top = 180 - ((Math.floor(x / 8) % 2) * 3);
-    rect(g, x, top, 1, GROUND - top, '#1a1429');
-  }
-  for (let x = 4; x < PW; x += 24) rect(g, x, 186, 2, 4, '#f0c75e');
+  // 벽 패널
+  rect(g, 0, 26, PW, GROUND - 26, '#3a404d');
+  for (let y = 26; y < GROUND; y += 38) rect(g, 0, y, PW, 1, '#2d323d');
+  for (let x = 0; x < PW; x += 48) { rect(g, x, 26, 1, GROUND - 26, '#2d323d'); rect(g, x + 1, 26, 1, GROUND - 26, '#454c5a'); }
+  // 패널 디테일 (볼트, 환기구)
+  for (let x = 0; x < PW; x += 48) for (let y = 26; y < GROUND - 30; y += 38) { g.fillStyle = '#525a69'; g.fillRect(x + 4, y + 4, 1, 1); g.fillRect(x + 43, y + 4, 1, 1); }
+  for (const vx of [20, 340]) { rect(g, vx, 120, 30, 14, '#2b303a'); for (let k = 0; k < 5; k++) rect(g, vx + 2, 122 + k * 2, 26, 1, '#3f4552'); }
+  // 홀로그램 표지 (훈련장 번호)
+  rect(g, 176, 68, 76, 22, '#162a2c');
+  g.globalAlpha = 0.9; rect(g, 176, 68, 76, 1, '#4fd1c1'); rect(g, 176, 89, 76, 1, '#4fd1c1'); g.globalAlpha = 1;
+  bitTextBg(g, 'RANGE 01', 214, 72, '#4fd1c1');
+  bitTextBg(g, 'DUEL ZONE', 214, 81, '#2f8f86');
+  // 벽 아래 안전 줄무늬
+  for (let x = 0; x < PW; x += 1) rect(g, x, GROUND - 8, 1, 6, Math.floor((x + 3) / 6) % 2 ? '#e7b93c' : '#1d1f25');
+  rect(g, 0, GROUND - 9, PW, 1, '#22252d');
+  rect(g, 0, GROUND - 2, PW, 2, '#2a2e37');
+  // 경기장 경계 기둥
   for (const wx of [STAGE.leftWall - 40, STAGE.rightWall + 40]) {
     const x = Math.round(wx / PX);
-    rect(g, x - 5, 96, 11, GROUND - 96, '#2c2340');
-    rect(g, x - 5, 96, 1, GROUND - 96, '#4a3d63');
-    rect(g, x + 5, 96, 1, GROUND - 96, '#140f1e');
-    for (let y = 104; y < GROUND; y += 10) rect(g, x - 5, y, 11, 1, '#1d1630');
-    rect(g, x - 7, 93, 15, 3, '#4a3d63');
-    rect(g, x - 2, 90, 5, 3, '#6a5a86');
+    rect(g, x - 4, 26, 9, GROUND - 26, '#2a2f3a');
+    rect(g, x - 4, 26, 1, GROUND - 26, '#4a5261');
+    for (let y = 40; y < GROUND - 10; y += 12) rect(g, x - 3, y, 7, 2, '#e7b93c');
   }
-  rect(g, 0, GROUND, PW, PH - GROUND, '#3a3150');
-  rect(g, 0, GROUND, PW, 1, '#8a7aa8');
-  rect(g, 0, GROUND + 1, PW, 1, '#5b4d78');
-  for (let row = 0; row < 6; row++) {
-    const y = GROUND + 3 + row * 6;
-    rect(g, 0, y + 5, PW, 1, '#2a233c');
-    const off = (row % 2) * 10;
-    for (let x = -20 + off; x < PW; x += 20) rect(g, x, y, 1, 5, '#2a233c');
+  // 바닥 (콘크리트) + 레인 표시
+  rect(g, 0, GROUND, PW, PH - GROUND, '#565c68');
+  rect(g, 0, GROUND, PW, 1, '#8a909e');
+  for (let x = 0; x < PW; x += 3) for (let y = GROUND + 2; y < PH; y += 4) if ((x * 7 + y * 13) % 11 === 0) rect(g, x, y, 1, 1, '#4c525d');
+  for (let x = 8; x < PW; x += 20) rect(g, x, GROUND + 14, 10, 1, '#e7b93c');
+  for (const [mx, label] of [[PW / 2, '0M'], [PW / 2 - 100, '10M'], [PW / 2 + 100, '10M']]) {
+    rect(g, Math.round(mx), GROUND + 2, 1, 8, '#c9ccd4');
+    bitTextBg(g, label, mx, GROUND + 18, '#7d838f');
   }
-  rect(g, 0, PH - 14, PW, 14, '#1d1830');
+  rect(g, 0, PH - 10, PW, 10, '#3f444e');
   return canvas;
 }
+
+function bitTextBg(g, str, cx, y, color) { text(g, str, cx, y, color, { align: 'center' }); }

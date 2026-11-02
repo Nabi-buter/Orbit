@@ -157,9 +157,9 @@ export class App {
       color = m.winner === mine ? UI.gold : UI.red;
     } else { title = `P${m.winner + 1} WIN!`; color = TEAM[m.winner].ui; }
     const reason = m.endReason === 'ko' ? 'K.O.' : '시간 종료 · 남은 체력 판정';
-    const lines = m.fighters.map((f, i) => [
-      `${names[i]} (${WEAPONS[this.weapons[i]].name})  체력 ${Math.ceil(f.hp)}  적중 ${f.stats.hitsLanded}  패링 ${f.stats.parries}  완벽 ${f.stats.perfects}`,
-      TEAM[i].ui,
+    const lines = m.fighters.flatMap((f, i) => [
+      [`${names[i]} · ${WEAPONS[this.weapons[i]].name}`, TEAM[i].ui],
+      [`체력 ${Math.ceil(f.hp)} · 적중 ${f.stats.hitsLanded} · 완벽패링 ${f.stats.perfects}`, UI.dim],
     ]);
     const items = online
       ? [['로비로 (재대결)', () => this.toOnline(), true], ['나가기', () => this.leaveOnline()]]
