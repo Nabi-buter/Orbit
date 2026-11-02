@@ -43,8 +43,10 @@ export const MOTIONS = {
   },
   greatsword: {
     '좌상단 베기': { beats: [{ from: P(2.6, -8, 106, { lean: -0.15 }), to: P(-0.95, 34, 64, { lean: 0.3, stride: 18, crouch: 6 }) }] },
+    '횡베기': { beats: [{ from: P(1.1, -14, 92, { lean: -0.22 }), to: P(-0.15, 40, 82, { lean: 0.34, stride: 18 }) }] },
     '우상단 베기': { beats: [{ from: P(-1.25, 24, 60, { lean: 0.3, crouch: 8, stride: 12 }), to: P(2.0, 12, 110, { lean: -0.08, stride: 6 }) }] },
     '대검 내려찍기': { beats: [{ from: P(3.0, -6, 114, { lean: -0.28, crouch: -4 }), to: P(-1.3, 34, 56, { lean: 0.42, stride: 20, crouch: 16 }) }] },
+    '대검 올려베기': { beats: [{ from: P(-1.35, 30, 54, { lean: 0.4, crouch: 16, stride: 18 }), to: P(2.3, 10, 116, { lean: -0.12, stride: 8, crouch: -4 }) }] },
   },
   dagger: {
     '찌르기': { beats: [{ from: P(-0.1, 6, 80), to: P(-0.05, 44, 84, { lean: 0.25, stride: 16 }) }] },
@@ -60,6 +62,7 @@ export const MOTIONS = {
   },
   axe: {
     '내려찍기': { beats: [{ from: P(2.35, 0, 108, { lean: -0.12 }), to: P(-0.95, 30, 66, { lean: 0.26, stride: 12, crouch: 6 }) }] },
+    '올려치기': { beats: [{ from: P(-1.0, 28, 62, { lean: 0.22, crouch: 8, stride: 10 }), to: P(1.9, 16, 108, { lean: 0.02, stride: 10 }) }] },
     '옆치기': { beats: [{ from: P(0.95, -18, 88, { lean: -0.25 }), to: P(0.05, 38, 84, { lean: 0.3, stride: 16 }) }] },
     '도끼 찍기': { beats: [{ from: P(3.05, -6, 116, { lean: -0.28, crouch: -3 }), to: P(-1.25, 30, 56, { lean: 0.42, stride: 16, crouch: 14 }) }] },
     '휘둘러 찍기': { beats: [{ from: P(0.4, -20, 74, { lean: -0.2, crouch: 4 }), to: P(-0.55, 42, 70, { lean: 0.36, stride: 18 }) }] },

@@ -16,6 +16,7 @@ function mash(id, keys, frames = 200, distance = 55) {
     const key = typeof keys === 'function' ? keys(names.length) : keys;
     m.step([I({ [key]: k % 2 === 0 }), I({ guard: true })]);
     m.fighters[1].x = a.x + distance; // 거리 고정 (넉백 무시)
+    m.fighters[1].guard = 100;        // 가드 브레이크(→특수강공) 없이 콤보 상한만 검사
     if (a.attack && a.attack !== last && (a.attack.def.kind === 'light' || a.attack.def.kind === 'heavy')) names.push(a.attack.def.name);
     last = a.attack;
     if (a.combo.lock > 0 && !lockSeen) lockSeen = a.combo.lockMax;
@@ -24,19 +25,19 @@ function mash(id, keys, frames = 200, distance = 55) {
   return { names, lock: lockSeen, m };
 }
 
-test('대검 약공 연타: 좌상단 베기 → 우상단 베기 (2콤보) 후 숨 고르기', () => {
+test('대검 약공 연타: 좌상단 베기 → 횡베기 → 우상단 베기 (3콤보) 후 숨 고르기', () => {
   const { names, lock } = mash('greatsword', 'light');
-  assert.deepEqual(names, ['좌상단 베기', '우상단 베기']);
+  assert.deepEqual(names, ['좌상단 베기', '횡베기', '우상단 베기']);
   assert.equal(lock, WEAPONS.greatsword.combo.fullLag);
 });
 
-test('무기별 약공 연타 상한: 대검 2, 단검 3, 너클 5 ...', () => {
+test('무기별 약공 연타 상한: 대검 3, 단검 3, 너클 5 ...', () => {
   for (const id of WEAPON_ORDER) {
     const { names, lock } = mash(id, 'light', 400);
     assert.equal(names.length, WEAPONS[id].combo.lightMax, `${id}: ${names.join('→')}`);
     assert.equal(lock, WEAPONS[id].combo.fullLag, `${id} 딜레이`);
   }
-  assert.equal(WEAPONS.greatsword.combo.lightMax, 2);
+  assert.equal(WEAPONS.greatsword.combo.lightMax, 3);
   assert.equal(WEAPONS.dagger.combo.lightMax, 3);
   assert.equal(WEAPONS.knuckle.combo.lightMax, 5);
 });
@@ -204,4 +205,31 @@ test('실전: 콤보를 끝까지 쓴 뒤 상대의 약공이 먼저 들어간�
     }
     assert.equal(first, 1, `${id}: 콤보 후 상대가 먼저 때림`);
   }
+});
+
+test('강공도 콤보가 있고, 모든 무기에서 강공 콤보는 약공 콤보보다 적다', () => {
+  for (const id of WEAPON_ORDER) {
+    const c = WEAPONS[id].combo;
+    assert.ok(c.heavyMax >= 2, `${id}: 강공 콤보 ${c.heavyMax}`);
+    assert.ok(c.heavyMax < c.lightMax, `${id}: 강공 ${c.heavyMax} < 약공 ${c.lightMax}`);
+    assert.ok(new Set(WEAPONS[id].heavies.map((d) => d.name)).size === WEAPONS[id].heavies.length, `${id}: 강공 단계마다 다른 기술`);
+  }
+});
+
+test('강공 연타: 약공처럼 이어지지만, 헛치면 약공보다 늦게 이어진다', () => {
+  const chainAt = (key) => {
+    const m = setup({ distance: 500, weapons: ['longsword', 'longsword'] });
+    const a = m.fighters[0];
+    m.step([I({ [key]: true }), I()]);
+    const first = a.attack;
+    for (let k = 0; k < 120; k++) {
+      m.step([I({ [key]: k % 2 === 0 }), I()]);
+      if (a.attack && a.attack !== first) return { at: first.frame - first.def.cancelFrom, name: a.attack.def.name };
+    }
+    return null;
+  };
+  const l = chainAt('light'), h = chainAt('heavy');
+  assert.ok(h, '헛친 강공도 다음 단계로 연결');
+  assert.equal(h.name, WEAPONS.longsword.heavies[1].name);
+  assert.ok(h.at >= BALANCE.combo.heavyWhiffDelay - 1 && h.at > l.at, `강공 지연 ${h.at} > 약공 지연 ${l.at}`);
 });

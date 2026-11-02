@@ -72,13 +72,14 @@ function plunge({ damage, guardDamage, landingLag, fallSpeed = 16, w = 80 }) {
 // 조정 근거와 결과는 docs/BALANCE.md, 자동 탐색 도구는 scripts/tune.js.
 // =============================================================================
 export const KNOBS = {
-  // scripts/tune.js 자동 탐색 결과 (8단계 딜레이 체계 기준, 새 시드 검증 승률 47~54%)
+  // scripts/tune.js 자동 탐색 결과 (강공 콤보 추가 후, 새 시드 검증 승률 48~54%)
+  // 규칙: 모든 무기 강공 콤보 ≥ 2, 강공 콤보 < 약공 콤보
   longsword: { combo: { lightMax: 3, heavyMax: 2, maxTotal: 4 }, reach: 0.99, damage: 0.96, speed: 1.27, hp: 1, guardTaken: 1 },
-  greatsword: { combo: { lightMax: 2, heavyMax: 1, maxTotal: 3 }, reach: 0.96, damage: 0.89, speed: 1.41, hp: 1, guardTaken: 1 },
+  greatsword: { combo: { lightMax: 3, heavyMax: 2, maxTotal: 4 }, reach: 0.95, damage: 0.87, speed: 1.43, hp: 1, guardTaken: 1 },
   dagger: { combo: { lightMax: 3, heavyMax: 2, maxTotal: 5 }, reach: 1.04, damage: 1.08, speed: 1.1, hp: 1, guardTaken: 1 },
-  axe: { combo: { lightMax: 2, heavyMax: 2, maxTotal: 3 }, reach: 1.01, damage: 1.01, speed: 1.4, hp: 1, guardTaken: 1 },
+  axe: { combo: { lightMax: 3, heavyMax: 2, maxTotal: 4 }, reach: 1.01, damage: 1.01, speed: 1.4, hp: 1, guardTaken: 1 },
   spear: { combo: { lightMax: 3, heavyMax: 2, maxTotal: 3 }, reach: 0.97, damage: 0.95, speed: 1.28, hp: 1, guardTaken: 1 },
-  knuckle: { combo: { lightMax: 5, heavyMax: 3, maxTotal: 7 }, reach: 1.04, damage: 1.12, speed: 1.1, hp: 1.07, guardTaken: 0.91 },
+  knuckle: { combo: { lightMax: 5, heavyMax: 3, maxTotal: 7 }, reach: 1.05, damage: 1.14, speed: 1.09, hp: 1.07, guardTaken: 0.91 },
 };
 
 const DEFS = {
@@ -128,9 +129,12 @@ const DEFS = {
     color: '#ffb36b',
     mods: { walkScale: 0.85, backWalkScale: 0.85, dashCostScale: 1.1 },
     lightSteps: [
+      { name: '횡베기', motion: 'slash-wide', dmg: 1.0, startup: 1 },
       { name: '우상단 베기', motion: 'slash-rev', dmg: 1.1, push: 6, recovery: 6 },
     ],
-    heavySteps: [],
+    heavySteps: [
+      { name: '대검 올려베기', motion: 'rising', dmg: 1.15, startup: 3, recovery: 6, push: 6 },
+    ],
     light: attack({
       id: 'light', kind: 'light', motion: 'slash-wide', cancelFrom: 17,
       hits: [singleHit({
@@ -199,6 +203,7 @@ const DEFS = {
     color: '#ff8b8b',
     mods: { walkScale: 0.95, backWalkScale: 0.9, dashCostScale: 1 },
     lightSteps: [
+      { name: '올려치기', motion: 'rising', dmg: 1.0, startup: 1 },
       { name: '옆치기', motion: 'slash-rev', dmg: 1.15, guard: 1.25, recovery: 6 },
     ],
     heavySteps: [

@@ -42,6 +42,7 @@ function identityOK() {
   const avg = (a) => a.reduce((s, h) => s + h.damage, 0) / a.length;
   if (avg(hits('dagger')) <= avg(hits('knuckle')) * 1.4) return '단검 한 타 > 너클 한 타 ×1.4';
   if (W.knuckle.combo.lightMax <= W.dagger.combo.lightMax) return '너클 콤보 > 단검 콤보';
+  for (const id of WEAPON_ORDER) if (W[id].combo.heavyMax >= W[id].combo.lightMax) return '강공 콤보 < 약공 콤보';
   return null;
 }
 
