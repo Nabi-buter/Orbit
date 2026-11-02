@@ -6,7 +6,7 @@
 
 import { S } from '../core/fighter.js';
 import { drawWeapon, drawFist, weaponSprite } from './weaponArt.js';
-import { line, disc, px, PX } from './pixel.js';
+import { line, disc, px, rect, PX } from './pixel.js';
 import { evalMotion, backHand, STANCE } from './motions.js';
 
 const SWING = {
@@ -45,7 +45,7 @@ export function attackPhase(attack) {
  */
 export function computePose(f, frame) {
   const p = {
-    lean: 0, crouch: 0, legSpread: 10, stride: 0, tuck: 0,
+    lean: 0, crouch: 0, legSpread: 16, stride: 0, tuck: 0,
     wAngle: 0.75, hand: [20, 82], hand2: [8, 78], spin: 0, extraFist: null,
   };
   const breathe = Math.sin(frame * 0.08) * 1.5;
@@ -205,10 +205,10 @@ function joint(a, b, bend) {
 }
 
 /**
- * 픽셀 캐릭터 그리기
+ * 픽셀 캐릭터 그리기 — 마네킹형 디자인 (큰 타원 머리 + 눈 띠, 어두운 어깨·관절, 밝은 가슴)
  * @param ctx 아트(저해상도) 캔버스 컨텍스트
  * @param ax, ay 발밑 위치 (아트 좌표)
- * @param pal {body, dark, light, accent, skin, hair, outline, weapon}
+ * @param pal {body, light, shade, joint, pad, visor, outline, weapon}
  * @returns {hand:[x,y], wAngle, pose} 무기 궤적 계산용
  */
 export function drawFighter(ctx, f, ax, ay, pal, frame, opts = {}) {
@@ -223,80 +223,123 @@ export function drawFighter(ctx, f, ax, ay, pal, frame, opts = {}) {
     return [ax + (facing * x) / PX, ay - y / PX];
   };
 
-  const hip = [0, 56 - pose.crouch];
+  const hip = [0, 54 - pose.crouch];
   const shoulder = [hip[0] + Math.sin(pose.lean) * 40, hip[1] + Math.cos(pose.lean) * 40];
-  const head = [shoulder[0] + Math.sin(pose.lean) * 17, shoulder[1] + Math.cos(pose.lean) * 17];
+  const chest = [hip[0] + Math.sin(pose.lean) * 26, hip[1] + Math.cos(pose.lean) * 26];
+  const head = [shoulder[0] + Math.sin(pose.lean) * 21, shoulder[1] + Math.cos(pose.lean) * 21];
   const dx = shoulder[0], dy = shoulder[1] - 96;
   const hand = [pose.hand[0] + dx, pose.hand[1] + dy];
   const hand2 = [pose.hand2[0] + dx, pose.hand2[1] + dy];
   const tuck = pose.tuck * 24;
   const footB = [-pose.legSpread - pose.stride * 0.5 - tuck * 0.3, tuck];
   const footF = [pose.legSpread + pose.stride * 0.5 + tuck * 0.2, tuck * 0.7];
-  const kneeB = joint(hip, footB, -1), kneeF = joint(hip, footF, -1);
-  const elbB = joint(shoulder, hand2, 1), elbF = joint(shoulder, hand, 1);
+  // 두 다리는 골반 양옆에서 시작 (겹쳐 보이지 않도록)
+  const hipB = [hip[0] - 4, hip[1]], hipF = [hip[0] + 4, hip[1]];
+  const kneeB = joint(hipB, footB, -1), kneeF = joint(hipF, footF, -1);
+  const shB = [shoulder[0] - 5, shoulder[1] - 2];
+  const elbB = joint(shB, hand2, 1), elbF = joint(shoulder, hand, 1);
   const extra = pose.extraFist ? [pose.extraFist[0] + dx, pose.extraFist[1] + dy] : null;
-  const elbX = extra ? joint(shoulder, extra, 1) : null;
+  const elbX = extra ? joint(shB, extra, 1) : null;
 
   const tint = opts.tint;
-  const C = tint ? { body: tint, dark: tint, light: tint, accent: tint, skin: tint, hair: tint } : pal;
+  const C = tint
+    ? { body: tint, light: tint, shade: tint, joint: tint, pad: tint, visor: tint }
+    : pal;
   const O = opts.silhouette ? null : pal.outline;
 
-  const seg = (pts, c, w) => { for (let i = 1; i < pts.length; i++) { const a = P(pts[i - 1]), b = P(pts[i]); line(ctx, a[0], a[1], b[0], b[1], c, w); } };
-  const parts = [
-    // [점들, 색, 두께] — 뒤에서 앞 순서
-    [[hip, kneeB, footB], C.dark, 3],
-    [[shoulder, elbB, hand2], C.dark, 2],
-    ...(extra ? [[[shoulder, elbX, extra], C.dark, 2]] : []),
-    [[hip, shoulder], C.body, 5],
-    [[hip, kneeF, footF], C.body, 3],
-  ];
+  const seg = (a, b, c, w) => { const p = P(a), q = P(b); line(ctx, p[0], p[1], q[0], q[1], c, w); };
+  const sq = (pt, c, n = 2) => { const p = P(pt); rect(ctx, Math.round(p[0]) - (n >> 1), Math.round(p[1]) - (n >> 1), n, n, c); };
+  /** 부위 하나: 외곽선(두께+2) → 채색. 뒤에서 앞 순서로 호출하면 겹친 곳에 경계선이 생긴다 */
+  const part = (pts, c, w) => {
+    if (O) for (let k = 1; k < pts.length; k++) seg(pts[k - 1], pts[k], O, w + 2);
+    for (let k = 1; k < pts.length; k++) seg(pts[k - 1], pts[k], c, w);
+  };
+  const bootAt = (ft, c) => {
+    const p = P(ft); const x0 = Math.round(p[0]) - (facing > 0 ? 1 : 3), y0 = Math.round(p[1]);
+    if (O) rect(ctx, x0 - 1, y0 - 2, 6, 4, O);
+    rect(ctx, x0, y0 - 1, 4, 1, c); rect(ctx, x0, y0, 4, 1, C.joint);
+  };
+  /** 둥근 어깨 패드 (외곽선 + 위쪽 하이라이트) */
+  const pad = (pt, r) => {
+    const p = P(pt);
+    if (O) disc(ctx, p[0], p[1], r + 1, O);
+    disc(ctx, p[0], p[1], r, C.pad);
+    if (!tint) px(ctx, p[0] - facing, p[1] - r + 1, C.light);
+  };
   const hd = P(head);
 
-  // 1) 외곽선
-  if (O) {
-    for (const [pts, , w] of parts) seg(pts, O, w + 2);
-    seg([shoulder, elbF, hand], O, 4);
-    disc(ctx, hd[0], hd[1], 5, O);
-  }
-  // 2) 몸
-  for (const [pts, c, w] of parts) seg(pts, c, w);
-  // 몸통 밝은 면 / 허리띠
-  const sh = P(shoulder), hp = P(hip);
-  line(ctx, sh[0] + facing, sh[1] + 1, hp[0] + facing, hp[1] - 1, C.light, 1);
-  const belt = P([hip[0], hip[1] + 4]);
-  line(ctx, belt[0] - 2, belt[1], belt[0] + 2, belt[1], C.accent, 1);
-  // 신발
-  for (const ft of [footB, footF]) { const p = P(ft); line(ctx, p[0], p[1], p[0] + facing * 2, p[1], O ?? C.dark, 1); }
-  // 머리
-  disc(ctx, hd[0], hd[1], 4, C.skin);
-  line(ctx, hd[0] - 4, hd[1] - 3, hd[0] + 4, hd[1] - 3, C.hair, 1);
-  line(ctx, hd[0] - 4, hd[1] - 4, hd[0] + 3, hd[1] - 4, C.hair, 1);
-  px(ctx, hd[0] - facing * 4, hd[1] - 2, C.hair);
-  // 머리띠 + 휘날리는 끈
-  line(ctx, hd[0] - 4, hd[1] - 1, hd[0] + 4, hd[1] - 1, C.accent, 1);
-  const wave = Math.round(Math.sin(frame * 0.25 + f.id * 2));
-  line(ctx, hd[0] - facing * 5, hd[1] - 1, hd[0] - facing * 8, hd[1] + wave, C.accent, 1);
-  px(ctx, hd[0] - facing * 9, hd[1] + 1 + wave, C.accent);
-  // 눈
-  if (!tint) px(ctx, hd[0] + facing * 2, hd[1], pal.outline);
+  // 뒷다리
+  part([hipB, kneeB, footB], C.shade, 3);
+  sq(kneeB, C.joint);
+  bootAt(footB, C.shade);
+  // 뒷팔
+  part([shB, elbB, hand2], C.shade, 3);
+  if (extra) part([shB, elbX, extra], C.shade, 3);
+  pad(shB, 2);
+  // 몸통: 복부(어둡게, 좁게) + 가슴(밝게, 넓게)
+  part([hip, chest], C.shade, 5);
+  part([chest, shoulder], C.body, 7);
+  const ch = P(chest), sh = P(shoulder);
+  line(ctx, ch[0] + facing * 2, ch[1] - 1, sh[0] + facing * 2, sh[1] + 1, C.light, 1);
+  sq(hip, C.joint);
+  // 목 + 머리 (달걀형, 위쪽 하이라이트, 얼굴 쪽 눈 띠)
+  part([[shoulder[0], shoulder[1] + 2], [head[0], head[1] - 9]], C.shade, 3);
+  drawHead(ctx, hd[0], hd[1], facing, C, O, !tint ? pal : null);
+  // 앞다리
+  part([hipF, kneeF, footF], C.body, 4);
+  sq(kneeF, C.joint);
+  bootAt(footF, C.body);
 
-  // 3) 무기 + 앞팔
+  // 무기 + 앞팔 + 앞 어깨 패드
   const hA = P(hand);
   if (f.weapon.id !== 'knuckle') {
     let ang = pose.wAngle;
     if (spin) ang += spin;
     if (!opts.silhouette) drawWeapon(ctx, f.weapon.id, pal.weapon, hA[0], hA[1], ang, facing);
   }
-  seg([shoulder, elbF, hand], C.body, 2);
+  part([shoulder, elbF, hand], C.body, 3);
+  sq(elbF, C.joint, 1);
+  pad(shoulder, 2);
   if (f.weapon.id === 'knuckle') {
     if (!opts.silhouette) {
       drawFist(ctx, pal.weapon, hA[0], hA[1], facing);
       if (extra) { const e = P(extra); drawFist(ctx, pal.weapon, e[0], e[1], facing); }
     }
   } else {
-    px(ctx, hA[0], hA[1], C.skin);
+    if (O) rect(ctx, Math.round(hA[0]) - 2, Math.round(hA[1]) - 2, 4, 4, O);
+    rect(ctx, Math.round(hA[0]) - 1, Math.round(hA[1]) - 1, 2, 2, C.body); // 주먹
   }
   return { hand: hA, wAngle: pose.wAngle + spin, pose };
+}
+
+/** 달걀형 머리 (폭 9 × 높이 10), 위쪽 하이라이트, 얼굴 쪽 눈 띠 */
+const HEAD_ROWS = [3, 7, 9, 9, 9, 9, 9, 7, 7, 5];
+function drawHead(ctx, cx, cy, facing, C, O, pal) {
+  cx = Math.round(cx); cy = Math.round(cy) - 5;
+  if (O) HEAD_ROWS.forEach((w, r) => { ctx.fillStyle = O; ctx.fillRect(cx - (w >> 1) - 1, cy + r - 1, w + 2, 3); });
+  HEAD_ROWS.forEach((w, r) => { ctx.fillStyle = r >= 8 ? C.shade : C.body; ctx.fillRect(cx - (w >> 1), cy + r, w, 1); });
+  // 하이라이트 (뒤통수 위쪽)
+  ctx.fillStyle = C.light;
+  ctx.fillRect(cx - facing * 2 - 1, cy + 1, 2, 1);
+  ctx.fillRect(cx - facing * 3 - (facing > 0 ? 0 : 0), cy + 2, 1, 2);
+  if (pal) {
+    // 눈 띠: 얼굴 쪽, 가운데보다 조금 아래
+    ctx.fillStyle = pal.outline;
+    ctx.fillRect(facing > 0 ? cx + 1 : cx - 4, cy + 5, 4, 1);
+    ctx.fillRect(facing > 0 ? cx + 2 : cx - 3, cy + 6, 2, 1);
+    ctx.fillStyle = pal.visor;
+    ctx.fillRect(cx + facing * 3, cy + 5, 1, 1);
+  }
+}
+
+/** 채운 타원 */
+function ellipse(ctx, cx, cy, rx, ry, c) {
+  cx = Math.round(cx); cy = Math.round(cy);
+  ctx.fillStyle = c;
+  for (let y = -ry; y <= ry; y++) {
+    const hw = Math.floor(rx * Math.sqrt(Math.max(0, 1 - (y * y) / (ry * ry + 0.6))) + 0.35);
+    ctx.fillRect(cx - hw, cy + y, hw * 2 + 1, 1);
+  }
 }
 
 /** 무기 끝(칼끝) 아트 좌표 — 휘두르기 궤적용 */

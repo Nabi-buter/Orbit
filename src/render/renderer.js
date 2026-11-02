@@ -18,8 +18,9 @@ export const AX = (x) => Math.round(x / PX);
 export const AY = (y) => Math.round((GY - y) / PX);
 
 export const TEAM = [
-  { body: '#3d6db3', dark: '#24406e', light: '#78a6dd', accent: '#f0c75e', skin: '#e8b48e', hair: '#3a2a2a', outline: '#140f1e', main: '#5d93d9', ui: '#78a6dd' },
-  { body: '#b3473f', dark: '#6c2730', light: '#e07f6a', accent: '#efe3c4', skin: '#d99c76', hair: '#efe3c4', outline: '#140f1e', main: '#d9655b', ui: '#e07f6a' },
+  // 마네킹형 회색 몸 + 팀 색 어깨 패드/눈빛
+  { body: '#c9cad6', light: '#eeeef6', shade: '#8e90a6', joint: '#545670', pad: '#4b5d8f', visor: '#8fbcff', outline: '#16121f', main: '#5d93d9', ui: '#78a6dd' },
+  { body: '#d0c8c8', light: '#f4eeee', shade: '#9a8c90', joint: '#5e4f58', pad: '#8f4e4b', visor: '#ff9a86', outline: '#16121f', main: '#d9655b', ui: '#e07f6a' },
 ];
 
 export const UI = {
@@ -166,7 +167,7 @@ export class Renderer {
       const x = AX(f.x), y = AY(f.y);
       if (prev !== f.state) {
         if (f.state === S.ULTIMATE) {
-          this.fx.text('궁극기!', x, y - 56, TEAM[i].light, 3, 50);
+          this.fx.text('궁극기!', x, y - 56, TEAM[i].ui, 3, 50);
           this.fx.ring(x, y - 20, '#f08a3c', 32, 18);
           this.fx.screenFlash('#000000', 0.35);
           playEvent('ult');
@@ -207,7 +208,7 @@ export class Renderer {
     match.fighters.forEach((f) => this.drawShadow(ctx, f));
     match.fighters.forEach((f, i) => this.trails[i].forEach((t) => {
       ctx.globalAlpha = 0.35 * (t.life / 12);
-      drawFighter(ctx, t.snap, AX(t.snap.x), AY(t.snap.y), TEAM[i], match.frame, { tint: TEAM[i].light, silhouette: true });
+      drawFighter(ctx, t.snap, AX(t.snap.x), AY(t.snap.y), TEAM[i], match.frame, { tint: TEAM[i].main, silhouette: true });
       ctx.globalAlpha = 1;
     }));
     const order = [0, 1].sort((a, b) => (match.fighters[a].attack ? 1 : 0) - (match.fighters[b].attack ? 1 : 0));

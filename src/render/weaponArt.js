@@ -1,106 +1,129 @@
 // =============================================================================
-// 무기 픽셀 스프라이트 (절차적 생성)
+// 무기 픽셀 스프라이트 (참고 도안 형태 기반, 회색 단색 금속 톤)
 // 스프라이트 좌표: +x = 칼끝 방향, 위쪽(row 감소) = 칼등. pivot = 손이 쥐는 지점.
+// 외곽선은 outlined() 가 자동으로 붙인다.
 // =============================================================================
 
 import { makeSprite, sset, outlined, blit } from './pixel.js';
 
 export const PAL = {
-  outline: '#1b1424',
-  steelHi: '#f4f1e8',
-  steel: '#b9c2cc',
-  steelLo: '#6c7486',
-  wood: '#9a6233',
-  woodLo: '#5f3a1c',
-  grip: '#4b2a36',
-  gold: '#e3a83b',
-  goldLo: '#a86a20',
-  iron: '#4d4f5e',
+  outline: '#16121f',
+  white: '#fbfbff',
+  light: '#e1e2ec',
+  mid: '#a6a8bb',
+  dark: '#5b5d73',
+  grip: '#3b3b4e',
+  gripLo: '#2a2a38',
 };
+const { white: W, light: L, mid: M, dark: D, grip: G, gripLo: GL } = PAL;
 
-function blade({ grip, guardH, len, thick, accent, fuller = false, pommel = true }) {
-  const h = Math.max(guardH, thick) + 2;
-  const mid = Math.floor(h / 2);
-  const w = grip + 1 + len;
-  const s = makeSprite(w, h, [grip - 1, mid]);
-  for (let x = 0; x < grip; x++) { sset(s, x, mid, PAL.grip); if (thick >= 4) sset(s, x, mid - 1, PAL.grip); }
-  if (pommel) { sset(s, 0, mid, accent); sset(s, 0, mid - 1, accent); }
-  const g0 = mid - Math.floor(guardH / 2);
-  for (let y = 0; y < guardH; y++) sset(s, grip, g0 + y, y === 0 ? PAL.gold : accent);
-  const top = mid - Math.floor((thick - 1) / 2);
-  for (let x = 0; x < len; x++) {
-    const bx = grip + 1 + x;
-    const taper = len - x <= 2 ? (len - x === 1 ? thick - 1 : Math.ceil(thick / 2) - 1) : 0;
-    for (let y = 0; y < thick - taper; y++) {
-      const yy = top + y + (len - x <= 2 ? Math.floor(taper / 2) : 0);
-      let c = PAL.steel;
-      if (y === 0) c = PAL.steelHi;
-      else if (y === thick - taper - 1) c = PAL.steelLo;
-      if (fuller && y === Math.floor(thick / 2) && x > 2 && x < len - 6) c = PAL.steelLo;
-      sset(s, bx, yy, c);
+/** 둥근 폼멜 (자루 끝 구슬) */
+function pommel(s, x, mid, accent) {
+  sset(s, x, mid - 1, L); sset(s, x + 1, mid - 1, M);
+  sset(s, x, mid, M); sset(s, x + 1, mid, M);
+  sset(s, x, mid + 1, D); sset(s, x + 1, mid + 1, D);
+  if (accent) sset(s, x + 1, mid, accent);
+}
+
+/** 칼날 한 열: 반폭 hw, 위 가장자리 밝게 / 아래 어둡게 (fuller=true 면 가운데 어두운 홈) */
+function bladeColumn(s, x, mid, hw, fuller = false) {
+  for (let r = -hw; r <= hw; r++) {
+    let c = M;
+    if (r === -hw) c = hw === 0 ? W : W;
+    else if (r < 0) c = L;
+    else if (r === hw) c = D;
+    if (fuller && hw >= 2 && (r === 0 || r === 1)) c = D;
+    if (hw === 0) c = L;
+    sset(s, x, mid + r, c);
+  }
+}
+
+function longsword(accent) {
+  const H = 9, mid = 4;
+  const s = makeSprite(32, H, [6, mid]);
+  pommel(s, 0, mid, accent);
+  for (let x = 2; x <= 6; x++) sset(s, x, mid, x % 2 ? G : GL);
+  for (let y = mid - 3; y <= mid + 3; y++) { sset(s, 7, y, y === mid + 3 ? D : L); sset(s, 8, y, y === mid + 3 ? D : M); }
+  for (let x = 9; x <= 30; x++) bladeColumn(s, x, mid, x >= 30 ? 0 : x >= 28 ? (x === 28 ? 1 : 0) : 1);
+  return s;
+}
+
+function greatsword(accent) {
+  const H = 13, mid = 6;
+  const s = makeSprite(44, H, [8, mid]);
+  pommel(s, 0, mid, accent); sset(s, 2, mid, M);
+  for (let x = 3; x <= 8; x++) { sset(s, x, mid, x % 2 ? G : GL); }
+  sset(s, 4, mid - 1, L); // 자루 띠
+  for (let y = mid - 4; y <= mid + 4; y++) { sset(s, 9, y, Math.abs(y - mid) === 4 ? M : D); sset(s, 10, y, Math.abs(y - mid) === 4 ? L : M); }
+  for (let x = 11; x <= 42; x++) {
+    const fromTip = 42 - x;
+    const hw = fromTip >= 8 ? 3 : Math.floor(fromTip / 2.5);
+    bladeColumn(s, x, mid, hw, true);
+  }
+  return s;
+}
+
+function dagger(accent) {
+  const H = 9, mid = 4;
+  const s = makeSprite(21, H, [4, mid]);
+  pommel(s, 0, mid, accent);
+  for (let x = 2; x <= 4; x++) sset(s, x, mid, x % 2 ? G : GL);
+  for (let y = mid - 3; y <= mid + 3; y++) { sset(s, 5, y, y === mid + 3 ? D : L); sset(s, 6, y, y === mid + 3 ? D : M); }
+  const leaf = [1, 2, 2, 2, 2, 2, 1, 1, 1, 1, 0, 0, 0]; // 잎사귀형: 넓어졌다 가늘어짐
+  leaf.forEach((hw, i) => bladeColumn(s, 7 + i, mid, hw));
+  return s;
+}
+
+function axe(accent) {
+  const H = 17, mid = 5;
+  const s = makeSprite(37, H, [10, mid]);
+  pommel(s, 0, mid, accent);
+  for (let x = 2; x <= 32; x++) { sset(s, x, mid, G); sset(s, x, mid + 1, GL); }
+  // 날 고정부 + 위쪽 돌기
+  for (let x = 26; x <= 29; x++) for (let y = mid - 2; y <= mid + 3; y++) sset(s, x, y, D);
+  for (let x = 27; x <= 29; x++) { sset(s, x, mid - 3, M); }
+  sset(s, 28, mid - 4, M); sset(s, 27, mid - 4, L);
+  // 초승달 날 (휘두르는 방향 = 아래쪽)
+  const cols = { 23: [3, 5], 24: [3, 7], 25: [4, 8], 26: [4, 9], 27: [4, 10], 28: [4, 10], 29: [4, 11], 30: [3, 11], 31: [2, 11], 32: [1, 10], 33: [1, 9], 34: [2, 7] };
+  for (const [xs, [t, b]] of Object.entries(cols)) {
+    const x = Number(xs);
+    for (let r = t; r <= b; r++) {
+      const edge = r === b || x >= 33;
+      const nearEdge = r === b - 1 || (x === 32 && r >= b - 2);
+      sset(s, x, mid + r, edge ? W : nearEdge ? L : r <= t + 1 ? D : M);
     }
   }
   return s;
 }
 
-function axe(accent) {
-  const s = makeSprite(34, 15, [9, 10]);
-  for (let x = 0; x < 32; x++) { sset(s, x, 10, PAL.wood); sset(s, x, 11, PAL.woodLo); }
-  sset(s, 0, 10, accent); sset(s, 0, 11, accent);
-  // 도끼 머리 (칼등 쪽으로 넓은 초승달)
-  const head = [
-    '   ####',
-    '  ######',
-    ' #######',
-    '########',
-    '#######',
-    '####',
-    '###',
-    '##',
-    '##',
-    '#',
-  ];
-  head.forEach((row, j) => [...row].forEach((ch, i) => {
-    if (ch !== '#') return;
-    const x = 23 + i, y = 1 + j;
-    sset(s, x, y, i >= row.length - 1 ? PAL.steelHi : j < 2 ? PAL.steel : PAL.steel);
-  }));
-  for (let j = 0; j < 10; j++) sset(s, 23, 1 + j + 1 > 11 ? 11 : 1 + j, PAL.steelLo);
-  sset(s, 30, 3, accent); sset(s, 30, 4, accent);
-  return s;
-}
-
 function spear(accent) {
-  const s = makeSprite(56, 7, [17, 3]);
-  for (let x = 0; x < 46; x++) sset(s, x, 3, x % 9 === 0 ? PAL.woodLo : PAL.wood);
-  sset(s, 0, 3, PAL.iron);
-  for (let x = 43; x < 46; x++) { sset(s, x, 2, accent); sset(s, x, 3, accent); sset(s, x, 4, accent); }
-  const tip = ['  ##', '#######', '##########', '#######', '  ##'];
-  tip.forEach((row, j) => [...row].forEach((ch, i) => {
-    if (ch === '#') sset(s, 46 + i, 1 + j, j === 1 ? PAL.steelHi : j === 3 ? PAL.steelLo : PAL.steel);
-  }));
+  const H = 9, mid = 4;
+  const s = makeSprite(58, H, [19, mid]);
+  pommel(s, 0, mid, accent);
+  for (let x = 2; x <= 44; x++) sset(s, x, mid, x % 9 === 0 ? GL : G);
+  // 고리
+  for (let x = 44; x <= 46; x++) for (let y = mid - 1; y <= mid + 1; y++) sset(s, x, y, y === mid - 1 ? L : y === mid + 1 ? D : M);
+  // 마름모형 창날
+  const head = [1, 2, 3, 3, 2, 2, 1, 1, 1, 0, 0];
+  head.forEach((hw, i) => bladeColumn(s, 47 + i, mid, hw));
   return s;
 }
 
-function fist(accent) {
+function knuckle(accent) {
+  // 세로 방향: 손가락 고리 4개(오른쪽) + 손바닥 쪽 바(왼쪽)
   const rows = [
-    ' ### ',
-    '#####',
-    '#####',
-    '#####',
-    ' ### ',
+    ' LLL ',
+    'DL.LD',
+    'DLLLD',
+    'DL.LD',
+    'DLLLD',
+    'DL.LD',
+    ' DDD ',
   ];
-  const s = makeSprite(7, 5, [2, 2]);
-  rows.forEach((row, j) => [...row].forEach((ch, i) => { if (ch === '#') sset(s, i, j, j === 1 ? PAL.steel : PAL.iron); }));
-  for (let j = 0; j < 5; j += 2) sset(s, 5, j, accent);
-  sset(s, 6, 2, accent);
+  const pal = { L, M, D };
+  const s = makeSprite(5, rows.length, [1, 3]);
+  rows.forEach((row, y) => [...row].forEach((ch, x) => { if (pal[ch]) sset(s, x, y, pal[ch]); }));
   return s;
-}
-
-function flipV(src) {
-  const o = makeSprite(src.w, src.h, [src.pivot[0], src.h - 1 - src.pivot[1]]);
-  for (let y = 0; y < src.h; y++) for (let x = 0; x < src.w; x++) sset(o, x, src.h - 1 - y, src.px[y * src.w + x]);
-  return o;
 }
 
 const cache = new Map();
@@ -109,17 +132,8 @@ const cache = new Map();
 export function weaponSprite(id, accent) {
   const key = id + accent;
   if (cache.has(key)) return cache.get(key);
-  let s;
-  switch (id) {
-    case 'longsword': s = blade({ grip: 5, guardH: 5, len: 24, thick: 3, accent }); break;
-    case 'greatsword': s = blade({ grip: 7, guardH: 9, len: 33, thick: 5, accent, fuller: true }); break;
-    case 'dagger': s = blade({ grip: 3, guardH: 3, len: 11, thick: 3, accent }); break;
-    case 'axe': s = flipV(axe(accent)); break; // 날이 휘두르는 방향(아래쪽)을 향하도록
-    case 'spear': s = spear(accent); break;
-    case 'knuckle': s = fist(accent); break;
-    default: s = blade({ grip: 4, guardH: 4, len: 20, thick: 3, accent });
-  }
-  s = outlined(s, PAL.outline);
+  const make = { longsword, greatsword, dagger, axe, spear, knuckle }[id] ?? longsword;
+  const s = outlined(make(null), PAL.outline);
   cache.set(key, s);
   return s;
 }
@@ -131,21 +145,30 @@ export function drawWeapon(ctx, id, accent, x, y, angleLocal, facing) {
   blit(ctx, s, x, y, theta, facing < 0);
 }
 
+/** 너클 장착 주먹 */
 export function drawFist(ctx, accent, x, y, facing) {
   blit(ctx, weaponSprite('knuckle', accent), x, y, facing > 0 ? 0 : Math.PI, facing < 0);
 }
 
-/** UI 아이콘: 중심 (cx, cy) 에 비스듬히 */
+/** 정수 배 확대 스프라이트 (아이콘용) */
+const scaledCache = new Map();
+function scaled(src, k) {
+  const key = src;
+  if (scaledCache.has(key)) return scaledCache.get(key);
+  const o = makeSprite(src.w * k, src.h * k, [src.pivot[0] * k, src.pivot[1] * k]);
+  for (let y = 0; y < o.h; y++) for (let x = 0; x < o.w; x++) sset(o, x, y, src.px[Math.floor(y / k) * src.w + Math.floor(x / k)]);
+  scaledCache.set(key, o);
+  return o;
+}
+
+/** UI 아이콘: 중심 (cx, cy) 에 참고 도안처럼 비스듬히 */
 export function drawWeaponIcon(ctx, id, accent, cx, cy) {
+  const s = weaponSprite(id, accent);
   if (id === 'knuckle') {
-    const s = weaponSprite('knuckle', accent);
-    blit(ctx, s, cx - 5, cy + 1, 0);
-    blit(ctx, s, cx + 4, cy - 2, 0);
+    blit(ctx, scaled(s, 2), cx, cy + 1, -Math.PI / 2); // 작으므로 2배, 고리가 위로 오게 가로로
     return;
   }
-  const s = weaponSprite(id, accent);
-  const ang = -0.6;
-  // 스프라이트 중심이 (cx, cy) 에 오도록 손잡이 위치 계산
+  const ang = -0.75;
   const half = s.w / 2 - s.pivot[0];
   blit(ctx, s, cx - Math.cos(ang) * half, cy - Math.sin(ang) * half, ang);
 }

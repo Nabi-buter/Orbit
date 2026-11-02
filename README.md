@@ -40,7 +40,8 @@ Esc/P 일시정지 · F2 판정 박스 · M 소리 켜기/끄기. 키 배치는 
   판정·수치와 분리되어 있어 그림만 바꿔도 게임 규칙은 그대로다.
 - **모션 뷰어**: `npm start` 후 `http://localhost:8080/tools/motions.html` — 모든 무기·단계를 재생/프레임 순서로 보여 준다 (판정 프레임 강조).
 - **무기 그림**: `src/render/weaponArt.js` (절차 생성 스프라이트, 문자열 그림 `spriteFrom()` 으로 교체 가능)
-- **캐릭터 그림**: `src/render/fighterArt.js` 의 `drawFighter()`
+- **캐릭터 그림**: `src/render/fighterArt.js` 의 `drawFighter()` — 마네킹형(큰 달걀형 머리·눈 띠·어두운 어깨/관절). 팀 색은 `renderer.js` 의 `TEAM`
+- **캐릭터 확대 보기**: `http://localhost:8080/tools/sprite-zoom.html` (여러 자세를 8배로)
 
 ## 모드 / 무기
 
