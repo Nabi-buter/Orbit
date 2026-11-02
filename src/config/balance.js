@@ -21,7 +21,7 @@ export const STAGE = {
 
 export const BALANCE = {
   fighter: {
-    maxHp: 1000,          // [TEMP]
+    maxHp: 1200,          // [TEMP] 밸런스: 1000→1200 (경기 시간 확보, 가드/궁극기 활용 기회 증가)
     maxStamina: 100,
     maxGuard: 100,
     maxUlt: 100,
@@ -72,8 +72,8 @@ export const BALANCE = {
     perfectDamageRatio: 1 / 50,   // [TEMP] 완벽패링 피해 = 최대 체력의 1/50
     perfectGuardCost: 6,          // [TEMP] 완벽패링 시 가드 게이지 소모
     perfectStun: 28,              // [TEMP] 완벽패링당한 공격자의 행동 불가 시간
-    regenDelay: 80,               // [TEMP] 마지막 패링 후 회복 시작까지
-    regenPerFrame: 1.2,           // [TEMP] 초당 72 회복 (비교적 빠름)
+    regenDelay: 100,              // [TEMP] 마지막 패링 후 회복 시작까지 (밸런스: 80→100)
+    regenPerFrame: 1.0,           // [TEMP] 초당 60 회복 (비교적 빠름, 밸런스: 72→60)
   },
 
   guardBreak: {
@@ -95,11 +95,12 @@ export const BALANCE = {
 
   ultGain: {
     // 궁극기 게이지 충전량 (공격별 ultGainScale 을 곱한다)
-    dealHit: 7,           // [TEMP] 공격 적중
-    dealGuarded: 3,       // [TEMP] 상대가 일반 패링
-    takeHit: 5,           // [TEMP] 피격
-    guard: 4,             // [TEMP] 일반 패링 성공
-    perfectParry: 9,      // [TEMP] 완벽패링 성공
+    // 밸런스: 전체 약 55% 하향 (AI 시뮬레이션에서 20초 경기당 궁극기 2회 → 너무 잦음)
+    dealHit: 3,           // [TEMP] 공격 적중
+    dealGuarded: 1.5,     // [TEMP] 상대가 일반 패링
+    takeHit: 2.5,         // [TEMP] 피격
+    guard: 2.5,           // [TEMP] 일반 패링 성공
+    perfectParry: 8,      // [TEMP] 완벽패링 성공 (상대적으로 보상 유지)
     perfectParried: 0,    // [TEMP] 완벽패링당함
   },
 

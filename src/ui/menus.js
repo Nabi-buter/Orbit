@@ -87,7 +87,8 @@ export class Menus {
     b1.dataset.autofocus = '';
     b1.onclick = onPvP; b2.onclick = onPvE; b3.onclick = onHelp;
     list.append(b1, b2, b3);
-    n.append(list, el('p', 'hint', '방향키/WASD 로 이동 · Enter/J 로 선택'));
+    n.append(list, el('p', 'hint', '방향키/WASD 로 이동 · Enter/J 로 선택'),
+      el('p', 'rotate-hint', '키보드 게임입니다. 가로 화면 / PC 환경을 권장합니다.'));
     this.show(n);
   }
 

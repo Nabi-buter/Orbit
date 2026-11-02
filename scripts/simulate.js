@@ -11,16 +11,22 @@ let seed = 12345;
 export function playMatch(w1, w2, d1 = diff, d2 = diff) {
   const m = new Match({ weapons: [w1, w2] });
   const ais = [new AIController(d1, seed++), new AIController(d2, seed++)];
-  const counts = { hit: 0, parry: 0, perfect: 0, guardBreak: 0, special: 0, armored: 0 };
+  const counts = { hit: 0, parry: 0, perfect: 0, guardBreak: 0, special: 0, armored: 0, ultCast: 0, ultHit: 0, ultPerfected: 0 };
+  const prev = ['', ''];
   while (!m.over) {
     const ev = m.step([ais[0].think(m, 0), ais[1].think(m, 1)]);
-    for (const e of ev) if (e.type in counts) counts[e.type]++;
+    for (const e of ev) {
+      if (e.type in counts) counts[e.type]++;
+      if (e.kind === 'ultimate' && e.type === 'hit') counts.ultHit++;
+      if (e.kind === 'ultimate' && e.type === 'perfect') counts.ultPerfected++;
+    }
+    m.fighters.forEach((f, i) => { if (f.state === 'ultimate' && prev[i] !== 'ultimate') counts.ultCast++; prev[i] = f.state; });
   }
   return { winner: m.winner, frames: m.frame, counts, hp: m.fighters.map((f) => f.hp) };
 }
 
 const wins = Object.fromEntries(WEAPON_ORDER.map((w) => [w, { w: 0, l: 0, d: 0 }]));
-const total = { hit: 0, parry: 0, perfect: 0, guardBreak: 0, special: 0, armored: 0 };
+const total = { hit: 0, parry: 0, perfect: 0, guardBreak: 0, special: 0, armored: 0, ultCast: 0, ultHit: 0, ultPerfected: 0 };
 let frames = 0, games = 0, timeouts = 0;
 const table = [];
 for (const a of WEAPON_ORDER) {
@@ -54,3 +60,4 @@ for (const w of WEAPON_ORDER) {
 }
 console.log(`\n평균 경기 시간 ${(frames / games / 60).toFixed(1)}s, 시간 초과 ${timeouts}/${games}`);
 console.log('경기당 이벤트', Object.fromEntries(Object.entries(total).map(([k, v]) => [k, (v / games).toFixed(1)])));
+console.log(`궁극기: 시전 ${total.ultCast}회 → 적중 ${(total.ultHit / total.ultCast * 100).toFixed(0)}%, 완벽패링당함 ${(total.ultPerfected / total.ultCast * 100).toFixed(0)}%, 빗나감 ${((total.ultCast - total.ultHit - total.ultPerfected) / total.ultCast * 100).toFixed(0)}%`);

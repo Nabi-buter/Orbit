@@ -13,6 +13,7 @@
 // 무기 수준 보정(mods):
 //   walkScale / backWalkScale : 걷기 속도 배율
 //   dashCostScale             : 대시 스태미나 소모 배율
+//   dashScale                 : 대시 이동 거리 배율 (무적 없음 규칙은 동일)
 // =============================================================================
 
 import { BALANCE } from './balance.js';
@@ -58,7 +59,7 @@ const DEFS = {
     light: attack({
       id: 'light', kind: 'light', motion: 'slash', cancelFrom: 12,
       hits: [singleHit({
-        startup: 5, active: 3, recovery: 12,
+        startup: 5, active: 3, recovery: 14,              // 밸런스: 후딜 12→14 (헛친 약공 반격 가능)
         box: { x: 10, y: 35, w: 85, h: 60 },
         damage: 40, guardDamage: 10, hitstun: 8, blockstun: 8, push: 10,
       })],
@@ -67,7 +68,7 @@ const DEFS = {
       id: 'heavy', kind: 'heavy', motion: 'overhead', cancelFrom: 26,
       moves: [{ from: 6, to: 14, vx: 3 }],
       hits: [singleHit({
-        startup: 14, active: 4, recovery: 20,
+        startup: 14, active: 4, recovery: 24,             // 밸런스: 후딜 20→24 (최대 사거리 강공 남발 억제)
         box: { x: 10, y: 25, w: 135, h: 85 },
         damage: 95, guardDamage: 26, hitstun: 12, blockstun: 12, push: 20, ultGainScale: 1.6,
       })],
@@ -84,22 +85,22 @@ const DEFS = {
     name: '대검',
     desc: '느리지만 한 방이 무겁다. 넓은 범위의 강공격으로 거리를 지배한다.',
     color: '#ffb36b',
-    mods: { walkScale: 0.88, backWalkScale: 0.88, dashCostScale: 1.1 },
+    mods: { walkScale: 0.85, backWalkScale: 0.85, dashCostScale: 1.1 },
     light: attack({
       id: 'light', kind: 'light', motion: 'slash-wide', cancelFrom: 17,
       hits: [singleHit({
-        startup: 8, active: 4, recovery: 16,
-        box: { x: 5, y: 25, w: 120, h: 80 },
-        damage: 58, guardDamage: 16, hitstun: 10, blockstun: 10, push: 12,
+        startup: 9, active: 4, recovery: 20,
+        box: { x: 5, y: 25, w: 110, h: 80 },
+        damage: 50, guardDamage: 16, hitstun: 10, blockstun: 10, push: 12,
       })],
     }),
     heavy: attack({
       id: 'heavy', kind: 'heavy', motion: 'overhead-big', cancelFrom: 36,
       moves: [{ from: 8, to: 20, vx: 2.5 }],
       hits: [singleHit({
-        startup: 22, active: 6, recovery: 26,
-        box: { x: -10, y: 0, w: 185, h: 140 },   // 넓은 호(머리 위~발밑)
-        damage: 150, guardDamage: 36, hitstun: 14, blockstun: 14, push: 26, ultGainScale: 1.8,
+        startup: 22, active: 6, recovery: 30,
+        box: { x: -10, y: 0, w: 168, h: 140 },   // 넓은 호(머리 위~발밑)
+        damage: 140, guardDamage: 36, hitstun: 14, blockstun: 14, push: 26, ultGainScale: 1.8,
       })],
     }),
     plunge: plunge({ damage: 95, guardDamage: 28, landingLag: 28, w: 110 }),
@@ -114,19 +115,19 @@ const DEFS = {
     name: '단검',
     desc: '매우 빠른 찌르기로 빈틈을 파고든다. 사거리가 짧다.',
     color: '#b8ffb0',
-    mods: { walkScale: 1.12, backWalkScale: 1.08, dashCostScale: 0.85 },
+    mods: { walkScale: 1.15, backWalkScale: 1.08, dashCostScale: 0.8, dashScale: 1.2 },
     light: attack({
       id: 'light', kind: 'light', motion: 'stab', cancelFrom: 9,
       hits: [singleHit({
-        startup: 3, active: 2, recovery: 11,
-        box: { x: 10, y: 45, w: 62, h: 45 },
-        damage: 34, guardDamage: 8, hitstun: 6, blockstun: 6, push: 8,
+        startup: 3, active: 2, recovery: 12,
+        box: { x: 10, y: 45, w: 66, h: 45 },
+        damage: 36, guardDamage: 8, hitstun: 6, blockstun: 6, push: 8,
       })],
     }),
     heavy: attack({
       id: 'heavy', kind: 'heavy', motion: 'double-stab', cancelFrom: 23,
       moves: [{ from: 3, to: 10, vx: 5.5 }],     // 순간 파고들기
-      duration: 32,
+      duration: 35,
       hits: [
         { from: 8, to: 9, box: { x: 10, y: 40, w: 70, h: 50 }, damage: 32, guardDamage: 9, hitstun: 10, blockstun: 9, push: 4, ultGainScale: 0.8 },
         { from: 14, to: 15, box: { x: 10, y: 40, w: 75, h: 50 }, damage: 40, guardDamage: 11, hitstun: 9, blockstun: 9, push: 14, ultGainScale: 0.8 },
@@ -148,18 +149,18 @@ const DEFS = {
     light: attack({
       id: 'light', kind: 'light', motion: 'chop', cancelFrom: 15,
       hits: [singleHit({
-        startup: 7, active: 3, recovery: 15,
+        startup: 6, active: 3, recovery: 17,             // 밸런스: 발생 7→6 (근접 견제력 보강)
         box: { x: 10, y: 30, w: 92, h: 70 },
-        damage: 48, guardDamage: 22, hitstun: 9, blockstun: 11, push: 7,
+        damage: 50, guardDamage: 22, hitstun: 9, blockstun: 11, push: 7,
       })],
     }),
     heavy: attack({
-      id: 'heavy', kind: 'heavy', motion: 'overhead-chop', cancelFrom: 29,
+      id: 'heavy', kind: 'heavy', motion: 'overhead-chop', cancelFrom: 30,
       moves: [{ from: 6, to: 16, vx: 2.5 }],
       hits: [singleHit({
-        startup: 18, active: 4, recovery: 24,
+        startup: 18, active: 4, recovery: 26,
         box: { x: 5, y: 10, w: 128, h: 120 },
-        damage: 115, guardDamage: 44, hitstun: 13, blockstun: 15, push: 14, ultGainScale: 1.7,
+        damage: 120, guardDamage: 44, hitstun: 13, blockstun: 15, push: 14, ultGainScale: 1.7,
       })],
     }),
     plunge: plunge({ damage: 85, guardDamage: 34, landingLag: 24, w: 90 }),
@@ -174,22 +175,22 @@ const DEFS = {
     name: '창',
     desc: '가장 긴 사거리. 거리를 유지하며 찌르기로 견제한다. 품에 파고들면 약하다.',
     color: '#d6a8ff',
-    mods: { walkScale: 0.95, backWalkScale: 1.15, dashCostScale: 1 },
+    mods: { walkScale: 0.9, backWalkScale: 1.0, dashCostScale: 1.1 },
     light: attack({
       id: 'light', kind: 'light', motion: 'thrust', cancelFrom: 15,
       hits: [singleHit({
-        startup: 7, active: 3, recovery: 16,
-        box: { x: 40, y: 55, w: 135, h: 30 },    // 가늘고 긴 찌르기 → 점프에 약함
-        damage: 36, guardDamage: 9, hitstun: 8, blockstun: 8, push: 14,
+        startup: 9, active: 3, recovery: 21,             // 밸런스: 사거리 175→152, 발생 7→9, 후딜 16→21
+        box: { x: 40, y: 55, w: 112, h: 30 },    // 가늘고 긴 찌르기 → 점프에 약함
+        damage: 28, guardDamage: 9, hitstun: 8, blockstun: 8, push: 14,
       })],
     }),
     heavy: attack({
       id: 'heavy', kind: 'heavy', motion: 'sweep', cancelFrom: 28,
       moves: [{ from: 4, to: 12, vx: 1.5 }],
       hits: [singleHit({
-        startup: 16, active: 5, recovery: 25,
-        box: { x: 25, y: 20, w: 170, h: 85 },
-        damage: 85, guardDamage: 22, hitstun: 12, blockstun: 12, push: 22, ultGainScale: 1.5,
+        startup: 17, active: 5, recovery: 31,
+        box: { x: 25, y: 20, w: 160, h: 85 },
+        damage: 78, guardDamage: 22, hitstun: 12, blockstun: 12, push: 22, ultGainScale: 1.5,
       })],
     }),
     plunge: plunge({ damage: 65, guardDamage: 18, landingLag: 24, w: 70 }),
@@ -204,21 +205,21 @@ const DEFS = {
     name: '너클',
     desc: '초근접 연타. 한 대는 약하지만 끊임없이 몰아친다.',
     color: '#ffe36b',
-    mods: { walkScale: 1.15, backWalkScale: 1.05, dashCostScale: 0.8 },
+    mods: { walkScale: 1.25, backWalkScale: 1.05, dashCostScale: 0.7, dashScale: 1.35 },
     light: attack({
-      id: 'light', kind: 'light', motion: 'jab-jab', cancelFrom: 12, duration: 19,
+      id: 'light', kind: 'light', motion: 'jab-jab', cancelFrom: 12, duration: 20,
       hits: [
-        { from: 3, to: 3, box: { x: 10, y: 55, w: 48, h: 35 }, damage: 15, guardDamage: 5, hitstun: 6, blockstun: 6, push: 2, ultGainScale: 0.6 },
-        { from: 7, to: 7, box: { x: 10, y: 55, w: 50, h: 35 }, damage: 17, guardDamage: 5, hitstun: 6, blockstun: 6, push: 6, ultGainScale: 0.6 },
+        { from: 3, to: 3, box: { x: 10, y: 55, w: 54, h: 35 }, damage: 18, guardDamage: 6, hitstun: 6, blockstun: 6, push: 2, ultGainScale: 0.6 },
+        { from: 7, to: 7, box: { x: 10, y: 55, w: 56, h: 35 }, damage: 20, guardDamage: 6, hitstun: 6, blockstun: 6, push: 6, ultGainScale: 0.6 },
       ],
     }),
     heavy: attack({
-      id: 'heavy', kind: 'heavy', motion: 'rush', cancelFrom: 24, duration: 32,
-      moves: [{ from: 2, to: 14, vx: 2.5 }],
+      id: 'heavy', kind: 'heavy', motion: 'rush', cancelFrom: 24, duration: 35,
+      moves: [{ from: 2, to: 14, vx: 4 }],        // 밸런스: 돌진 거리 32→52px (사거리 열세 보완)
       hits: [
-        { from: 6, to: 6, box: { x: 10, y: 45, w: 55, h: 45 }, damage: 16, guardDamage: 7, hitstun: 6, blockstun: 6, push: 1, ultGainScale: 0.6 },
-        { from: 10, to: 10, box: { x: 10, y: 45, w: 55, h: 45 }, damage: 16, guardDamage: 7, hitstun: 7, blockstun: 6, push: 1, ultGainScale: 0.6 },
-        { from: 15, to: 16, box: { x: 10, y: 50, w: 62, h: 60 }, damage: 28, guardDamage: 11, hitstun: 9, blockstun: 9, push: 14, ultGainScale: 0.8 },
+        { from: 6, to: 6, box: { x: 10, y: 45, w: 55, h: 45 }, damage: 19, guardDamage: 7, hitstun: 6, blockstun: 6, push: 1, ultGainScale: 0.6 },
+        { from: 10, to: 10, box: { x: 10, y: 45, w: 55, h: 45 }, damage: 19, guardDamage: 7, hitstun: 7, blockstun: 6, push: 1, ultGainScale: 0.6 },
+        { from: 15, to: 16, box: { x: 10, y: 50, w: 62, h: 60 }, damage: 31, guardDamage: 12, hitstun: 9, blockstun: 9, push: 14, ultGainScale: 0.8 },
       ],
     }),
     plunge: plunge({ damage: 50, guardDamage: 14, landingLag: 16, fallSpeed: 18, w: 60 }),

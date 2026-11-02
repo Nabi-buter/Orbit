@@ -9,7 +9,7 @@
 // =============================================================================
 
 import { BALANCE } from '../config/balance.js';
-import { reachOf } from '../core/attackDef.js';
+import { reachOf, contactFrame } from '../core/attackDef.js';
 import { S, EMPTY_INPUT, isFree } from '../core/fighter.js';
 import { dashCost } from '../core/actions.js';
 
@@ -76,6 +76,8 @@ export class AIController {
     this.nextThink = 0;
     this.lastTap = {};      // key → 마지막 누른 프레임 (엣지 생성용)
     this.watchedAttack = null;
+    this.oppAttackStarts = []; // 인지한 상대 공격 시작 시각 (연타 리듬 학습)
+    this.rhythmPlanned = -1;
   }
 
   chance(p) { return this.random() < p; }
@@ -129,9 +131,17 @@ export class AIController {
     const plunging = seen.state === S.PLUNGE;
     if ((attacking || plunging) && this.watchedAttack !== seen.atk) {
       this.watchedAttack = seen.atk;
+      this.oppAttackStarts.push(frame - seen.aframe);
+      if (!plunging) this.lastOppDef = seen.def;
+      if (this.oppAttackStarts.length > 8) this.oppAttackStarts.shift();
       const reach = plunging ? 140 : reachOf(seen.def) + 40;
-      if (dist <= reach && (isFree(me) || me.state === S.ATTACK)) this.respondToThreat(me, seen, frame, plunging);
+      const canRespond = isFree(me) || me.state === S.ATTACK || me.state === S.BLOCKSTUN || me.state === S.HITSTUN;
+      if (!plunging && dist > reachOf(seen.def) + 35 && isFree(me)) this.planWhiffPunish(me, seen, frame, dist);
+      else if (dist <= reach && canRespond) this.respondToThreat(me, seen, frame, plunging, dist);
     }
+
+    // 1-b) 연타 압박 학습: 상대가 짧은 간격으로 계속 공격하면 리듬에 맞춰 완벽패링을 노린다
+    this.rhythmParry(me, frame, dist, opp);
 
     // 2) 내 공격이 접촉 → 연결 (자기 상태는 지연 없이 안다)
     if (me.state === S.ATTACK && me.attack?.connected && me.attack.def.cancelFrom != null &&
@@ -161,6 +171,23 @@ export class AIController {
     }
     if (!STUNNED_OPP.has(seen.state)) this.punishing = false;
 
+    // 3-b) 가드 경직이 풀린 순간: 상대가 느린 공격으로 이어 올 것을 읽고 끼어들기 (심리전)
+    // (피격 경직 후에는 밀려난 거리를 상대가 다시 좁히는 동안 빠른 공격이 먼저 닿는다)
+    const fromStun = this.prevMyState === S.BLOCKSTUN || this.prevMyState === S.HITSTUN;
+    if (fromStun && me.state !== this.prevMyState && isFree(me)) {
+      const lightReach = reachOf(me.weapon.light) + 30;
+      const oppSlow = (this.lastOppDef?.hits[0].from ?? 0) >= 12;
+      const wasHit = this.prevMyState === S.HITSTUN;
+      if (dist <= lightReach && this.chance(oppSlow || wasHit ? P.aggression + 0.25 : P.aggression * 0.5)) {
+        this.release('guard');
+        this.tapAt(frame, 'light');
+      } else if (oppSlow && this.chance(P.evadeChance * 2) && me.stamina >= dashCost(me) && me.dashCooldown <= 0) {
+        this.release('guard');
+        this.tapAt(frame, 'dash', { [me.facing > 0 ? 'left' : 'right']: true });
+      }
+    }
+    this.prevMyState = me.state;
+
     // 4) 피격 경직 중이면 이어지는 공격에 대비 (가드 유지 또는 탈출 대시)
     if (me.state === S.HITSTUN && me.timer === 2 && !this.escapeDecided) {
       this.escapeDecided = true;
@@ -172,14 +199,68 @@ export class AIController {
     // 5) 궁극기 맞대응: 궁극기 인지 시 완벽패링 시도 확률↑
   }
 
-  respondToThreat(me, seen, frame, plunging) {
+  /** 최근 상대 공격 간격으로 연타 리듬 추정 */
+  pressureRhythm(frame) {
+    const st = this.oppAttackStarts.filter((t) => frame - t < 150);
+    if (st.length < 3) return null;
+    const gaps = [];
+    for (let i = 1; i < st.length; i++) gaps.push(st[i] - st[i - 1]);
+    const avg = gaps.reduce((a, b) => a + b, 0) / gaps.length;
+    const dev = Math.max(...gaps.map((g) => Math.abs(g - avg)));
+    if (avg > 45 || dev > 8) return null;
+    return { period: avg, last: st.at(-1) };
+  }
+
+  rhythmParry(me, frame, dist, opp) {
     const P = this.p;
-    // 판정까지 남은 실제 프레임 추정
+    const r = this.pressureRhythm(frame);
+    if (!r || dist > reachOf(opp.weapon.heavy) + 40) return;
+    const nextStart = r.last + r.period * Math.ceil((frame - r.last + 1) / r.period);
+    if (this.rhythmPlanned >= nextStart - 2) return;
+    this.rhythmPlanned = nextStart;
+    // 최근 관찰한 공격의 판정 시점을 기준으로 가드 재입력 (학습 정확도 = 난이도)
+    const hitAt = nextStart + (this.lastOppDef ?? opp.weapon.light).hits[0].from;
+    if (!this.chance(P.perfectChance + 0.25)) {
+      this.holdFor('guard', frame, Math.max(10, hitAt - frame + 10));
+      return;
+    }
+    const err = Math.round((this.random() * 2 - 1) * P.perfectError);
+    const pressAt = hitAt - 3 + err;
+    if (pressAt <= frame) return;
+    this.release('guard');
+    this.tapAt(pressAt, 'guard', {}, 16);
+  }
+
+  /** 상대 공격이 닿지 않는 거리 → 후딜레이를 노려 반격 */
+  planWhiffPunish(me, seen, frame, dist) {
+    const P = this.p;
+    if (!this.chance(P.punishChance)) return;
+    const remaining = seen.def.duration - seen.aframe - P.reaction; // 실제 남은 후딜레이(추정)
+    const lightReach = reachOf(me.weapon.light) + 20;
+    const heavyReach = reachOf(me.weapon.heavy) + 20;
+    const lightSu = me.weapon.light.hits[0].from;
+    const heavySu = me.weapon.heavy.hits[0].from;
+    const fwd = me.facing > 0 ? 'right' : 'left';
+    if (dist <= heavyReach && remaining > heavySu + 1) { this.release('guard'); this.tapAt(frame, 'heavy'); return; }
+    const dashDist = BALANCE.dash.speed * BALANCE.dash.duration;
+    if (dist - dashDist <= lightReach && remaining > BALANCE.dash.duration + lightSu + 1 &&
+        me.stamina >= dashCost(me) && me.dashCooldown <= 0) {
+      this.release('guard');
+      this.tapAt(frame, 'dash', { [fwd]: true });
+      this.tapAt(frame + BALANCE.dash.duration - 2, 'light');
+    }
+  }
+
+  respondToThreat(me, seen, frame, plunging, dist) {
+    const P = this.p;
+    // 판정까지 남은 실제 프레임 추정 (돌진 공격은 거리까지 고려)
     let until = 6;
     if (!plunging) {
       const next = seen.def.hits.find((h) => h.to >= seen.aframe);
       if (!next) return;
-      until = next.from - seen.aframe - P.reaction;
+      const startDist = dist + this.travelSince(seen);
+      const contact = contactFrame(seen.def, startDist) ?? next.from;
+      until = Math.max(next.from, contact) - seen.aframe - P.reaction;
     }
     const isUlt = seen.def?.kind === 'ultimate';
     const r = this.random();
@@ -200,6 +281,13 @@ export class AIController {
       return;
     }
     if (this.chance(P.evadeChance / (1 - perfectP - P.guardChance + 1e-6))) this.evade(me, frame);
+  }
+
+  /** 인지 시점 이후 상대가 공격 이동으로 다가온 거리 (근사) */
+  travelSince(seen) {
+    let pos = 0;
+    for (let f = 0; f < seen.aframe; f++) for (const m of seen.def.moves) if (f >= m.from && f <= m.to) pos += Math.max(0, m.vx);
+    return pos;
   }
 
   evade(me, frame) {
@@ -237,8 +325,30 @@ export class AIController {
       if (this.chance(oppVulnerable ? 0.8 : 0.12)) { this.release('guard'); this.tapAt(frame, 'ult'); return; }
     }
 
+    // 상대 공격이 이미 진행 중이고 닿는 거리면 맞받아치지 않는다 (먼저 시작한 쪽이 이김)
+    const incoming = seen.def && (seen.state === S.ATTACK || seen.state === S.SPECIAL) &&
+      dist <= reachOf(seen.def) + 40 && seen.aframe < (seen.def.hits.at(-1)?.to ?? 0);
+    if (incoming) {
+      if (this.chance(P.guardChance + 0.15)) this.holdFor('guard', frame, 14);
+      else if (this.chance(P.evadeChance * 2)) this.evade(me, frame);
+      return;
+    }
+
     // 상대가 가드 중이면 강공(도끼 등)으로 압박하거나 잠시 물러남
     const oppGuarding = seen.state === S.GUARD || seen.state === S.BLOCKSTUN;
+
+    // 상대 사거리가 더 긴데 그 안쪽(내 사거리 밖)에 서 있으면: 파고들기 / 물러나 헛치기 유도 / 가드
+    if (dist > lightReach + 15 && dist <= oppReach + 25 && oppReach > heavyReach) {
+      const r0 = this.random();
+      if (r0 < 0.45 && me.stamina > dashCost(me) + 10 && me.dashCooldown <= 0) {
+        // 파고들기: 대시 직후 빠른 공격
+        this.tapAt(frame, 'dash', { [fwd]: true });
+        this.tapAt(frame + BALANCE.dash.duration - 3, this.chance(0.7) ? 'light' : 'heavy');
+      }
+      else if (r0 < 0.7) this.holdFor(back, frame, 10);
+      else this.holdFor('guard', frame, 12);
+      return;
+    }
 
     if (dist > heavyReach + 30) {
       // 접근: 걷기 또는 대시

@@ -9,10 +9,12 @@ import { CONTROLS, KEY_LABELS } from '../config/controls.js';
 import { Match } from '../core/match.js';
 import { AIController, DIFFICULTY } from '../ai/ai.js';
 import { Keyboard } from '../input/keyboard.js';
-import { Renderer } from '../render/renderer.js';
+import { Renderer, hitstopFor } from '../render/renderer.js';
+import { sfx, playEvent } from '../render/sfx.js';
 import { Menus } from '../ui/menus.js';
 
 const STEP = 1000 / FPS;
+const INTRO_FRAMES = 96;
 
 export class App {
   constructor({ canvas, overlay }) {
@@ -74,7 +76,10 @@ export class App {
     this.menus.clear();
     this.match = new Match({ weapons: this.weapons });
     this.ai = this.mode === 'pve' ? new AIController(this.difficulty) : null;
-    this.renderer.reset?.();
+    this.renderer.reset();
+    this.hitstop = 0;
+    this.intro = INTRO_FRAMES; // READY → FIGHT! 동안 입력 대기
+    this.acc = 0;
     this.canvas.focus();
   }
 
@@ -126,6 +131,7 @@ export class App {
   // --- 입력 ------------------------------------------------------------------
   onMenuKey(e) {
     if (e.repeat) return;
+    if (e.code === 'KeyM' && this.scene !== 'select') { sfx.muted = !sfx.muted; return; }
     if (this.scene === 'battle') {
       if (e.code === 'Escape' || e.code === 'KeyP') {
         e.preventDefault();
@@ -154,17 +160,39 @@ export class App {
     } else {
       this.keyboard.endFrame();
     }
-    if (this.match) this.renderer.draw(this.match, { names: this.playerNames(), paused: this.paused, dt });
-    else this.renderer.drawBackdrop?.(dt);
+    if (this.match) {
+      this.renderer.draw(this.match, {
+        names: this.playerNames(), paused: this.paused, dt,
+        frozen: this.paused || this.hitstop > 0,
+        intro: this.introText(),
+      });
+    } else this.renderer.drawBackdrop(dt);
     requestAnimationFrame((t) => this.loop(t));
+  }
+
+  introText() {
+    if (!this.match || this.intro <= 0 || this.scene !== 'battle') return null;
+    const fightAt = 30;
+    if (this.intro > fightAt) return { text: 'READY', t: (this.intro - fightAt) / (INTRO_FRAMES - fightAt) };
+    return { text: 'FIGHT!', t: this.intro / fightAt };
   }
 
   tick() {
     const m = this.match;
+    // 시작 연출: 입력 무시
+    if (this.intro > 0) {
+      if (this.intro === 30) playEvent('fight');
+      this.intro--;
+      this.keyboard.endFrame();
+      return;
+    }
+    // 히트스톱: 시뮬레이션 정지(양쪽 동일). 짧은 입력은 래치되어 유지된다
+    if (this.hitstop > 0) { this.hitstop--; return; }
     const p1 = this.keyboard.sample(0);
     const p2 = this.ai ? this.ai.think(m, 1) : this.keyboard.sample(1);
     const events = m.step([p1, p2]);
     this.renderer.pushEvents(events, m);
+    this.hitstop = hitstopFor(events);
     this.keyboard.endFrame();
     if (m.over) this.toResult();
   }

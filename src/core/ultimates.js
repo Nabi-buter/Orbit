@@ -38,15 +38,17 @@ export function buildUltimate(weaponId, spec) {
 }
 
 // --- 공통 임시 궁극기: 즉시 돌진 베기 [TEMP] -----------------------------------
+// 밸런스: 첫 판정 사거리 110→70, 돌진 속도 10→8 (백대시 12px/f 로 벗어날 수 있음),
+//         돌진 22f→18f. 원거리 시전은 반응해서 대응 가능하고 근거리에서는 여전히 강력하다.
 registerUltimateType('placeholderLunge', (p) => attack({
   id: 'ultimate',
   kind: 'ultimate',
   motion: 'ult-lunge',
   duration: p.duration ?? 56,
-  moves: [{ from: 0, to: p.lungeFrames ?? 22, vx: p.lungeSpeed ?? 10 }],
+  moves: [{ from: 0, to: p.lungeFrames ?? 18, vx: p.lungeSpeed ?? 8 }],
   hits: [{
-    from: 1, to: p.lungeFrames ?? 22,
-    box: { x: 0, y: 10, w: p.reach ?? 110, h: 100 },
+    from: 1, to: p.lungeFrames ?? 18,
+    box: { x: 0, y: 10, w: p.reach ?? 70, h: 100 },
     damage: p.damage ?? 220, guardDamage: 0,
     hitstun: 30, blockstun: 0, push: 26, ultGainScale: 0,
   }],

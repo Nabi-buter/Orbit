@@ -20,7 +20,7 @@ function attackVx(f) {
 export function integrate(f) {
   switch (f.state) {
     case S.DASH:
-      f.vx = f.dash.dir * B.dash.speed;
+      f.vx = f.dash.dir * B.dash.speed * (f.weapon.mods?.dashScale ?? 1);
       break;
     case S.ATTACK:
     case S.SPECIAL:

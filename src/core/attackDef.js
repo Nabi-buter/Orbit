@@ -32,3 +32,18 @@ export function reachOf(def) {
   const lunge = def.moves.reduce((s, m) => s + Math.max(0, m.vx) * (m.to - m.from + 1), 0);
   return Math.max(...def.hits.map((h) => h.box.x + h.box.w)) + lunge;
 }
+
+/**
+ * 시작 시 거리 dist 인 정지 상대에게 판정이 처음 닿는 프레임 (닿지 않으면 null).
+ * 상대 허트박스 반폭(halfWidth)을 포함한다. AI 의 타이밍 추정용.
+ */
+export function contactFrame(def, dist, halfWidth = 25) {
+  let pos = 0;
+  for (let f = 0; f < def.duration; f++) {
+    for (const m of def.moves) if (f >= m.from && f <= m.to) pos += Math.max(0, m.vx);
+    for (const h of def.hits) {
+      if (f >= h.from && f <= h.to && pos + h.box.x + h.box.w + halfWidth >= dist && pos + h.box.x - halfWidth <= dist) return f;
+    }
+  }
+  return null;
+}
