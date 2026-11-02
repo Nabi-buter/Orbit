@@ -72,7 +72,9 @@ export class Match {
     if (--this.timeLeft <= 0) {
       this.timeLeft = 0;
       this.endReason = 'time';
-      this.winner = a.hp === b.hp ? 'draw' : a.hp > b.hp ? 0 : 1;
+      // 시간 종료: 남은 체력 비율로 판정 (무기별 체력이 다를 수 있음)
+      const ra = a.hp / a.maxHp, rb = b.hp / b.maxHp;
+      this.winner = ra === rb ? 'draw' : ra > rb ? 0 : 1;
       this.over = true;
     }
   }

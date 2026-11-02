@@ -42,7 +42,8 @@ export function createFighter({ id, x, facing, weapon }) {
     slide: null,      // 특수강공 후 위치 보간 {fromX, toX, t, frames}
     facing,
 
-    hp: F.maxHp,
+    maxHp: Math.round(F.maxHp * (weapon.hpScale ?? 1)), // 무기별 체력 배율
+    hp: Math.round(F.maxHp * (weapon.hpScale ?? 1)),
     stamina: F.maxStamina,
     guard: F.maxGuard,
     ult: 0,

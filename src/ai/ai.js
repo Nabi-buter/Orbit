@@ -18,6 +18,7 @@ export const DIFFICULTY = {
   easy: {
     label: '쉬움',
     reaction: 24,        // 인지 지연(프레임)
+    reactionJitter: 6,   // 반응 속도 흔들림(±프레임)
     thinkEvery: 14,      // 판단 주기
     aggression: 0.35,    // 공격 선택 경향
     guardChance: 0.35,   // 위협 인지 시 가드 선택 확률
@@ -31,6 +32,7 @@ export const DIFFICULTY = {
   normal: {
     label: '보통',
     reaction: 16,
+    reactionJitter: 4,
     thinkEvery: 9,
     aggression: 0.5,
     guardChance: 0.55,
@@ -44,6 +46,7 @@ export const DIFFICULTY = {
   hard: {
     label: '어려움',
     reaction: 11,
+    reactionJitter: 3,
     thinkEvery: 6,
     aggression: 0.6,
     guardChance: 0.7,
@@ -93,7 +96,7 @@ export class AIController {
 
   /** 지연된 인지 */
   perceive(frame) {
-    const idx = Math.max(0, this.history.length - 1 - this.p.reaction);
+    const idx = Math.max(0, this.history.length - 1 - this.reactNow);
     return this.history[idx];
   }
 
@@ -110,6 +113,12 @@ export class AIController {
     const me = match.fighters[index];
     const opp = match.fighters[1 - index];
     const frame = match.frame;
+    // 사람처럼 흔들리는 반응 속도와 공격 성향 (기계적인 패턴 고착 방지)
+    if (frame >= (this.nextMood ?? 0)) {
+      this.nextMood = frame + 40 + Math.floor(this.random() * 80);
+      this.reactNow = Math.max(6, this.p.reaction + Math.round((this.random() * 2 - 1) * this.p.reactionJitter));
+      this.aggr = Math.max(0.05, Math.min(0.95, this.p.aggression * (0.75 + this.random() * 0.5)));
+    }
     this.history.push(this.snapshot(opp));
     if (this.history.length > 90) this.history.shift();
     const seen = this.perceive(frame);
@@ -182,7 +191,7 @@ export class AIController {
       const lightReach = reachOf(me.weapon.light) + 30;
       const oppSlow = (this.lastOppDef?.hits[0].from ?? 0) >= 12;
       const wasHit = this.prevMyState === S.HITSTUN;
-      if (dist <= lightReach && this.chance(oppSlow || wasHit ? P.aggression + 0.25 : P.aggression * 0.5)) {
+      if (dist <= lightReach && this.chance(oppSlow || wasHit ? this.aggr + 0.25 : this.aggr * 0.5)) {
         this.release('guard');
         this.tapAt(frame, 'light');
       } else if (oppSlow && this.chance(P.evadeChance * 2) && me.stamina >= dashCost(me) && me.dashCooldown <= 0) {
@@ -193,7 +202,7 @@ export class AIController {
     this.prevMyState = me.state;
 
     // 3-c) 상대가 숨 고르기(공격 불가) 중 → 파고들어 반격 (화면에 보이는 정보)
-    const lockLeft = (seen.lock ?? 0) - P.reaction;
+    const lockLeft = (seen.lock ?? 0) - this.reactNow;
     if (lockLeft > 8 && isFree(me) && me.combo.lock === 0 && this.lockPunishFor !== seen.atk && frame >= (this.lockPunishAt ?? 0)) {
       this.lockPunishAt = frame + 20;
       if (this.chance(P.punishChance)) {
@@ -256,7 +265,7 @@ export class AIController {
   planWhiffPunish(me, seen, frame, dist) {
     const P = this.p;
     if (!this.chance(P.punishChance)) return;
-    const remaining = seen.def.duration - seen.aframe - P.reaction; // 실제 남은 후딜레이(추정)
+    const remaining = seen.def.duration - seen.aframe - this.reactNow; // 실제 남은 후딜레이(추정)
     const lightReach = reachOf(me.weapon.light) + 20;
     const heavyReach = reachOf(me.weapon.heavy) + 20;
     const lightSu = me.weapon.light.hits[0].from;
@@ -281,7 +290,7 @@ export class AIController {
       if (!next) return;
       const startDist = dist + this.travelSince(seen);
       const contact = contactFrame(seen.def, startDist) ?? next.from;
-      until = Math.max(next.from, contact) - seen.aframe - P.reaction;
+      until = Math.max(next.from, contact) - seen.aframe - this.reactNow;
     }
     const isUlt = seen.def?.kind === 'ultimate';
     const r = this.random();
@@ -392,12 +401,12 @@ export class AIController {
     const r = this.random();
     if (dist <= lightReach + 15) {
       // 근거리
-      if (r < P.aggression) {
+      if (r < this.aggr) {
         this.release('guard');
         this.tapAt(frame, oppGuarding && this.chance(0.5) ? 'heavy' : this.chance(0.65) ? 'light' : 'heavy');
-      } else if (r < P.aggression + P.preGuard) {
+      } else if (r < this.aggr + P.preGuard) {
         this.holdFor('guard', frame, 14 + Math.floor(this.random() * 16));
-      } else if (r < P.aggression + P.preGuard + 0.15) {
+      } else if (r < this.aggr + P.preGuard + 0.15) {
         this.holdFor(back, frame, 12);
       } else if (this.chance(P.evadeChance) && me.stamina > dashCost(me) + 20) {
         this.tapAt(frame, 'dash', { [back]: true });
@@ -408,12 +417,12 @@ export class AIController {
       }
     } else {
       // 중거리: 강공 견제 / 간격 조절 / 접근
-      if (r < P.aggression * 0.55) {
+      if (r < this.aggr * 0.55) {
         this.release('guard');
         this.tapAt(frame, 'heavy');
-      } else if (r < P.aggression * 0.55 + 0.25) {
+      } else if (r < this.aggr * 0.55 + 0.25) {
         this.holdFor(fwd, frame, 8 + Math.floor(this.random() * 10));
-      } else if (r < P.aggression * 0.55 + 0.4 && dist < oppReach + 20) {
+      } else if (r < this.aggr * 0.55 + 0.4 && dist < oppReach + 20) {
         this.holdFor(back, frame, 10);
       } else if (this.chance(P.preGuard)) {
         this.holdFor('guard', frame, 16);

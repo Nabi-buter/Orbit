@@ -10,6 +10,8 @@ npm test                           # 전투 규칙 자동 테스트 (Node 18+)
 node scripts/e2e.cjs               # 브라우저 종단 테스트 (Playwright 필요)
 node scripts/simulate.js 40 hard   # AI 대 AI 무기 상성 시뮬레이션
 node scripts/balance-check.js      # 단순 전략 봇 / 거리별 판정 점검
+node scripts/matrix.js 12          # 무기 상성표 (난이도 교차 AI 대전)
+node scripts/tune.js 9 16          # 무기 밸런스 변수 자동 탐색
 ```
 
 ## 조작
@@ -57,7 +59,8 @@ Esc/P 일시정지 · F2 판정 박스 · M 소리 켜기/끄기. 키 배치는 
 넷코드: 결정론적 시뮬레이션 + **락스텝(입력 지연)** 방식. 서버는 판정하지 않고 입력만 중계한다.
 입력 지연은 두 플레이어의 핑을 보고 2~8프레임 사이로 자동 결정되고, 1초마다 상태 해시를 비교해 동기화 오류를 감지한다.
 온라인에서는 P1/P2 어느 키 배치로도 내 캐릭터를 조작할 수 있다. 대전 중 일시정지는 없다(Esc: 메뉴/기권).
-- 무기 6종: 장검 · 대검 · 단검 · 도끼 · 창 · 너클 (`docs/BALANCE.md` 에 콤보 상한·수치 정리)
+- 무기 6종: 장검 · 대검 · 단검 · 도끼 · 창 · 너클
+- 무기별 밸런스 변수는 `src/config/weapons.js` 의 `KNOBS` 한곳: 콤보 · 리치 · 데미지 · 공격속도 (+ 보조: 체력 · 가드 감소량). 근거는 `docs/BALANCE.md`
 
 ## 구조
 

@@ -68,7 +68,7 @@ export class Renderer {
     this.trails = [[], []];
     this.swings = [[], []];
     this.prevState = [null, null];
-    this.hpTrail = [BALANCE.fighter.maxHp, BALANCE.fighter.maxHp];
+    this.hpTrail = [Infinity, Infinity];
     this.hpTrailDelay = [0, 0];
   }
 
@@ -358,8 +358,8 @@ export class Renderer {
       text(ctx, f.weapon.name, X + s * (nw + 5), 6, f.weapon.color, { size: 10, align: left ? 'left' : 'right', shadow: UI.ink });
 
       bar(ctx, X, 19, 150, 7, s, [
-        { v: this.hpTrail[i] / F.maxHp, c: UI.paper },
-        { v: f.hp / F.maxHp, c: f.hp / F.maxHp < 0.25 ? UI.red : TEAM[i].main },
+        { v: Math.min(this.hpTrail[i], f.maxHp) / f.maxHp, c: UI.paper },
+        { v: f.hp / f.maxHp, c: f.hp / f.maxHp < 0.25 ? UI.red : TEAM[i].main },
       ]);
       const sta = f.stamina / F.maxStamina;
       const al = left ? 'left' : 'right';

@@ -111,7 +111,8 @@ export function applyHits(events, frame) {
 
 function resolve(A, D, hit, kind, frame) {
   const G = B.guard;
-  const maxHp = B.fighter.maxHp;
+  const maxHp = D.maxHp ?? B.fighter.maxHp;
+  const gTaken = D.weapon.guardTaken ?? 1; // 무기별 가드 게이지 감소량 배율
   const scale = hit.ultGainScale ?? 1;
   const isUlt = kind === 'ultimate';
 
@@ -132,7 +133,7 @@ function resolve(A, D, hit, kind, frame) {
   if (guarding && isPerfectTiming(D, frame)) {
     const chip = Math.max(1, Math.round(maxHp * G.perfectDamageRatio));
     damage(D, chip);
-    D.guard -= G.perfectGuardCost;
+    D.guard -= G.perfectGuardCost * gTaken;
     D.lastGuardUse = frame;
     // 피격자 쪽은 경직 없음 → 즉시 반격 가능
     D.state = S.GUARD;
@@ -154,7 +155,7 @@ function resolve(A, D, hit, kind, frame) {
   if (guarding && !isUlt) {
     const dmg = Math.round(hit.damage * G.normalParryDamageRate);
     damage(D, dmg);
-    D.guard -= hit.guardDamage;
+    D.guard -= hit.guardDamage * gTaken;
     D.lastGuardUse = frame;
     D.state = S.BLOCKSTUN;
     D.timer = hit.blockstun;

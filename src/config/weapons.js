@@ -57,6 +57,30 @@ function plunge({ damage, guardDamage, landingLag, fallSpeed = 16, w = 80 }) {
   };
 }
 
+
+// =============================================================================
+// ★ 무기별 밸런스 변수 (한곳에서 조정) ★  — 모두 [TEMP]
+// -----------------------------------------------------------------------------
+//   combo  : 콤보 횟수 {lightMax 약공 연속, heavyMax 강공 연속, maxTotal 섞을 때 최대,
+//            fullLag/mixedLag 콤보 종료 딜레이(프레임)}
+//   reach  : 리치 배율 (공격 판정 폭 × reach)
+//   damage : 데미지 배율 (약/강/낙하 공격 피해 × damage. 특수강공·궁극기는 제외)
+//   speed  : 공격 속도 = 무게감 배율 (발생·판정·후딜·연결 시점 × speed, 클수록 느림)
+//   ── 위 4개로 부족할 때 쓰는 보조 변수 ──
+//   hp         : 체력 배율 (기본 체력 × hp)
+//   guardTaken : 상대 공격을 막을 때 내 가드 게이지 감소량 배율 (클수록 가드가 빨리 깨짐)
+// 조정 근거와 결과는 docs/BALANCE.md, 자동 탐색 도구는 scripts/tune.js.
+// =============================================================================
+export const KNOBS = {
+  // scripts/tune.js 자동 탐색 결과 (난이도 교차 AI 대전, 새 시드 검증 승률 48~52%)
+  longsword: { combo: { lightMax: 3, heavyMax: 2, maxTotal: 4, fullLag: 52, mixedLag: 24 }, reach: 0.99, damage: 0.96, speed: 1.27, hp: 1, guardTaken: 1 },
+  greatsword: { combo: { lightMax: 2, heavyMax: 1, maxTotal: 3, fullLag: 62, mixedLag: 32 }, reach: 0.98, damage: 0.95, speed: 1.38, hp: 1, guardTaken: 1 },
+  dagger: { combo: { lightMax: 3, heavyMax: 2, maxTotal: 4, fullLag: 42, mixedLag: 20 }, reach: 1, damage: 1, speed: 1.15, hp: 1, guardTaken: 1 },
+  axe: { combo: { lightMax: 2, heavyMax: 2, maxTotal: 3, fullLag: 56, mixedLag: 28 }, reach: 1, damage: 0.99, speed: 1.41, hp: 1, guardTaken: 1 },
+  spear: { combo: { lightMax: 3, heavyMax: 2, maxTotal: 3, fullLag: 52, mixedLag: 26 }, reach: 1.01, damage: 1.03, speed: 1.23, hp: 1, guardTaken: 1 },
+  knuckle: { combo: { lightMax: 5, heavyMax: 3, maxTotal: 7, fullLag: 40, mixedLag: 18 }, reach: 1.03, damage: 1.06, speed: 1.11, hp: 1.07, guardTaken: 0.91 },
+};
+
 const DEFS = {
   // ---------------------------------------------------------------------------
   // 장검: 균형형 기본 무기
@@ -66,8 +90,6 @@ const DEFS = {
     desc: '속도·위력·사거리가 균형 잡힌 기본 무기. 처음 시작하기 좋다.',
     color: '#9fd3ff',
     mods: { walkScale: 1, backWalkScale: 1, dashCostScale: 1 },
-    tempo: 1.25,                                                                 // [TEMP] 무게감 배율
-    combo: { lightMax: 3, heavyMax: 2, maxTotal: 4, fullLag: 52, mixedLag: 24 },   // [TEMP]
     lightSteps: [
       { name: '되베기', motion: 'slash-rev', startup: 1 },
       { name: '찔러 마무리', motion: 'thrust', dmg: 1.3, push: 8, recovery: 6 },
@@ -105,8 +127,6 @@ const DEFS = {
     desc: '느리지만 한 방이 무겁다. 넓은 범위의 강공격으로 거리를 지배한다.',
     color: '#ffb36b',
     mods: { walkScale: 0.85, backWalkScale: 0.85, dashCostScale: 1.1 },
-    tempo: 1.35,                                                                 // [TEMP] 무게감 배율
-    combo: { lightMax: 2, heavyMax: 1, maxTotal: 3, fullLag: 62, mixedLag: 32 },   // [TEMP]
     lightSteps: [
       { name: '우상단 베기', motion: 'slash-rev', dmg: 1.1, push: 6, recovery: 6 },
     ],
@@ -141,8 +161,6 @@ const DEFS = {
     desc: '매우 빠른 찌르기로 빈틈을 파고든다. 사거리가 짧다.',
     color: '#b8ffb0',
     mods: { walkScale: 1.15, backWalkScale: 1.08, dashCostScale: 0.8, dashScale: 1.2 },
-    tempo: 1.15,                                                                 // [TEMP] 무게감 배율
-    combo: { lightMax: 3, heavyMax: 2, maxTotal: 4, fullLag: 42, mixedLag: 20 },   // [TEMP]
     lightSteps: [
       { name: '가르기', motion: 'slash' },
       { name: '깊게 찌르기', motion: 'stab', dmg: 1.25, push: 6, recovery: 5 },
@@ -180,8 +198,6 @@ const DEFS = {
     desc: '가드 게이지를 크게 깎는 강타로 방어를 무너뜨린다.',
     color: '#ff8b8b',
     mods: { walkScale: 0.95, backWalkScale: 0.9, dashCostScale: 1 },
-    tempo: 1.4,                                                                 // [TEMP] 무게감 배율
-    combo: { lightMax: 2, heavyMax: 2, maxTotal: 3, fullLag: 56, mixedLag: 28 },   // [TEMP]
     lightSteps: [
       { name: '옆치기', motion: 'slash-rev', dmg: 1.15, guard: 1.25, recovery: 6 },
     ],
@@ -218,8 +234,6 @@ const DEFS = {
     desc: '가장 긴 사거리. 거리를 유지하며 찌르기로 견제한다. 품에 파고들면 약하다.',
     color: '#d6a8ff',
     mods: { walkScale: 0.9, backWalkScale: 1.0, dashCostScale: 1.1 },
-    tempo: 1.25,                                                                 // [TEMP] 무게감 배율
-    combo: { lightMax: 3, heavyMax: 2, maxTotal: 3, fullLag: 52, mixedLag: 26 },   // [TEMP]
     lightSteps: [
       { name: '재찌르기', motion: 'thrust', startup: 1 },
       { name: '밀어 찌르기', motion: 'thrust', dmg: 1.3, push: 10, recovery: 6 },
@@ -257,8 +271,6 @@ const DEFS = {
     desc: '초근접 연타. 한 대는 약하지만 끊임없이 몰아친다.',
     color: '#ffe36b',
     mods: { walkScale: 1.25, backWalkScale: 1.05, dashCostScale: 0.7, dashScale: 1.35 },
-    tempo: 1.15,                                                                 // [TEMP] 무게감 배율
-    combo: { lightMax: 5, heavyMax: 3, maxTotal: 7, fullLag: 40, mixedLag: 18 },   // [TEMP]
     lightSteps: [
       { name: '잽', motion: 'jab' },
       { name: '훅', motion: 'hook', dmg: 1.15 },
@@ -294,9 +306,28 @@ const DEFS = {
 
 export const WEAPON_ORDER = ['longsword', 'greatsword', 'dagger', 'axe', 'spear', 'knuckle'];
 
-/** 콤보 단계별 공격 목록: [1단계(기본), ...변형] */
-function buildSteps(base, steps, firstName) {
-  return [{ ...base, name: firstName }, ...steps.map((st) => variant(base, st))];
+/**
+ * 콤보 단계 목록을 정확히 n 개로 만든다.
+ * 정의된 단계보다 많으면 중간 단계를 반복하고, 마무리(마지막 단계)는 항상 끝에 둔다.
+ */
+function buildSteps(base, steps, firstName, n) {
+  const all = [{ ...base, name: firstName }, ...steps.map((st) => variant(base, st))];
+  if (n <= 1) return [all[0]];
+  const finisher = all[all.length - 1];
+  const body = all.slice(0, Math.max(1, all.length - 1));
+  const out = [];
+  for (let i = 0; i < n - 1; i++) out.push(body[i % body.length]);
+  out.push(all.length > 1 ? finisher : all[0]);
+  return out;
+}
+
+/** 리치/데미지 배율 적용 */
+function scaleDef(def, { reach = 1, damage = 1 }) {
+  if (reach === 1 && damage === 1) return def;
+  return {
+    ...def,
+    hits: def.hits.map((h) => ({ ...h, damage: Math.round(h.damage * damage), box: { ...h.box, w: Math.round(h.box.w * reach) } })),
+  };
 }
 
 const FIRST_NAMES = {
@@ -304,21 +335,35 @@ const FIRST_NAMES = {
   axe: ['내려찍기', '도끼 찍기'], spear: ['찌르기', '휘두르기'], knuckle: ['잽', '돌진 연타'],
 };
 
-export const WEAPONS = Object.fromEntries(
-  Object.entries(DEFS).map(([id, w]) => {
-    const k = w.tempo ?? 1;
-    const lights = buildSteps(w.light, w.lightSteps ?? [], FIRST_NAMES[id][0]).map((d) => tempo(d, k));
-    const heavies = buildSteps(w.heavy, w.heavySteps ?? [], FIRST_NAMES[id][1]).map((d) => tempo(d, k));
-    const plungeDef = { ...w.plunge, landingLag: Math.round(w.plunge.landingLag * k) };
-    if (lights.length !== w.combo.lightMax || heavies.length !== w.combo.heavyMax) {
-      throw new Error(`${id}: 콤보 단계 수와 lightMax/heavyMax 불일치`);
-    }
-    return [id, {
-      id, ...w, light: lights[0], heavy: heavies[0], lights, heavies, plunge: plungeDef,
-      ultimateSpec: w.ultimate, ultimate: buildUltimate(id, w.ultimate),
-    }];
-  }),
-);
+/** 변수 표(knobs)로 무기 하나를 만든다 */
+export function buildWeapon(id, kn = KNOBS[id]) {
+  const w = DEFS[id];
+  const k = kn.speed ?? 1;
+  const tune = (d) => tempo(scaleDef(d, kn), k);
+  const lights = buildSteps(w.light, w.lightSteps ?? [], FIRST_NAMES[id][0], kn.combo.lightMax).map(tune);
+  const heavies = buildSteps(w.heavy, w.heavySteps ?? [], FIRST_NAMES[id][1], kn.combo.heavyMax).map(tune);
+  const plungeDef = {
+    ...w.plunge,
+    landingLag: Math.round(w.plunge.landingLag * k),
+    hit: { ...w.plunge.hit, damage: Math.round(w.plunge.hit.damage * (kn.damage ?? 1)) },
+  };
+  return {
+    id, ...w, combo: kn.combo, tempo: k, knobs: kn,
+    hpScale: kn.hp ?? 1, guardTaken: kn.guardTaken ?? 1,
+    light: lights[0], heavy: heavies[0], lights, heavies, plunge: plungeDef,
+    ultimateSpec: w.ultimate, ultimate: buildUltimate(id, w.ultimate),
+  };
+}
+
+export const WEAPONS = Object.fromEntries(Object.keys(DEFS).map((id) => [id, buildWeapon(id)]));
+
+/** 밸런스 탐색용: 변수를 바꿔 무기를 다시 만든다 (기존 객체를 갱신) */
+export function applyKnobs(id, kn) {
+  KNOBS[id] = kn;
+  const fresh = buildWeapon(id, kn);
+  for (const key of Object.keys(WEAPONS[id])) delete WEAPONS[id][key];
+  Object.assign(WEAPONS[id], fresh);
+}
 
 export const DEFAULT_WEAPON = 'longsword';
 
