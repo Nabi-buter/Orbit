@@ -46,13 +46,14 @@ test('락스텝: 입력이 늦게 와도 두 시뮬레이션은 같은 결과 (�
         if (msg.t === 'input') ls[slot].onRemoteInput(msg.f, msg.i);
         if (msg.t === 'hash') ls[slot].onRemoteHash(msg.f, msg.h);
       }
+      if (ms[slot].frame >= 1500) continue; // 두 쪽을 같은 프레임에서 멈춰 비교
       if (ls[slot].needsLocal()) ls[slot].pushLocal(script(slot, sampled[slot]++));
       const pair = ls[slot].next();
       if (pair) { ms[slot].step(pair); ls[slot].afterStep(ms[slot]); }
     }
   }
-  const n = Math.min(ms[0].frame, ms[1].frame);
-  assert.ok(n > 1000, `진행 프레임 ${n}`);
+  assert.equal(ms[0].frame, 1500);
+  assert.equal(ms[1].frame, 1500);
   // 같은 프레임 수까지 맞춘 뒤 비교
   assert.equal(stateHash(ms[0]), stateHash(ms[1]));
   assert.equal(ls[0].desyncAt, null);

@@ -73,3 +73,27 @@ export function variant(base, { name, motion, dmg = 1, guard = dmg, startup = 0,
     })),
   };
 }
+
+/**
+ * 무기 무게감(템포) 적용: 발생·판정·후딜·연결 시점·이동 구간을 k배로 늘린다.
+ * 이동 거리는 유지(속도 ÷ k). 피격/가드 경직은 늘리지 않는다 → 콤보 사이 대응 틈은 더 커진다.
+ */
+export function tempo(def, k) {
+  if (k === 1) return def;
+  const s = (v) => Math.round(v * k);
+  return {
+    ...def,
+    duration: s(def.duration),
+    cancelFrom: def.cancelFrom == null ? null : s(def.cancelFrom),
+    moves: def.moves.map((m) => {
+      const from = s(m.from), to = Math.max(from, s(m.to));
+      const total = m.vx * (m.to - m.from + 1);
+      return { ...m, from, to, vx: total / (to - from + 1) };
+    }),
+    // 다단 히트 내부(마지막 판정 제외)는 다음 판정까지 이어지도록 경직도 같이 늘린다
+    hits: def.hits.map((h, i, arr) => ({
+      ...h, from: s(h.from), to: Math.max(s(h.from), s(h.to)),
+      hitstun: i < arr.length - 1 ? Math.ceil(h.hitstun * k) + 1 : h.hitstun,
+    })),
+  };
+}

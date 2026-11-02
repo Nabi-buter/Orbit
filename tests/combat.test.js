@@ -102,7 +102,7 @@ test('피격 시 공격/대시/이동이 즉시 끊긴다', () => {
   m = setup({ distance: 220 });
   [a, b] = m.fighters;
   tap(m, 0, 'heavy');
-  run(m, 6);
+  run(m, a.weapon.heavy.hits[0].from - 8); // 판정 직전에 상대가 대시로 파고듦
   m.step([I(), I({ dash: true, left: true })]);
   until(m, () => b.state !== S.DASH);
   assert.equal(b.state, S.HITSTUN);

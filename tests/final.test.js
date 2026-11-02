@@ -72,7 +72,7 @@ test('완벽패링 후 공격자 경직 동안 모든 무기가 약공으로 반
     run(m, 6, I(), I({ guard: true }));
     assert.equal(a.state, S.PARRIED);
     m.step([I(), I({ light: true })]);
-    const ev = run(m, 12);
+    const ev = run(m, B.guard.perfectStun - 4);
     assert.ok(ev.some((e) => e.type === 'hit' && e.attacker === 1), id);
   }
 });
