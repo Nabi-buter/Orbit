@@ -76,11 +76,11 @@ export const KNOBS = {
   // 새 시드 검증 승률 48~53%
   // 규칙: 모든 무기 강공 콤보 ≥ 2, 강공 콤보 < 약공 콤보
   longsword: { combo: { lightMax: 3, heavyMax: 2, maxTotal: 4 }, reach: 0.98, damage: 0.95, speed: 1.39, hp: 1, guardTaken: 1 },
-  greatsword: { combo: { lightMax: 3, heavyMax: 2, maxTotal: 3 }, reach: 0.91, damage: 0.77, speed: 1.26, hp: 1, guardTaken: 1 },
-  dagger: { combo: { lightMax: 3, heavyMax: 2, maxTotal: 5 }, reach: 1.07, damage: 1.16, speed: 1.58, hp: 1, guardTaken: 1 },
-  axe: { combo: { lightMax: 3, heavyMax: 2, maxTotal: 3 }, reach: 1.01, damage: 1.01, speed: 1.49, hp: 1, guardTaken: 1 },
+  greatsword: { combo: { lightMax: 3, heavyMax: 2, maxTotal: 3 }, reach: 0.9, damage: 0.76, speed: 1.27, hp: 1, guardTaken: 1 },
+  dagger: { combo: { lightMax: 3, heavyMax: 2, maxTotal: 5 }, reach: 1.09, damage: 1.19, speed: 1.57, hp: 1, guardTaken: 1 },
+  axe: { combo: { lightMax: 3, heavyMax: 2, maxTotal: 3 }, reach: 1.02, damage: 1.03, speed: 1.48, hp: 1, guardTaken: 1 },
   spear: { combo: { lightMax: 3, heavyMax: 2, maxTotal: 3 }, reach: 0.9, damage: 0.78, speed: 1.05, hp: 1, guardTaken: 1 },
-  knuckle: { combo: { lightMax: 5, heavyMax: 3, maxTotal: 8 }, reach: 1.16, damage: 1.23, speed: 1.51, hp: 1.07, guardTaken: 0.91 },
+  knuckle: { combo: { lightMax: 5, heavyMax: 3, maxTotal: 8 }, reach: 1.15, damage: 1.19, speed: 1.52, hp: 1.07, guardTaken: 0.91 },
 };
 
 const DEFS = {
