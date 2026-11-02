@@ -84,10 +84,18 @@ function assert(c, msg) { if (!c) throw new Error('E2E 실패: ' + msg); console
     assert(await page.evaluate(() => window.__game.match.frame) < 5, '재시작');
 
     // 결과
-    await page.evaluate(() => { const g = window.__game; g.intro = 0; g.match.fighters[1].hp = 1; g.match.fighters[0].x = 600; g.match.fighters[1].x = 660; g.ai = null; });
+    const koOnce = () => page.evaluate(() => { const g = window.__game; g.intro = 0; g.match.roundIntro = 0; g.match.fighters[1].hp = 1; g.match.fighters[0].x = 600; g.match.fighters[1].x = 660; g.ai = null; });
+    await koOnce();
+    await key('KeyJ');
+    await page.waitForFunction(() => window.__game.match.round === 2, null, { timeout: 4000 });
+    const r2 = await page.evaluate(() => ({ lives: window.__game.match.lives, hp: window.__game.match.fighters.map((f) => f.hp / f.maxHp) }));
+    assert(r2.lives.join() === '2,1' && r2.hp[1] === 1, `첫 KO → 2라운드 (목숨 ${r2.lives}, 쓰러진 쪽 체력 회복)`);
+    await wait(300);
+    await shot(page, '05a-round2');
+    await koOnce();
     await key('KeyJ');
     await wait(2500);
-    assert(await scene() === 'result', 'KO → 결과');
+    assert(await scene() === 'result', '두 번째 KO → 결과');
     await shot(page, '05-result');
     await key('Enter');
     assert(await scene() === 'battle', '다시 대전');

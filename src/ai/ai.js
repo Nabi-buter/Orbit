@@ -547,7 +547,7 @@ export class AIController {
         else this.holdFor('guard', frame, 12);
         return true;
       case 'ult':
-        if (opp.ult >= 100 && dist < 260) { this.retreat(me, frame, 14); return true; }
+        if (opp.ult >= BALANCE.ultimate.cost && dist < 260) { this.retreat(me, frame, 14); return true; }
         return false;
       default:
         return false;

@@ -156,7 +156,7 @@ export class App {
       title = m.winner === mine ? 'WIN!' : 'LOSE';
       color = m.winner === mine ? UI.gold : UI.red;
     } else { title = `P${m.winner + 1} WIN!`; color = TEAM[m.winner].ui; }
-    const reason = m.endReason === 'ko' ? 'K.O.' : '시간 종료 · 남은 체력 판정';
+    const reason = m.endReason === 'ko' ? `K.O. · ${m.round}라운드` : '시간 종료 · 남은 목숨·체력 판정';
     const lines = m.fighters.flatMap((f, i) => [
       [`${names[i]} · ${WEAPONS[this.weapons[i]].name}`, TEAM[i].ui],
       [`체력 ${Math.ceil(f.hp)} · 적중 ${f.stats.hitsLanded} · 완벽패링 ${f.stats.perfects}`, UI.dim],
@@ -331,7 +331,10 @@ export class App {
   }
 
   introText() {
-    if (!this.match || this.intro <= 0 || this.scene !== 'battle') return null;
+    if (!this.match || this.scene !== 'battle') return null;
+    const ri = this.match.roundIntro;
+    if (this.intro <= 0 && ri > 0) return { text: ri > 28 ? `ROUND ${this.match.round}` : 'FIGHT!' };
+    if (this.intro <= 0) return null;
     return { text: this.intro > 30 ? 'READY' : 'FIGHT!' };
   }
 
@@ -368,6 +371,7 @@ export class App {
     const events = m.step(inputs);
     this.lockstep?.afterStep(m);
     this.renderer.pushEvents(events, m);
+    if (m.roundIntro === 28) playEvent('fight');
     this.hitstop = hitstopFor(events);
     if (m.over) this.toResult();
   }

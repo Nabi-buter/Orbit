@@ -155,6 +155,10 @@ export class Renderer {
           fx.ring(x, y, '#f08a3c', 8, 8);
           fx.text('버팀', x, y - 14, '#f6b26b', 1, 24);
           break;
+        case 'round':
+          // 다음 라운드: 남은 효과 정리
+          fx.particles = []; fx.rings = []; fx.texts = []; fx.impacts = []; fx.flash = null;
+          break;
         case 'ko':
           fx.text('K.O.', PW / 2, 80, UI.paper, 5, 90);
           fx.screenFlash('#ffffff', 0.35);
@@ -358,6 +362,15 @@ export class Renderer {
       // 이름 · 무기
       const nw = text(ctx, name, X, 7, UI.paper, { size: 11, align: al, shadow: UI.ink });
       text(ctx, f.weapon.name, X + s * (nw + 6), 7, TEAM[i].ui, { size: 11, align: al, shadow: UI.ink });
+      // 목숨: 체력 막대 끝 위에 작은 칸 (남은 목숨 = 채움)
+      const lives = match.lives?.[i] ?? 1, maxLives = BALANCE.round.lives;
+      for (let k = 0; k < maxLives; k++) {
+        const lx = left ? X + 150 - 6 - k * 9 : X - 150 + k * 9;
+        const on = k < lives;
+        rect(ctx, lx - 1, 9, 8, 8, UI.ink);
+        rect(ctx, lx, 10, 6, 6, on ? TEAM[i].main : '#30343f');
+        if (on) { ctx.globalAlpha = 0.4; rect(ctx, lx, 10, 6, 1, '#fff'); ctx.globalAlpha = 1; }
+      }
       // 체력: 10% 눈금
       const W = 150;
       const x0 = left ? X : X - W;
@@ -428,7 +441,7 @@ export class Renderer {
     ctx.globalAlpha = 0.6; rect(ctx, 0, 104, PW, 22, UI.ink); ctx.globalAlpha = 1;
     rect(ctx, PW / 2 - 60, 104, 120, 1, fight ? UI.gold : UI.dim);
     rect(ctx, PW / 2 - 60, 125, 120, 1, fight ? UI.gold : UI.dim);
-    text(ctx, fight ? 'FIGHT' : 'READY', PW / 2, 108, fight ? UI.gold : UI.paper, { scale: 2, align: 'center', shadow: UI.ink });
+    text(ctx, fight ? 'FIGHT' : str, PW / 2, 108, fight ? UI.gold : UI.paper, { scale: 2, align: 'center', shadow: UI.ink });
   }
 }
 

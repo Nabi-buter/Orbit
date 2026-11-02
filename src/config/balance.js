@@ -25,10 +25,10 @@ export const BALANCE = {
   timing: { windup: 1.45, recovery: 0.8 },   // [TEMP]
 
   fighter: {
-    maxHp: 1200,          // [TEMP] 밸런스: 1000→1200 (경기 시간 확보, 가드/궁극기 활용 기회 증가)
+    maxHp: 600,           // [TEMP] 목숨 2개 도입으로 1200→600 (한 목숨 약 18초, 경기 전체 약 55초)
     maxStamina: 100,
-    maxGuard: 100,
-    maxUlt: 100,
+    maxGuard: 70,         // [TEMP] 100→70: 자세가 더 빨리 무너진다
+    maxUlt: 70,           // [TEMP] 100→70: 궁극기가 더 자주 나온다 (충전량은 그대로)
     width: 50,            // 피격 판정(허트박스) 폭
     height: 120,          // 피격 판정 높이
     walkSpeed: 4.2,       // [TEMP] 전진 속도(px/프레임)
@@ -98,7 +98,7 @@ export const BALANCE = {
 
   ultimate: {
     // 궁극기는 즉시 시전, 일반 공격으로 취소 불가, 일반 패링 불가, 완벽패링으로만 끊김.
-    cost: 100,
+    cost: 70,             // = fighter.maxUlt
   },
 
   ultGain: {
@@ -128,6 +128,8 @@ export const BALANCE = {
 
   round: {
     timeSeconds: 99,      // [TEMP]
-    koDelay: 90,          // KO 후 결과까지 대기
+    koDelay: 90,          // KO 후 다음 라운드(또는 결과)까지 대기
+    lives: 2,             // 목숨 수
+    introFrames: 75,      // 라운드 사이 정지 (ROUND 2 / FIGHT 표시)
   },
 };

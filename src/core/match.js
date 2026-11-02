@@ -15,12 +15,18 @@ export class Match {
   constructor({ weapons = [DEFAULT_WEAPON, DEFAULT_WEAPON], roundSeconds = BALANCE.round.timeSeconds } = {}) {
     const cx = STAGE.width / 2;
     const half = STAGE.startDistance / 2;
-    this.fighters = [
-      createFighter({ id: 0, x: cx - half, facing: 1, weapon: getWeapon(weapons[0]) }),
-      createFighter({ id: 1, x: cx + half, facing: -1, weapon: getWeapon(weapons[1]) }),
+    this.spawn = [
+      { id: 0, x: cx - half, facing: 1, weapon: getWeapon(weapons[0]) },
+      { id: 1, x: cx + half, facing: -1, weapon: getWeapon(weapons[1]) },
     ];
+    this.fighters = this.spawn.map((sp) => createFighter(sp));
     this.frame = 0;
+    this.roundSeconds = roundSeconds;
     this.timeLeft = roundSeconds * FPS;
+    // 목숨: 한쪽이 쓰러지면 처음 위치에서 다시 시작. 쓰러진 쪽만 체력이 차고, 버틴 쪽은 깎인 체력 그대로.
+    this.lives = [BALANCE.round.lives, BALANCE.round.lives];
+    this.round = 1;
+    this.roundIntro = 0;   // 라운드 사이 정지 프레임 (입력 무시)
     this.events = [];      // 이번 프레임에 발생한 이벤트
     this.over = false;
     this.winner = null;    // 0 | 1 | 'draw'
@@ -31,6 +37,11 @@ export class Match {
   /** @param {[object, object]} inputs 각 플레이어의 이번 프레임 버튼 상태 */
   step(inputs = [EMPTY_INPUT, EMPTY_INPUT]) {
     if (this.over) return this.events = [];
+    if (this.roundIntro > 0) {
+      this.roundIntro--;
+      this.frame++;
+      return this.events = [];
+    }
     const [a, b] = this.fighters;
     const frame = this.frame;
 
@@ -67,16 +78,40 @@ export class Match {
         this.endReason = 'ko';
         this.winner = a.state === S.KO && b.state === S.KO ? 'draw' : a.state === S.KO ? 1 : 0;
       }
-      if (++this.koTimer >= BALANCE.round.koDelay) this.over = true;
+      if (++this.koTimer >= BALANCE.round.koDelay) {
+        this.fighters.forEach((f, i) => { if (f.state === S.KO) this.lives[i] = Math.max(0, this.lives[i] - 1); });
+        if (this.lives[0] > 0 && this.lives[1] > 0) this.nextRound();
+        else {
+          this.winner = this.lives[0] === this.lives[1] ? 'draw' : this.lives[0] > 0 ? 0 : 1;
+          this.over = true;
+        }
+      }
       return;
     }
     if (--this.timeLeft <= 0) {
       this.timeLeft = 0;
       this.endReason = 'time';
-      // 시간 종료: 남은 체력 비율로 판정 (무기별 체력이 다를 수 있음)
-      const ra = a.hp / a.maxHp, rb = b.hp / b.maxHp;
+      // 시간 종료: 남은 목숨 → 남은 체력 비율 순으로 판정 (무기별 체력이 다를 수 있음)
+      const ra = this.lives[0] + a.hp / a.maxHp, rb = this.lives[1] + b.hp / b.maxHp;
       this.winner = ra === rb ? 'draw' : ra > rb ? 0 : 1;
       this.over = true;
     }
+  }
+
+  /** 다음 라운드: 처음 위치로. 쓰러진 쪽은 체력 회복, 버틴 쪽은 체력 유지. 궁극기 게이지와 기록은 이어진다. */
+  nextRound() {
+    this.fighters.forEach((f, i) => {
+      const fresh = createFighter(this.spawn[i]);
+      const keep = { hp: f.state === S.KO ? fresh.hp : f.hp, ult: f.ult, stats: f.stats };
+      for (const k of Object.keys(f)) delete f[k];
+      Object.assign(f, fresh, keep);
+    });
+    this.round++;
+    this.koTimer = 0;
+    this.winner = null;
+    this.endReason = null;
+    this.timeLeft = this.roundSeconds * FPS;
+    this.roundIntro = BALANCE.round.introFrames;
+    this.events.push({ type: 'round', round: this.round, lives: [...this.lives] });
   }
 }

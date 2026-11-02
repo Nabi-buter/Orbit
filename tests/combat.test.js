@@ -364,9 +364,34 @@ test('동시 공격은 상쇄(양쪽 피격)된다 – 처리 순서 불공정 �
   assert.ok(a.hp < B.fighter.maxHp);
 });
 
-test('KO 및 시간 종료 판정', () => {
+test('KO 및 시간 종료 판정 (목숨 2개)', () => {
   let m = setup({ distance: 85 });
-  m.fighters[1].hp = 10;
+  const [a, b] = m.fighters;
+  const startX = m.spawn.map((sp) => sp.x);
+  // 첫 KO: 경기는 계속, 처음 위치에서 다음 라운드
+  a.hp = 300;
+  b.hp = 10;
+  a.ult = 20;
+  tap(m, 0, 'light');
+  run(m, 120);
+  assert.equal(m.over, false);
+  assert.equal(m.round, 2);
+  assert.deepEqual(m.lives, [2, 1]);
+  assert.equal(b.hp, b.maxHp, '쓰러진 쪽은 체력 회복');
+  assert.equal(a.hp, 300, '버틴 쪽은 체력 그대로');
+  assert.ok(a.ult > 20, '궁극기 게이지 유지 (적중으로 얻은 양 포함)');
+  assert.equal(a.guard, B.fighter.maxGuard);
+  assert.deepEqual([a.x, b.x], startX, '처음 위치');
+  assert.ok(m.roundIntro > 0);
+  // 라운드 사이 정지 중에는 입력 무시
+  const fr = m.frame;
+  m.step([I({ right: true, light: true }), I()]);
+  assert.equal(a.x, startX[0]);
+  assert.equal(m.frame, fr + 1);
+  run(m, B.round.introFrames);
+  // 두 번째 KO: 경기 종료
+  a.x = b.x - 85;
+  b.hp = 10;
   tap(m, 0, 'light');
   run(m, 120);
   assert.equal(m.over, true);
