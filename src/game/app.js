@@ -94,6 +94,12 @@ export class App {
     this.mode = 'online';
     this.match = null;
     if (this.net?.connected && this.netState?.phase === 'room') { this.renderLobby(); return; }
+    if (window.ORBIT_STATIC) {
+      // 정적 호스팅(서버 없음)에서는 온라인 대전을 쓸 수 없다
+      this.netState = { phase: 'connecting', error: '이 링크는 서버 없이 게임 파일만 제공해 온라인 대전을 할 수 없습니다. 온라인 대전은 npm start 로 실행한 서버 주소에서 이용하세요. (PvE·로컬 2인 대전은 사용 가능)' };
+      this.renderLobby();
+      return;
+    }
     this.netState = { phase: 'connecting', error: null };
     this.renderLobby();
     try {

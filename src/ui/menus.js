@@ -225,7 +225,7 @@ export class Menus {
     if (state.error) n.append(el('p', 'net-error', state.error));
 
     if (state.phase === 'connecting') {
-      n.append(el('p', 'hint', '서버에 연결 중…'));
+      if (!state.error) n.append(el('p', 'hint', '서버에 연결 중…'));
       const back = el('button', 'btn ghost', '← 메인으로');
       back.onclick = cb.onBack;
       n.append(back);
