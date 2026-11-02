@@ -73,10 +73,16 @@ function canUltimate(f) {
   return [S.IDLE, S.WALK, S.GUARD, S.ATTACK, S.DASH, S.LANDING].includes(f.state);
 }
 
+/**
+ * 콤보 연결 가능 여부.
+ * - 맞히거나 막혔으면 cancelFrom 부터 연결
+ * - 헛쳤어도 cancelFrom + whiffDelay 부터 연결 (콤보 문자열은 이어지지만 헛치면 더 느림)
+ */
 function canChain(f) {
   if (f.state !== S.ATTACK || !f.attack) return false;
   const { def, frame, connected } = f.attack;
-  return connected && def.cancelFrom != null && frame >= def.cancelFrom;
+  if (def.cancelFrom == null) return false;
+  return frame >= def.cancelFrom + (connected ? 0 : B.combo.whiffDelay);
 }
 
 /**
@@ -117,7 +123,14 @@ export function processInput(f, opp, input, frame) {
     }
   }
 
-  const buf = f.buffer;
+  // 공격 중에 누른 다음 공격은 연결 시점까지 예약해 둔다 (콤보 입력이 씹히지 않도록)
+  if (f.state === S.ATTACK) {
+    if (pressed.light || pressed.heavy) f.queued = pressed.heavy ? 'heavy' : 'light';
+  } else {
+    f.queued = null;
+  }
+  let buf = f.buffer;
+  if (!buf && f.queued && canChain(f)) buf = { action: f.queued, dir: 0, frames: 1 };
   const action = buf?.action;
 
   // --- 궁극기: 최우선, 즉시 시전 ---
@@ -152,6 +165,7 @@ export function processInput(f, opp, input, frame) {
     const def = takeComboAttack(f, action, frame, chaining && !free);
     if (def) {
       consumeBuffer(f);
+      f.queued = null;
       startAttack(f, def);
       return;
     }

@@ -16,7 +16,7 @@ const types = {
   '.html': 'text/html; charset=utf-8', '.js': 'text/javascript; charset=utf-8', '.css': 'text/css; charset=utf-8',
   '.json': 'application/json', '.svg': 'image/svg+xml', '.png': 'image/png', '.md': 'text/plain; charset=utf-8',
 };
-const PUBLIC = ['index.html', 'src/'];
+const PUBLIC = ['index.html', 'src/', 'tools/'];
 
 export function createServer() {
   const server = http.createServer((req, res) => {

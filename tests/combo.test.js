@@ -130,3 +130,37 @@ test('특수강공과 궁극기는 숨 고르기 중에도 사용 가능', () =>
   m.step([I({ ult: true }), I()]);
   assert.equal(a.state, S.ULTIMATE);
 });
+
+test('공격 중 미리 누른 다음 공격은 예약되어 연결 시점에 나간다 (한 번만 눌러도)', () => {
+  for (const id of WEAPON_ORDER) {
+    const m = setup({ distance: 55, weapons: [id, 'longsword'] });
+    const a = m.fighters[0];
+    run(m, 30, I(), I({ guard: true }));
+    m.step([I({ light: true }), I({ guard: true })]);
+    const first = a.attack;
+    run(m, 2, I(), I({ guard: true }));
+    m.step([I({ light: true }), I({ guard: true })]); // 연결 시점보다 훨씬 이른 1회 입력
+    let chained = false;
+    for (let k = 0; k < 80 && a.attack; k++) {
+      m.step([I(), I({ guard: true })]);
+      if (a.attack && a.attack !== first) { chained = true; break; }
+    }
+    assert.ok(chained, `${id}: 예약 입력으로 2단계 연결`);
+    assert.equal(a.attack.def.name, WEAPONS[id].lights[1].name);
+  }
+});
+
+test('헛쳐도 콤보 문자열은 이어지지만 맞혔을 때보다 늦다', () => {
+  const m = setup({ distance: 500, weapons: ['longsword', 'longsword'] });
+  const a = m.fighters[0];
+  m.step([I({ light: true }), I()]);
+  const first = a.attack;
+  let chainedAt = null;
+  for (let k = 0; k < 60; k++) {
+    m.step([I({ light: k % 2 === 0 }), I()]);
+    if (a.attack && a.attack !== first) { chainedAt = first.frame; break; }
+  }
+  assert.ok(chainedAt != null, '헛친 뒤 2단계 연결');
+  assert.ok(chainedAt >= first.def.cancelFrom + BALANCE.combo.whiffDelay - 1, `연결 시점 ${chainedAt}`);
+  assert.equal(a.attack.def.name, WEAPONS.longsword.lights[1].name);
+});

@@ -44,7 +44,7 @@ export const BALANCE = {
     cost: 30,             // [TEMP] 스태미나 소모
     duration: 12,         // [TEMP] 대시 지속 프레임 (무적 없음)
     speed: 12,            // [TEMP] 12 * 12 = 약 144px 이동
-    cooldown: 40,         // [TEMP] 대시 시작 후 재사용 대기 (26→40)
+    cooldown: 34,         // [TEMP] 대시 시작 후 재사용 대기
     allowDoubleTap: true, // 방향키 두 번 입력으로도 대시
     doubleTapWindow: 12,  // [TEMP]
   },
@@ -54,7 +54,7 @@ export const BALANCE = {
     velocity: 15,         // [TEMP] 초기 상승 속도
     gravity: 0.8,         // [TEMP] → 최고점 약 140px, 체공 약 38프레임
     airSpeed: 4,          // [TEMP] 점프 중 수평 속도(이륙 시 방향으로 고정)
-    landingLag: 8,        // [TEMP] 일반 착지 후 짧은 경직 (4→8)
+    landingLag: 6,        // [TEMP] 일반 착지 후 짧은 경직
   },
 
   hit: {
@@ -71,7 +71,7 @@ export const BALANCE = {
     perfectRearm: 22,             // [TEMP] 연타 방지: 직전 가드 입력과 최소 간격
     perfectDamageRatio: 1 / 50,   // [TEMP] 완벽패링 피해 = 최대 체력의 1/50
     perfectGuardCost: 6,          // [TEMP] 완벽패링 시 가드 게이지 소모
-    perfectStun: 42,              // [TEMP] 완벽패링당한 공격자의 행동 불가 시간 (느려진 반격에 맞춰 28→42)
+    perfectStun: 38,              // [TEMP] 완벽패링당한 공격자의 행동 불가 시간 (느려진 반격에 맞춰 28→42)
     regenDelay: 100,              // [TEMP] 마지막 패링 후 회복 시작까지 (밸런스: 80→100)
     regenPerFrame: 1.0,           // [TEMP] 초당 60 회복 (비교적 빠름, 밸런스: 72→60)
   },
@@ -107,6 +107,7 @@ export const BALANCE = {
   combo: {
     // 콤보가 끝난 뒤 이 시간 안에 다시 공격하면 같은 콤보로 계속 센다 (빠졌다 다시 몰아치기 방지)
     window: 36,           // [TEMP] (26→36)
+    whiffDelay: 8,        // [TEMP] 헛친 공격도 cancelFrom + 이 프레임부터 다음 콤보 단계로 연결
     // 무기별 상한(lightMax/heavyMax/maxTotal)과 딜레이(fullLag/mixedLag)는 weapons.js 의 combo 항목
   },
 

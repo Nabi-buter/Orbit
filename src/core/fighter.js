@@ -60,6 +60,7 @@ export function createFighter({ id, x, facing, weapon }) {
 
     prevInput: { ...EMPTY_INPUT },
     buffer: null,           // 선입력 {action, dir, frames}
+    queued: null,           // 공격 중 예약된 다음 공격 ('light'|'heavy')
     lastTap: { dir: 0, frame: -9999 },
 
     // 렌더/디버그용 정보

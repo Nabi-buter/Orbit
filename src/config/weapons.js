@@ -66,8 +66,8 @@ const DEFS = {
     desc: '속도·위력·사거리가 균형 잡힌 기본 무기. 처음 시작하기 좋다.',
     color: '#9fd3ff',
     mods: { walkScale: 1, backWalkScale: 1, dashCostScale: 1 },
-    tempo: 1.45,                                                                 // [TEMP] 무게감 배율
-    combo: { lightMax: 3, heavyMax: 2, maxTotal: 4, fullLag: 60, mixedLag: 28 },   // [TEMP]
+    tempo: 1.25,                                                                 // [TEMP] 무게감 배율
+    combo: { lightMax: 3, heavyMax: 2, maxTotal: 4, fullLag: 52, mixedLag: 24 },   // [TEMP]
     lightSteps: [
       { name: '되베기', motion: 'slash-rev', startup: 1 },
       { name: '찔러 마무리', motion: 'thrust', dmg: 1.3, push: 8, recovery: 6 },
@@ -105,8 +105,8 @@ const DEFS = {
     desc: '느리지만 한 방이 무겁다. 넓은 범위의 강공격으로 거리를 지배한다.',
     color: '#ffb36b',
     mods: { walkScale: 0.85, backWalkScale: 0.85, dashCostScale: 1.1 },
-    tempo: 1.55,                                                                 // [TEMP] 무게감 배율
-    combo: { lightMax: 2, heavyMax: 1, maxTotal: 3, fullLag: 72, mixedLag: 38 },   // [TEMP]
+    tempo: 1.35,                                                                 // [TEMP] 무게감 배율
+    combo: { lightMax: 2, heavyMax: 1, maxTotal: 3, fullLag: 62, mixedLag: 32 },   // [TEMP]
     lightSteps: [
       { name: '우상단 베기', motion: 'slash-rev', dmg: 1.1, push: 6, recovery: 6 },
     ],
@@ -141,8 +141,8 @@ const DEFS = {
     desc: '매우 빠른 찌르기로 빈틈을 파고든다. 사거리가 짧다.',
     color: '#b8ffb0',
     mods: { walkScale: 1.15, backWalkScale: 1.08, dashCostScale: 0.8, dashScale: 1.2 },
-    tempo: 1.3,                                                                 // [TEMP] 무게감 배율
-    combo: { lightMax: 3, heavyMax: 2, maxTotal: 4, fullLag: 50, mixedLag: 24 },   // [TEMP]
+    tempo: 1.15,                                                                 // [TEMP] 무게감 배율
+    combo: { lightMax: 3, heavyMax: 2, maxTotal: 4, fullLag: 42, mixedLag: 20 },   // [TEMP]
     lightSteps: [
       { name: '가르기', motion: 'slash' },
       { name: '깊게 찌르기', motion: 'stab', dmg: 1.25, push: 6, recovery: 5 },
@@ -180,8 +180,8 @@ const DEFS = {
     desc: '가드 게이지를 크게 깎는 강타로 방어를 무너뜨린다.',
     color: '#ff8b8b',
     mods: { walkScale: 0.95, backWalkScale: 0.9, dashCostScale: 1 },
-    tempo: 1.6,                                                                 // [TEMP] 무게감 배율
-    combo: { lightMax: 2, heavyMax: 2, maxTotal: 3, fullLag: 66, mixedLag: 34 },   // [TEMP]
+    tempo: 1.4,                                                                 // [TEMP] 무게감 배율
+    combo: { lightMax: 2, heavyMax: 2, maxTotal: 3, fullLag: 56, mixedLag: 28 },   // [TEMP]
     lightSteps: [
       { name: '옆치기', motion: 'slash-rev', dmg: 1.15, guard: 1.25, recovery: 6 },
     ],
@@ -218,8 +218,8 @@ const DEFS = {
     desc: '가장 긴 사거리. 거리를 유지하며 찌르기로 견제한다. 품에 파고들면 약하다.',
     color: '#d6a8ff',
     mods: { walkScale: 0.9, backWalkScale: 1.0, dashCostScale: 1.1 },
-    tempo: 1.4,                                                                 // [TEMP] 무게감 배율
-    combo: { lightMax: 3, heavyMax: 2, maxTotal: 3, fullLag: 60, mixedLag: 30 },   // [TEMP]
+    tempo: 1.25,                                                                 // [TEMP] 무게감 배율
+    combo: { lightMax: 3, heavyMax: 2, maxTotal: 3, fullLag: 52, mixedLag: 26 },   // [TEMP]
     lightSteps: [
       { name: '재찌르기', motion: 'thrust', startup: 1 },
       { name: '밀어 찌르기', motion: 'thrust', dmg: 1.3, push: 10, recovery: 6 },
@@ -257,8 +257,8 @@ const DEFS = {
     desc: '초근접 연타. 한 대는 약하지만 끊임없이 몰아친다.',
     color: '#ffe36b',
     mods: { walkScale: 1.25, backWalkScale: 1.05, dashCostScale: 0.7, dashScale: 1.35 },
-    tempo: 1.3,                                                                 // [TEMP] 무게감 배율
-    combo: { lightMax: 5, heavyMax: 3, maxTotal: 7, fullLag: 46, mixedLag: 22 },   // [TEMP]
+    tempo: 1.15,                                                                 // [TEMP] 무게감 배율
+    combo: { lightMax: 5, heavyMax: 3, maxTotal: 7, fullLag: 40, mixedLag: 18 },   // [TEMP]
     lightSteps: [
       { name: '잽', motion: 'jab' },
       { name: '훅', motion: 'hook', dmg: 1.15 },

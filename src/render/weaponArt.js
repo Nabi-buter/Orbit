@@ -97,6 +97,12 @@ function fist(accent) {
   return s;
 }
 
+function flipV(src) {
+  const o = makeSprite(src.w, src.h, [src.pivot[0], src.h - 1 - src.pivot[1]]);
+  for (let y = 0; y < src.h; y++) for (let x = 0; x < src.w; x++) sset(o, x, src.h - 1 - y, src.px[y * src.w + x]);
+  return o;
+}
+
 const cache = new Map();
 
 /** 무기 스프라이트 (외곽선 포함) */
@@ -108,7 +114,7 @@ export function weaponSprite(id, accent) {
     case 'longsword': s = blade({ grip: 5, guardH: 5, len: 24, thick: 3, accent }); break;
     case 'greatsword': s = blade({ grip: 7, guardH: 9, len: 33, thick: 5, accent, fuller: true }); break;
     case 'dagger': s = blade({ grip: 3, guardH: 3, len: 11, thick: 3, accent }); break;
-    case 'axe': s = axe(accent); break;
+    case 'axe': s = flipV(axe(accent)); break; // 날이 휘두르는 방향(아래쪽)을 향하도록
     case 'spear': s = spear(accent); break;
     case 'knuckle': s = fist(accent); break;
     default: s = blade({ grip: 4, guardH: 4, len: 20, thick: 3, accent });

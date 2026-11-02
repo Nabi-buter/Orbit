@@ -7,6 +7,7 @@
 import { S } from '../core/fighter.js';
 import { drawWeapon, drawFist, weaponSprite } from './weaponArt.js';
 import { line, disc, px, PX } from './pixel.js';
+import { evalMotion, backHand, STANCE } from './motions.js';
 
 const SWING = {
   slash: [1.9, -0.6], 'slash-wide': [1.7, -0.9], overhead: [2.4, -0.9], 'overhead-big': [2.7, -1.15],
@@ -50,6 +51,9 @@ export function computePose(f, frame) {
   const breathe = Math.sin(frame * 0.08) * 1.5;
   p.crouch = breathe;
   const weaponId = f.weapon.id;
+  // 무기별 기본 자세
+  const st = STANCE[weaponId];
+  if (st) { p.wAngle = st.a; p.hand = [...st.h]; p.hand2 = backHand(weaponId, st); }
 
   switch (f.state) {
     case S.WALK:
@@ -126,12 +130,23 @@ export function computePose(f, frame) {
     default:
       break;
   }
+  if (weaponId === 'knuckle' && !p.extraFist) p.extraFist = p.hand2;
   return p;
 }
 
 function attackPose(p, f, weaponId) {
   const a = f.attack;
   if (!a) return;
+  // 무기별 키프레임 모션 (src/render/motions.js)
+  const mp = evalMotion(weaponId, a.def, a.frame);
+  if (mp) {
+    p.wAngle = mp.a;
+    p.hand = mp.h;
+    p.hand2 = backHand(weaponId, mp);
+    p.lean = mp.lean; p.stride = mp.stride; p.crouch = mp.crouch;
+    if (weaponId === 'knuckle') p.extraFist = p.hand2;
+    return;
+  }
   const { phase, t, hitIndex } = attackPhase(a);
   const motion = a.def.motion;
   const isUlt = a.def.kind === 'ultimate';

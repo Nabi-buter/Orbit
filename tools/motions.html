@@ -1,0 +1,74 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<title>Orbit Duel 모션 뷰어</title>
+<style>
+  body { margin: 0; background: #140f1e; color: #efe3c4; font: 14px system-ui, sans-serif; padding: 16px; }
+  h2 { margin: 18px 0 6px; font-size: 16px; }
+  .row { display: flex; align-items: center; gap: 10px; margin: 4px 0; }
+  .row b { width: 110px; flex: none; font-weight: 600; color: #f0c75e; }
+  canvas { image-rendering: pixelated; background: #221a33; }
+  p { color: #8f86a6; margin: 0 0 8px; }
+</style>
+</head>
+<body>
+<p>src/render/motions.js 의 키프레임을 무기·콤보 단계별로 보여 줍니다. 왼쪽은 재생, 오른쪽은 프레임 순서 (노란 칸 = 판정 프레임). 수정 후 새로고침.</p>
+<div id="out"></div>
+<script type="module">
+import { WEAPONS, WEAPON_ORDER } from '../src/config/weapons.js';
+import { createFighter, S } from '../src/core/fighter.js';
+import { drawFighter } from '../src/render/fighterArt.js';
+import { TEAM } from '../src/render/renderer.js';
+
+const SCALE = 3, CW = 64, CH = 56, STRIP = 10;
+const out = document.getElementById('out');
+const players = [];
+for (const id of WEAPON_ORDER) {
+  const w = WEAPONS[id];
+  const h = document.createElement('h2');
+  h.textContent = `${w.name} (${id})`;
+  out.append(h);
+  for (const def of [...w.lights, ...w.heavies]) {
+    const row = document.createElement('div');
+    row.className = 'row';
+    row.innerHTML = `<b>${def.kind === 'light' ? '약' : '강'} · ${def.name}</b>`;
+    const live = document.createElement('canvas');
+    live.width = CW; live.height = CH; live.style.width = CW * SCALE + 'px';
+    const strip = document.createElement('canvas');
+    strip.width = CW * STRIP; strip.height = CH; strip.style.width = CW * STRIP * 2 + 'px';
+    row.append(live, strip);
+    out.append(row);
+    const f = createFighter({ id: 0, x: 0, facing: 1, weapon: w });
+    const pal = { ...TEAM[0], weapon: w.color };
+    const draw = (ctx, frame, ox) => {
+      f.state = S.ATTACK; f.attack = { def, frame };
+      drawFighter(ctx, f, ox + 22, CH - 4, pal, 0);
+    };
+    const sctx = strip.getContext('2d');
+    for (let k = 0; k < STRIP; k++) {
+      const frame = Math.round((k / (STRIP - 1)) * (def.duration - 1));
+      const active = def.hits.some((h) => frame >= h.from && frame <= h.to);
+      sctx.fillStyle = active ? '#4a3d20' : (k % 2 ? '#221a33' : '#261d3a');
+      sctx.fillRect(k * CW, 0, CW, CH);
+      draw(sctx, frame, k * CW);
+    }
+    players.push({ live, def, draw, t: 0 });
+  }
+}
+function loop() {
+  for (const p of players) {
+    const ctx = p.live.getContext('2d');
+    p.t = (p.t + 1) % (p.def.duration + 30);
+    const frame = Math.min(p.t, p.def.duration - 1);
+    const active = p.def.hits.some((h) => frame >= h.from && frame <= h.to) && p.t < p.def.duration;
+    ctx.fillStyle = active ? '#4a3d20' : '#221a33';
+    ctx.fillRect(0, 0, CW, CH);
+    p.draw(ctx, frame, 0);
+  }
+  requestAnimationFrame(loop);
+}
+loop();
+</script>
+</body>
+</html>
