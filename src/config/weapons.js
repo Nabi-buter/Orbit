@@ -61,8 +61,8 @@ function plunge({ damage, guardDamage, landingLag, fallSpeed = 16, w = 80 }) {
 // =============================================================================
 // ★ 무기별 밸런스 변수 (한곳에서 조정) ★  — 모두 [TEMP]
 // -----------------------------------------------------------------------------
-//   combo  : 콤보 횟수 {lightMax 약공 연속, heavyMax 강공 연속, maxTotal 섞을 때 최대,
-//            fullLag/mixedLag 콤보 종료 딜레이(프레임)}
+//   combo  : 콤보 횟수 {lightMax 약공 연속, heavyMax 강공 연속, maxTotal 섞을 때 최대}
+//            (콤보 종료 딜레이는 BALANCE.combo.turnAdvantage 에서 자동 계산 → 공격권이 상대에게 넘어감)
 //   reach  : 리치 배율 (공격 판정 폭 × reach)
 //   damage : 데미지 배율 (약/강/낙하 공격 피해 × damage. 특수강공·궁극기는 제외)
 //   speed  : 공격 속도 = 무게감 배율 (발생·판정·후딜·연결 시점 × speed, 클수록 느림)
@@ -72,13 +72,13 @@ function plunge({ damage, guardDamage, landingLag, fallSpeed = 16, w = 80 }) {
 // 조정 근거와 결과는 docs/BALANCE.md, 자동 탐색 도구는 scripts/tune.js.
 // =============================================================================
 export const KNOBS = {
-  // scripts/tune.js 자동 탐색 결과 (난이도 교차 AI 대전, 새 시드 검증 승률 48~52%)
-  longsword: { combo: { lightMax: 3, heavyMax: 2, maxTotal: 4, fullLag: 52, mixedLag: 24 }, reach: 0.99, damage: 0.96, speed: 1.27, hp: 1, guardTaken: 1 },
-  greatsword: { combo: { lightMax: 2, heavyMax: 1, maxTotal: 3, fullLag: 62, mixedLag: 32 }, reach: 0.98, damage: 0.95, speed: 1.38, hp: 1, guardTaken: 1 },
-  dagger: { combo: { lightMax: 3, heavyMax: 2, maxTotal: 4, fullLag: 42, mixedLag: 20 }, reach: 1, damage: 1, speed: 1.15, hp: 1, guardTaken: 1 },
-  axe: { combo: { lightMax: 2, heavyMax: 2, maxTotal: 3, fullLag: 56, mixedLag: 28 }, reach: 1, damage: 0.99, speed: 1.41, hp: 1, guardTaken: 1 },
-  spear: { combo: { lightMax: 3, heavyMax: 2, maxTotal: 3, fullLag: 52, mixedLag: 26 }, reach: 1.01, damage: 1.03, speed: 1.23, hp: 1, guardTaken: 1 },
-  knuckle: { combo: { lightMax: 5, heavyMax: 3, maxTotal: 7, fullLag: 40, mixedLag: 18 }, reach: 1.03, damage: 1.06, speed: 1.11, hp: 1.07, guardTaken: 0.91 },
+  // scripts/tune.js 자동 탐색 결과 (8단계 딜레이 체계 기준, 새 시드 검증 승률 47~54%)
+  longsword: { combo: { lightMax: 3, heavyMax: 2, maxTotal: 4 }, reach: 0.99, damage: 0.96, speed: 1.27, hp: 1, guardTaken: 1 },
+  greatsword: { combo: { lightMax: 2, heavyMax: 1, maxTotal: 3 }, reach: 0.96, damage: 0.89, speed: 1.41, hp: 1, guardTaken: 1 },
+  dagger: { combo: { lightMax: 3, heavyMax: 2, maxTotal: 5 }, reach: 1.04, damage: 1.08, speed: 1.1, hp: 1, guardTaken: 1 },
+  axe: { combo: { lightMax: 2, heavyMax: 2, maxTotal: 3 }, reach: 1.01, damage: 1.01, speed: 1.4, hp: 1, guardTaken: 1 },
+  spear: { combo: { lightMax: 3, heavyMax: 2, maxTotal: 3 }, reach: 0.97, damage: 0.95, speed: 1.28, hp: 1, guardTaken: 1 },
+  knuckle: { combo: { lightMax: 5, heavyMax: 3, maxTotal: 7 }, reach: 1.04, damage: 1.12, speed: 1.1, hp: 1.07, guardTaken: 0.91 },
 };
 
 const DEFS = {
@@ -335,6 +335,43 @@ const FIRST_NAMES = {
   axe: ['내려찍기', '도끼 찍기'], spear: ['찌르기', '휘두르기'], knuckle: ['잽', '돌진 연타'],
 };
 
+/**
+ * 콤보 단계 사이 최소 틈 보장: 어떤 단계가 가장 늦게 맞아도, 가장 빠른 다음 단계 판정보다
+ * 피격자가 BALANCE.combo.minGap 프레임 먼저 움직일 수 있도록 연결 시점(cancelFrom)을 늦춘다.
+ */
+function enforceGaps(steps) {
+  const minStart = Math.min(...steps.map((d) => d.hits[0].from));
+  for (const d of steps) {
+    if (d.cancelFrom == null) continue;
+    const last = d.hits.at(-1);
+    const need = last.to + last.hitstun + BALANCE.combo.minGap - minStart;
+    if (d.cancelFrom < need) {
+      d.cancelFrom = need;
+      d.duration = Math.max(d.duration, need + 2);
+    }
+  }
+}
+
+/**
+ * 콤보 후 공격권 이전: 콤보가 끝난 뒤(상한 도달) 상대가 "가장 느린 약공"으로도 먼저 공격할 수 있도록
+ * 콤보 종료 딜레이를 계산한다. 마지막 단계가 무엇이든(최악의 경우) 목표 여유 프레임을 보장.
+ */
+export function finalizeTiming() {
+  const maxLight = Math.max(...Object.values(WEAPONS).map((w) => w.light.hits[0].from));
+  for (const w of Object.values(WEAPONS)) {
+    const steps = [...w.lights, ...w.heavies];
+    const startA = Math.min(...steps.map((d) => d.hits[0].from));
+    let need = 0;
+    for (const d of steps) {
+      const last = d.hits.at(-1);
+      const defFree = last.to + Math.max(last.hitstun, last.blockstun);
+      need = Math.max(need, defFree + maxLight - (d.duration + startA));
+    }
+    const T = BALANCE.combo.turnAdvantage;
+    w.combo = { ...w.knobs.combo, mixedLag: Math.max(0, need + T.mixed), fullLag: Math.max(0, need + T.full) };
+  }
+}
+
 /** 변수 표(knobs)로 무기 하나를 만든다 */
 export function buildWeapon(id, kn = KNOBS[id]) {
   const w = DEFS[id];
@@ -342,6 +379,7 @@ export function buildWeapon(id, kn = KNOBS[id]) {
   const tune = (d) => tempo(scaleDef(d, kn), k);
   const lights = buildSteps(w.light, w.lightSteps ?? [], FIRST_NAMES[id][0], kn.combo.lightMax).map(tune);
   const heavies = buildSteps(w.heavy, w.heavySteps ?? [], FIRST_NAMES[id][1], kn.combo.heavyMax).map(tune);
+  enforceGaps([...lights, ...heavies]);
   const plungeDef = {
     ...w.plunge,
     landingLag: Math.round(w.plunge.landingLag * k),
@@ -356,6 +394,7 @@ export function buildWeapon(id, kn = KNOBS[id]) {
 }
 
 export const WEAPONS = Object.fromEntries(Object.keys(DEFS).map((id) => [id, buildWeapon(id)]));
+finalizeTiming();
 
 /** 밸런스 탐색용: 변수를 바꿔 무기를 다시 만든다 (기존 객체를 갱신) */
 export function applyKnobs(id, kn) {
@@ -363,6 +402,7 @@ export function applyKnobs(id, kn) {
   const fresh = buildWeapon(id, kn);
   for (const key of Object.keys(WEAPONS[id])) delete WEAPONS[id][key];
   Object.assign(WEAPONS[id], fresh);
+  finalizeTiming();
 }
 
 export const DEFAULT_WEAPON = 'longsword';

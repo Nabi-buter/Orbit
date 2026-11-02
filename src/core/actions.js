@@ -76,13 +76,16 @@ function canUltimate(f) {
 /**
  * 콤보 연결 가능 여부.
  * - 맞히거나 막혔으면 cancelFrom 부터 연결
- * - 헛쳤어도 cancelFrom + whiffDelay 부터 연결 (콤보 문자열은 이어지지만 헛치면 더 느림)
+ * - 헛친 약공은 cancelFrom + whiffDelay 부터 연결, 헛친 강공은 연결 불가 (연타 너프)
  */
 function canChain(f) {
   if (f.state !== S.ATTACK || !f.attack) return false;
   const { def, frame, connected } = f.attack;
   if (def.cancelFrom == null) return false;
-  return frame >= def.cancelFrom + (connected ? 0 : B.combo.whiffDelay);
+  if (connected) return frame >= def.cancelFrom;
+  // 헛친 강공은 이어지지 않는다 (후딜 전부 감수). 헛친 약공은 늦게 이어진다.
+  if (def.kind === 'heavy') return false;
+  return frame >= def.cancelFrom + B.combo.whiffDelay;
 }
 
 /**

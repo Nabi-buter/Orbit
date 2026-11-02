@@ -8,11 +8,12 @@
 // - 난이도는 아래 DIFFICULTY 수치로 조절한다. [TEMP]
 // =============================================================================
 
-import { BALANCE } from '../config/balance.js';
+import { BALANCE, STAGE } from '../config/balance.js';
 import { reachOf, contactFrame } from '../core/attackDef.js';
 import { S, EMPTY_INPUT, isFree } from '../core/fighter.js';
 import { dashCost } from '../core/actions.js';
 import { comboAllows } from '../core/combo.js';
+import { OpponentModel } from './predictor.js';
 
 export const DIFFICULTY = {
   easy: {
@@ -28,6 +29,7 @@ export const DIFFICULTY = {
     punishChance: 0.3,   // 빈틈 반격 확률
     evadeChance: 0.1,    // 대시/점프 회피 확률
     preGuard: 0.08,      // 근거리에서 미리 가드할 확률
+    adapt: 0.25,         // 상대 패턴 예측을 행동에 반영하는 정도
   },
   normal: {
     label: '보통',
@@ -42,6 +44,7 @@ export const DIFFICULTY = {
     punishChance: 0.6,
     evadeChance: 0.18,
     preGuard: 0.18,
+    adapt: 0.55,
   },
   hard: {
     label: '어려움',
@@ -56,6 +59,7 @@ export const DIFFICULTY = {
     punishChance: 0.85,
     evadeChance: 0.22,
     preGuard: 0.25,
+    adapt: 0.8,
   },
 };
 
@@ -80,15 +84,20 @@ export class AIController {
     this.nextThink = 0;
     this.lastTap = {};      // key → 마지막 누른 프레임 (엣지 생성용)
     this.watchedAttack = null;
+    this.model = new OpponentModel();
     this.oppAttackStarts = []; // 인지한 상대 공격 시작 시각 (연타 리듬 학습)
     this.rhythmPlanned = -1;
   }
 
   chance(p) { return this.random() < p; }
 
-  snapshot(o) {
+  snapshot(o, me) {
+    const toMe = Math.sign(me.x - o.x) || 1;
     return {
       state: o.state, x: o.x, y: o.y, vy: o.vy,
+      toward: !!o.dash && o.dash.dir === toMe,
+      walkingAway: o.state === S.WALK && Math.sign(o.vx) === -toMe,
+      walkingToward: o.state === S.WALK && Math.sign(o.vx) === toMe,
       def: o.attack?.def ?? null, aframe: o.attack?.frame ?? 0, atk: o.attack,
       timer: o.timer, guard: o.guard, ult: o.ult, lock: o.combo.lock,
     };
@@ -119,9 +128,10 @@ export class AIController {
       this.reactNow = Math.max(6, this.p.reaction + Math.round((this.random() * 2 - 1) * this.p.reactionJitter));
       this.aggr = Math.max(0.05, Math.min(0.95, this.p.aggression * (0.75 + this.random() * 0.5)));
     }
-    this.history.push(this.snapshot(opp));
+    this.history.push(this.snapshot(opp, me));
     if (this.history.length > 90) this.history.shift();
     const seen = this.perceive(frame);
+    this.model.observe(seen, me, frame); // 상대 패턴 학습 (보이는 정보만)
 
     this.react(me, opp, seen, frame);
     if (frame >= this.nextThink) {
@@ -169,7 +179,8 @@ export class AIController {
     // 3) 상대 빈틈(완벽패링당함/착지/가드 브레이크) 반격
     if (STUNNED_OPP.has(seen.state) && isFree(me) && !this.punishing) {
       this.punishing = true;
-      if (this.chance(P.punishChance)) {
+      const bonus = seen.state === S.LANDING && frame < (this.antiAirUntil ?? 0) ? 0.3 : 0;
+      if (this.chance(Math.min(1, P.punishChance + bonus))) {
         this.release('guard');
         if (seen.state === S.GUARD_BREAK) {
           if (dist <= BALANCE.special.triggerRange) this.tapAt(frame, 'heavy');
@@ -177,7 +188,11 @@ export class AIController {
         } else {
           const lightReach = reachOf(me.weapon.light) + 20;
           const heavyReach = reachOf(me.weapon.heavy) + 20;
-          if (dist <= lightReach) this.tapAt(frame, 'light');
+          // 남은 빈틈이 충분하면 강공으로 크게 반격
+          const left = (seen.timer ?? 0) - this.reactNow;
+          const heavyFits = left > me.weapon.heavy.hits[0].from + 3;
+          if (dist <= heavyReach && heavyFits) this.tapAt(frame, 'heavy');
+          else if (dist <= lightReach) this.tapAt(frame, 'light');
           else if (dist <= heavyReach) this.tapAt(frame, 'heavy');
         }
       }
@@ -196,7 +211,7 @@ export class AIController {
         this.tapAt(frame, 'light');
       } else if (oppSlow && this.chance(P.evadeChance * 2) && me.stamina >= dashCost(me) && me.dashCooldown <= 0) {
         this.release('guard');
-        this.tapAt(frame, 'dash', { [me.facing > 0 ? 'left' : 'right']: true });
+        this.retreat(me, frame, 12, true);
       }
     }
     this.prevMyState = me.state;
@@ -222,7 +237,7 @@ export class AIController {
     if (me.state === S.HITSTUN && me.timer === 2 && !this.escapeDecided) {
       this.escapeDecided = true;
       if (this.chance(P.guardChance * 0.8)) this.holdFor('guard', frame, 18);
-      else if (this.chance(P.evadeChance * 1.5) && me.stamina >= dashCost(me)) this.tapAt(frame + 2, 'dash', { [me.facing > 0 ? 'left' : 'right']: true });
+      else if (this.chance(P.evadeChance * 1.5) && me.stamina >= dashCost(me)) this.retreat(me, frame, 12, true);
     }
     if (me.state !== S.HITSTUN) this.escapeDecided = false;
 
@@ -293,8 +308,19 @@ export class AIController {
       until = Math.max(next.from, contact) - seen.aframe - this.reactNow;
     }
     const isUlt = seen.def?.kind === 'ultimate';
+    // 느린 공격(강공 등)이고 사거리 끝이면: 뒤로 빠져 헛치게 한 뒤 후딜을 노린다
+    if (!plunging && !isUlt && until >= 3 && dist > reachOf(seen.def) - 45 && this.roomBehind(me) > 70 && this.chance(P.adapt)) {
+      const back = me.facing > 0 ? 'left' : 'right';
+      this.release('guard');
+      if (me.stamina >= dashCost(me) && me.dashCooldown <= 0 && until < 10) this.retreat(me, frame, 12, true);
+      else this.retreat(me, frame, until + 6);
+      return;
+    }
     const r = this.random();
-    const perfectP = isUlt ? Math.min(0.9, P.perfectChance * 1.6) : P.perfectChance;
+    // 상대가 강공 위주(견제형)면 느린 강공에 완벽패링을 더 노린다 (반응 가능한 속도라 공정)
+    const slowHit = !plunging && seen.def?.kind === 'heavy' && until >= 2;
+    const vsPoker = slowHit && this.model.style() === 'poker' ? P.adapt * 0.6 : 0;
+    const perfectP = isUlt ? Math.min(0.9, P.perfectChance * 1.6) : Math.min(0.85, P.perfectChance + vsPoker);
 
     if (until >= 1 && r < perfectP) {
       // 완벽패링 시도: 가드를 떼었다가 예상 판정 직전에 다시 누른다 (오차 포함)
@@ -320,10 +346,29 @@ export class AIController {
     return pos;
   }
 
+  /** 등 뒤 벽까지 남은 거리 */
+  roomBehind(me) { return me.facing > 0 ? me.x - STAGE.leftWall : STAGE.rightWall - me.x; }
+
+  /**
+   * 뒤로 빠지기. 벽에 몰렸으면 빠질 수 없으므로 상대 머리 위로 점프해 빠져나가거나 가드한다.
+   */
+  retreat(me, frame, n, dash = false) {
+    const back = me.facing > 0 ? 'left' : 'right';
+    const fwd = me.facing > 0 ? 'right' : 'left';
+    if (this.roomBehind(me) > 70) {
+      if (dash && me.stamina >= dashCost(me) && me.dashCooldown <= 0) this.tapAt(frame, 'dash', { [back]: true });
+      else this.holdFor(back, frame, n);
+      return;
+    }
+    this.release(back);
+    if (me.stamina >= BALANCE.jump.cost + 5 && this.chance(0.45)) this.tapAt(frame, 'up', { [fwd]: true });
+    else this.holdFor('guard', frame, n + 6);
+  }
+
   evade(me, frame) {
     const back = me.facing > 0 ? 'left' : 'right';
     if (me.stamina >= dashCost(me) && me.dashCooldown <= 0) {
-      this.tapAt(frame, 'dash', { [back]: true });
+      this.retreat(me, frame, 12, true);
     } else if (me.stamina >= BALANCE.jump.cost && this.chance(0.4)) {
       this.tapAt(frame, 'up');
     }
@@ -349,10 +394,13 @@ export class AIController {
     // 숨 고르기(공격 불가) 중: 물러나거나 가드
     if (me.combo.lock > 0) {
       if (dist < reachOf(opp.weapon.heavy) + 20) {
-        if (this.chance(0.5)) this.holdFor(back, frame, 10); else this.holdFor('guard', frame, 12);
+        if (this.chance(0.5)) this.retreat(me, frame, 10); else this.holdFor('guard', frame, 12);
       }
       return;
     }
+
+    // 상대 패턴 예측에 따른 대응 (예측 반영 정도 = 난이도)
+    if (this.model.count >= 6 && this.chance(P.adapt) && this.counterPlan(me, opp, seen, frame, dist)) return;
 
     // 가드는 위협이 없으면 풀어 준다
     if (this.hold.guard && this.hold.guard <= frame + 2) this.release('guard');
@@ -383,7 +431,7 @@ export class AIController {
         this.tapAt(frame, 'dash', { [fwd]: true });
         this.tapAt(frame + BALANCE.dash.duration - 3, this.chance(0.7) ? 'light' : 'heavy');
       }
-      else if (r0 < 0.7) this.holdFor(back, frame, 10);
+      else if (r0 < 0.7) this.retreat(me, frame, 10);
       else this.holdFor('guard', frame, 12);
       return;
     }
@@ -407,9 +455,9 @@ export class AIController {
       } else if (r < this.aggr + P.preGuard) {
         this.holdFor('guard', frame, 14 + Math.floor(this.random() * 16));
       } else if (r < this.aggr + P.preGuard + 0.15) {
-        this.holdFor(back, frame, 12);
+        this.retreat(me, frame, 12);
       } else if (this.chance(P.evadeChance) && me.stamina > dashCost(me) + 20) {
-        this.tapAt(frame, 'dash', { [back]: true });
+        this.retreat(me, frame, 12, true);
       } else if (this.chance(0.08) && me.stamina > 50) {
         this.tapAt(frame, 'up', { [fwd]: true });
       } else {
@@ -423,12 +471,72 @@ export class AIController {
       } else if (r < this.aggr * 0.55 + 0.25) {
         this.holdFor(fwd, frame, 8 + Math.floor(this.random() * 10));
       } else if (r < this.aggr * 0.55 + 0.4 && dist < oppReach + 20) {
-        this.holdFor(back, frame, 10);
+        this.retreat(me, frame, 10);
       } else if (this.chance(P.preGuard)) {
         this.holdFor('guard', frame, 16);
       } else {
         this.holdFor(fwd, frame, 6);
       }
+    }
+  }
+
+  /**
+   * 예측한 상대 행동에 맞춘 대응. 대응했으면 true.
+   * 큰 틀: 강공 예측 → 사거리 밖으로 빠져 헛치게 하거나 빠른 공격으로 먼저 / 약공 연타 예측 → 미리 가드(완벽패링 노림) 또는 빠지기
+   *        돌진 예측 → 들어오는 길목에 견제 / 가드 예측 → 가드 압박(강공) / 점프 예측 → 착지 노리기
+   *        대기·후퇴 예측 → 무리하지 않고 미끼 걸음 / 궁극기 예측 → 거리 벌리기
+   */
+  counterPlan(me, opp, seen, frame, dist) {
+    const { action, p } = this.model.top(dist);
+    this.lastPrediction = { action, p };
+    if (p < 0.28) return false;
+    const fwd = me.facing > 0 ? 'right' : 'left';
+    const back = me.facing > 0 ? 'left' : 'right';
+    const myLight = reachOf(me.weapon.light), myHeavy = reachOf(me.weapon.heavy);
+    const opLight = reachOf(opp.weapon.light), opHeavy = reachOf(opp.weapon.heavy);
+    const myLightSu = me.weapon.light.hits[0].from, opHeavySu = opp.weapon.heavy.hits[0].from;
+    switch (action) {
+      case 'heavy':
+        if (dist > opHeavy + 60) return false;
+        // 사거리 경계 바깥: 들어가지 않고 기다린다 (상대가 걸어 들어오며 강공 → 헛치게 해서 반격)
+        if (dist > opHeavy + 8) { this.release('guard'); return true; }
+        // 품 안: 내 약공이 상대 강공보다 확실히 빠르면 먼저 친다
+        if (dist <= myLight + 10 && myLightSu + 4 < opHeavySu) { this.release('guard'); this.tapAt(frame, 'light'); return true; }
+        // 그 외: 사거리 밖으로 빠진다 (가드로 받으면 상대 공격권이 이어지므로)
+        if (me.stamina >= dashCost(me) + 5 && me.dashCooldown <= 0) this.retreat(me, frame, 12, true);
+        else this.retreat(me, frame, 14);
+        return true;
+      case 'light':
+        if (dist > opLight + 50) {
+          if (myHeavy > opLight + 20 && dist <= myHeavy) { this.release('guard'); this.tapAt(frame, 'heavy'); return true; } // 사거리로 이기기
+          return false;
+        }
+        if (me.stamina >= dashCost(me) + 10 && me.dashCooldown <= 0 && this.chance(0.35)) { this.retreat(me, frame, 12, true); return true; }
+        this.holdFor('guard', frame, 18 + Math.floor(this.random() * 10)); return true;
+      case 'dashIn':
+        if (dist > myHeavy + 160) return false;
+        if (dist <= myHeavy + 40) { this.release('guard'); this.tapAt(frame, dist <= myLight + 30 ? 'light' : 'heavy'); return true; }
+        return true; // 그 자리에서 기다림 (들어오면 견제)
+      case 'guard':
+        if (dist <= myHeavy) { this.release('guard'); this.tapAt(frame, 'heavy'); return true; }
+        this.holdFor(fwd, frame, 10); return true;
+      case 'jump':
+        if (dist < 160 && me.weapon.heavy.hits[0].box.h >= 100 && dist <= myHeavy) { this.tapAt(frame, 'heavy'); return true; } // 대공
+        this.antiAirUntil = frame + 60; // 착지 반격 확률 상승
+        if (dist < 70) this.retreat(me, frame, 10);
+        return true;
+      case 'wait':
+      case 'retreat':
+        if (dist > myHeavy + 60) { this.holdFor(fwd, frame, 10); return true; }
+        // 기다리는 상대에게는 미끼 걸음 (들어갔다 빠지기)
+        if (this.chance(0.5)) { this.holdFor(fwd, frame, 6); this.taps.push({ frame: frame + 7, key: back, extra: {}, thenHold: 8 }); }
+        else this.holdFor('guard', frame, 12);
+        return true;
+      case 'ult':
+        if (opp.ult >= 100 && dist < 260) { this.retreat(me, frame, 14); return true; }
+        return false;
+      default:
+        return false;
     }
   }
 

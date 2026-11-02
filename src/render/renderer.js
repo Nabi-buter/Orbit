@@ -372,6 +372,10 @@ export class Renderer {
       const u = f.ult / F.maxUlt;
       bar(ctx, X, 49, 110, 4, s, [{ v: u, c: u >= 1 ? (this.time % 16 < 8 ? '#f6b26b' : UI.gold) : UI.purple }], 4);
       text(ctx, u >= 1 ? 'ULT READY' : `ULT ${Math.floor(u * 100)}%`, X + s * 115, 48, u >= 1 ? UI.gold : UI.dim, { align: al });
+      // PvE: AI 분석 표시 (CPU 쪽)
+      if (opts.ai && i === 1) {
+        text(ctx, `분석: ${opts.ai.style}${opts.ai.predict ? ` · 예상: ${opts.ai.predict}` : ''}`, X, 70, UI.dim, { size: 11, align: al, shadow: UI.ink });
+      }
       // 콤보 단계 / 숨 고르기 (HUD 아래)
       const c = f.combo;
       if (f.state === S.ATTACK && c.total > 0 && f.attack.def.name) {

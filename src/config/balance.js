@@ -67,8 +67,8 @@ export const BALANCE = {
   guard: {
     // 가드 버튼을 누르고 있는 것만으로는 게이지가 소모되지 않는다.
     normalParryDamageRate: 0.5,   // 일반 패링: 원래 피해의 50%
-    perfectWindow: 7,             // [TEMP] 가드 입력 후 이 프레임 이내 피격 → 완벽패링
-    perfectRearm: 22,             // [TEMP] 연타 방지: 직전 가드 입력과 최소 간격
+    perfectWindow: 6,             // [TEMP] 가드 입력 후 이 프레임 이내 피격 → 완벽패링 (7→6, 공격이 느려진 만큼 정확도 요구)
+    perfectRearm: 24,             // [TEMP] 연타 방지: 직전 가드 입력과 최소 간격 (22→24)
     perfectDamageRatio: 1 / 50,   // [TEMP] 완벽패링 피해 = 최대 체력의 1/50
     perfectGuardCost: 6,          // [TEMP] 완벽패링 시 가드 게이지 소모
     perfectStun: 38,              // [TEMP] 완벽패링당한 공격자의 행동 불가 시간 (느려진 반격에 맞춰 28→42)
@@ -107,7 +107,13 @@ export const BALANCE = {
   combo: {
     // 콤보가 끝난 뒤 이 시간 안에 다시 공격하면 같은 콤보로 계속 센다 (빠졌다 다시 몰아치기 방지)
     window: 36,           // [TEMP] (26→36)
-    whiffDelay: 8,        // [TEMP] 헛친 공격도 cancelFrom + 이 프레임부터 다음 콤보 단계로 연결
+    whiffDelay: 12,       // [TEMP] 헛친 공격은 cancelFrom + 이 프레임부터 다음 단계 (8→12, 헛친 연타 너프)
+    // 콤보 단계 사이: 가장 늦게 맞아도 피격자가 이만큼 먼저 움직일 수 있다 (가드/완벽패링/대시 틈)
+    minGap: 4,            // [TEMP] (기존 데이터 최소 2 → 4)
+    // 콤보가 끝나면(상한 도달) 공격권은 상대에게 넘어간다:
+    // 어떤 무기의 상대라도 "가장 느린 약공"으로 먼저 공격할 수 있는 여유 프레임.
+    // 무기별 콤보 종료 딜레이(fullLag/mixedLag)는 이 값에서 자동 계산된다 (weapons.js finalizeTiming)
+    turnAdvantage: { mixed: 18, full: 34 },   // [TEMP] 섞어서 끝냄 / 한 종류만 연타
     // 무기별 상한(lightMax/heavyMax/maxTotal)과 딜레이(fullLag/mixedLag)는 weapons.js 의 combo 항목
   },
 

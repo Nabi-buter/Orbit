@@ -8,6 +8,7 @@ import { WEAPONS, WEAPON_ORDER } from '../config/weapons.js';
 import { Match } from '../core/match.js';
 import { EMPTY_INPUT } from '../core/fighter.js';
 import { AIController, DIFFICULTY } from '../ai/ai.js';
+import { STYLE_LABEL } from '../ai/predictor.js';
 import { Keyboard } from '../input/keyboard.js';
 import { Renderer, hitstopFor, UI, TEAM } from '../render/renderer.js';
 import { sfx, playEvent } from '../render/sfx.js';
@@ -305,11 +306,19 @@ export class App {
         frozen: this.paused || this.hitstop > 0,
         intro: this.introText(),
         net: this.mode === 'online' && this.scene === 'battle' ? this.netInfo() : null,
+        ai: this.ai ? this.aiInfo() : null,
       });
     }
     this.screen?.draw(ctx);
     this.renderer.present();
     requestAnimationFrame((t) => this.loop(t));
+  }
+
+  /** PvE: AI 가 플레이어를 어떻게 분석하고 있는지 */
+  aiInfo() {
+    const LABEL = { light: '약공', heavy: '강공', guard: '가드', dashIn: '접근', retreat: '후퇴', jump: '점프', wait: '대기', ult: '궁극기' };
+    const p = this.ai.lastPrediction;
+    return { style: STYLE_LABEL[this.ai.model.style()], predict: p && p.p >= 0.28 ? LABEL[p.action] : null };
   }
 
   netInfo() {

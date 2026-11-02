@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { BALANCE } from '../src/config/balance.js';
 import { WEAPONS, WEAPON_ORDER } from '../src/config/weapons.js';
 import { S } from '../src/core/fighter.js';
-import { setup, run, I } from './helpers.js';
+import { setup, run, until, I } from './helpers.js';
 
 /** 상대가 가드만 하는 상태에서 key 를 계속 연타. 시작된 공격 이름 목록과 마지막 잠금 반환 */
 function mash(id, keys, frames = 200, distance = 55) {
@@ -163,4 +163,45 @@ test('헛쳐도 콤보 문자열은 이어지지만 맞혔을 때보다 늦다',
   assert.ok(chainedAt != null, '헛친 뒤 2단계 연결');
   assert.ok(chainedAt >= first.def.cancelFrom + BALANCE.combo.whiffDelay - 1, `연결 시점 ${chainedAt}`);
   assert.equal(a.attack.def.name, WEAPONS.longsword.lights[1].name);
+});
+
+test('콤보 후 공격권은 상대에게 넘어간다 (모든 무기·모든 마지막 단계, 가장 느린 상대 약공 기준)', () => {
+  const maxLight = Math.max(...WEAPON_ORDER.map((w) => WEAPONS[w].light.hits[0].from));
+  for (const id of WEAPON_ORDER) {
+    const w = WEAPONS[id];
+    const steps = [...w.lights, ...w.heavies];
+    const startA = Math.min(...steps.map((d) => d.hits[0].from));
+    for (const d of steps) {
+      const last = d.hits.at(-1);
+      const defFree = last.to + Math.max(last.hitstun, last.blockstun);
+      for (const [kind, lag] of [['mixed', w.combo.mixedLag], ['full', w.combo.fullLag]]) {
+        const adv = d.duration + lag + startA - (defFree + maxLight);
+        assert.ok(adv >= BALANCE.combo.turnAdvantage[kind], `${id} ${d.name} ${kind}: 상대 유리 ${adv}f`);
+      }
+    }
+  }
+});
+
+test('실전: 콤보를 끝까지 쓴 뒤 상대의 약공이 먼저 들어간다', () => {
+  for (const id of WEAPON_ORDER) {
+    const m = setup({ distance: 55, weapons: [id, 'greatsword'] });
+    const [a, b] = m.fighters;
+    run(m, 30, I(), I({ guard: true }));
+    // 공격자는 약공 연타로 콤보 끝까지, 수비는 계속 가드
+    for (let k = 0; k < 400 && a.combo.lock === 0; k++) {
+      m.step([I({ light: k % 2 === 0 }), I({ guard: true })]);
+      b.x = a.x + 55;
+    }
+    assert.ok(a.combo.lock > 0, `${id} 콤보 종료`);
+    // 이제 수비(대검, 가장 느린 약공)가 반격, 공격자는 계속 약공 연타
+    until(m, () => b.state === 'idle' || b.state === 'guard', I(), I());
+    let first = null;
+    for (let k = 0; k < 120 && !first; k++) {
+      const ev = m.step([I({ light: k % 2 === 0 }), I({ light: k % 2 === 0 })]);
+      b.x = a.x + 55;
+      const h = ev.find((e) => e.type === 'hit');
+      if (h) first = h.attacker;
+    }
+    assert.equal(first, 1, `${id}: 콤보 후 상대가 먼저 때림`);
+  }
 });
