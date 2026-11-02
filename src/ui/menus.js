@@ -21,7 +21,7 @@ export function weaponStats(id) {
   const reach = reachOf(w.light) + reachOf(w.heavy);
   const power = w.heavy.hits.reduce((s, h) => s + h.damage, 0);
   const guardPressure = [...w.light.hits, ...w.heavy.hits].reduce((s, h) => s + h.guardDamage, 0);
-  const combo = w.light.hits.length + w.heavy.hits.length;
+  const combo = w.combo.lightMax + w.combo.heavyMax + w.combo.maxTotal;
   return { speed, reach, power, guardPressure, combo, dps: dps(w.light) + dps(w.heavy) };
 }
 
@@ -165,7 +165,9 @@ export class Menus {
         for (const c of pp.grid.children) c.classList.toggle('selected', c.dataset.id === sel[p]);
         const w = WEAPONS[sel[p]];
         const st = this.stats[sel[p]];
+        const cb = w.combo;
         pp.info.innerHTML = `<h3 style="color:${w.color}">${w.name}</h3><p>${w.desc}</p>` +
+          `<p class="combo-line">약공 ${cb.lightMax}콤보 · 강공 ${cb.heavyMax}콤보 · 섞으면 최대 ${cb.maxTotal}</p>` +
           Object.entries(STAT_LABELS).map(([k, l]) =>
             `<div class="stat"><span>${l}</span><i>${'<b></b>'.repeat(st[k])}${'<b class="off"></b>'.repeat(5 - st[k])}</i></div>`).join('');
         pp.panel.classList.toggle('is-ready', ready[p]);

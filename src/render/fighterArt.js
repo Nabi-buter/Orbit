@@ -11,6 +11,7 @@ const SWING = {
   slash: [1.9, -0.6], 'slash-wide': [1.7, -0.9], overhead: [2.4, -0.9], 'overhead-big': [2.7, -1.15],
   chop: [2.0, -0.7], 'overhead-chop': [2.6, -1.05], sweep: [0.9, -0.3],
   'special-cleave': [2.8, -1.2], 'special-crush': [2.8, -1.2],
+  'slash-rev': [-0.9, 1.7], rising: [-1.1, 2.1],
 };
 const THRUST = new Set(['stab', 'double-stab', 'thrust', 'special-thrust', 'special-pierce', 'special-flurry']);
 const PUNCH = new Set(['jab-jab', 'rush', 'special-uppercut']);
@@ -134,7 +135,7 @@ function attackPose(p, f, weaponId) {
   const motion = a.def.motion;
   const isUlt = a.def.kind === 'ultimate';
 
-  if (isUlt || THRUST.has(motion) || (weaponId === 'spear' && motion !== 'sweep')) {
+  if (isUlt || THRUST.has(motion) || (weaponId === 'spear' && !SWING[motion])) {
     const reach = weaponId === 'spear' ? 46 : 42;
     if (phase === 'windup') { p.hand = [lerp(18, 0, ease(t)), 80]; p.lean = -0.08 * t; }
     else if (phase === 'strike') { p.hand = [lerp(4, reach, ease(Math.min(1, t * 1.6))), 80]; p.lean = 0.22; p.stride = 16; }
@@ -148,7 +149,7 @@ function attackPose(p, f, weaponId) {
   if (PUNCH.has(motion) || weaponId === 'knuckle') {
     const front = hitIndex % 2 === 0;
     const out = phase === 'strike' ? ease(Math.min(1, t * 1.8)) * (1 - Math.max(0, t - 0.7)) : phase === 'windup' ? -0.3 * t : 0;
-    const upper = motion === 'special-uppercut' && phase !== 'windup';
+    const upper = motion.includes('uppercut') && phase !== 'windup';
     const ext = [lerp(16, 46, Math.max(0, out)), upper ? lerp(70, 112, Math.max(0, out)) : 84];
     const rest = [12, 76];
     p.hand = front ? ext : rest;

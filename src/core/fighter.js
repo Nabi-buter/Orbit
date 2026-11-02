@@ -4,6 +4,7 @@
 // =============================================================================
 
 import { BALANCE } from '../config/balance.js';
+import { createComboState } from './combo.js';
 
 export const S = Object.freeze({
   IDLE: 'idle',
@@ -63,6 +64,7 @@ export function createFighter({ id, x, facing, weapon }) {
 
     // 렌더/디버그용 정보
     flash: null,            // 최근 결과 {type, frame}
+    combo: createComboState(),
     stats: { hitsLanded: 0, parries: 0, perfects: 0, damageDealt: 0 },
   };
 }

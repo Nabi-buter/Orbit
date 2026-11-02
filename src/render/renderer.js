@@ -300,6 +300,30 @@ export class Renderer {
       ctx.textAlign = 'center';
       ctx.fillText('흐트러짐', sx, sy - 160);
     }
+    // 콤보 단계 / 숨 고르기 표시
+    const c = f.combo;
+    if (f.state === S.ATTACK && c.total > 0) {
+      const max = f.weapon.combo[c.lastType === 'heavy' ? 'heavyMax' : 'lightMax'];
+      const n = c[c.lastType];
+      ctx.font = '800 14px system-ui, sans-serif';
+      ctx.textAlign = 'center';
+      ctx.lineWidth = 4; ctx.strokeStyle = '#000';
+      const label = `${f.attack.def.name ?? ''} ${n}/${max}`;
+      ctx.strokeText(label, sx, sy - 162);
+      ctx.fillStyle = n >= max ? '#ffb35a' : '#ffffff';
+      ctx.fillText(label, sx, sy - 162);
+    }
+    if (c.lock > 0 && f.state !== S.KO) {
+      const t = c.lock / c.lockMax;
+      ctx.fillStyle = '#000a';
+      ctx.fillRect(sx - 30, sy - 172, 60, 6);
+      ctx.fillStyle = '#9aa3b5';
+      ctx.fillRect(sx - 30, sy - 172, 60 * t, 6);
+      ctx.font = '700 12px system-ui, sans-serif';
+      ctx.textAlign = 'center';
+      ctx.fillStyle = '#c8cfdc';
+      ctx.fillText('숨 고르기', sx, sy - 177);
+    }
     // 플레이어 표시 (머리 위 작은 삼각형)
     if (f.state !== S.KO) {
       ctx.fillStyle = TEAM[i].main;

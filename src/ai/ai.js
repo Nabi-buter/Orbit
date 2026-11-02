@@ -12,6 +12,7 @@ import { BALANCE } from '../config/balance.js';
 import { reachOf, contactFrame } from '../core/attackDef.js';
 import { S, EMPTY_INPUT, isFree } from '../core/fighter.js';
 import { dashCost } from '../core/actions.js';
+import { comboAllows } from '../core/combo.js';
 
 export const DIFFICULTY = {
   easy: {
@@ -86,7 +87,7 @@ export class AIController {
     return {
       state: o.state, x: o.x, y: o.y, vy: o.vy,
       def: o.attack?.def ?? null, aframe: o.attack?.frame ?? 0, atk: o.attack,
-      timer: o.timer, guard: o.guard, ult: o.ult,
+      timer: o.timer, guard: o.guard, ult: o.ult, lock: o.combo.lock,
     };
   }
 
@@ -148,8 +149,11 @@ export class AIController {
         me.attack.frame >= me.attack.def.cancelFrom - 2 && this.chainDecidedFor !== me.attack) {
       this.chainDecidedFor = me.attack;
       if (this.chance(P.comboChance)) {
-        const key = this.chance(0.55) ? 'light' : 'heavy';
-        if (dist <= reachOf(me.weapon[key]) + 10) this.tapAt(frame + 1, key);
+        // 콤보 상한을 고려: 가능한 종류만, 섞어서 길게 잇는 것을 선호
+        const opts = ['light', 'heavy'].filter((k) => comboAllows(me, k, frame, true) && dist <= reachOf(me.weapon[k]) + 10);
+        const other = opts.find((k) => k !== me.combo.lastType);
+        const key = other && this.chance(0.6) ? other : opts[Math.floor(this.random() * opts.length)];
+        if (key) this.tapAt(frame + 1, key);
       }
     }
 
@@ -187,6 +191,23 @@ export class AIController {
       }
     }
     this.prevMyState = me.state;
+
+    // 3-c) 상대가 숨 고르기(공격 불가) 중 → 파고들어 반격 (화면에 보이는 정보)
+    const lockLeft = (seen.lock ?? 0) - P.reaction;
+    if (lockLeft > 8 && isFree(me) && me.combo.lock === 0 && this.lockPunishFor !== seen.atk && frame >= (this.lockPunishAt ?? 0)) {
+      this.lockPunishAt = frame + 20;
+      if (this.chance(P.punishChance)) {
+        const fwd = me.facing > 0 ? 'right' : 'left';
+        const lr = reachOf(me.weapon.light) + 15, hr = reachOf(me.weapon.heavy) + 10;
+        this.release('guard');
+        if (dist <= lr) this.tapAt(frame, 'light');
+        else if (dist <= hr && lockLeft > me.weapon.heavy.hits[0].from) this.tapAt(frame, 'heavy');
+        else if (me.stamina >= dashCost(me) && me.dashCooldown <= 0 && lockLeft > BALANCE.dash.duration + 4) {
+          this.tapAt(frame, 'dash', { [fwd]: true });
+          this.tapAt(frame + BALANCE.dash.duration - 2, 'light');
+        } else this.holdFor(fwd, frame, 8);
+      }
+    }
 
     // 4) 피격 경직 중이면 이어지는 공격에 대비 (가드 유지 또는 탈출 대시)
     if (me.state === S.HITSTUN && me.timer === 2 && !this.escapeDecided) {
@@ -313,6 +334,14 @@ export class AIController {
     // 공중: 하강 중이면 낙하 공격
     if (me.state === S.JUMP) {
       if (me.vy < 0 && dist < 90 && this.chance(0.7)) this.tapAt(frame, 'heavy');
+      return;
+    }
+
+    // 숨 고르기(공격 불가) 중: 물러나거나 가드
+    if (me.combo.lock > 0) {
+      if (dist < reachOf(opp.weapon.heavy) + 20) {
+        if (this.chance(0.5)) this.holdFor(back, frame, 10); else this.holdFor('guard', frame, 12);
+      }
       return;
     }
 

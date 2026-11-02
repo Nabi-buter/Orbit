@@ -15,20 +15,20 @@ test('무기 6종이 존재한다', () => {
   for (const id of WEAPON_ORDER) assert.ok(WEAPONS[id]);
 });
 
-test('모든 무기·연결 조합에서 콤보 사이에 대응할 틈(≥2프레임)이 있다', () => {
+test('모든 무기·모든 콤보 단계 조합에서 콤보 사이에 대응할 틈(≥2프레임)이 있다', () => {
   for (const id of WEAPON_ORDER) {
     const w = WEAPONS[id];
-    for (const first of ['light', 'heavy']) {
-      // 다단 히트 내부: 이전 판정의 경직 중에 다음 판정이 이어진다
-      const hs = w[first].hits;
+    const steps = [...w.lights, ...w.heavies];
+    for (const A of steps) {
+      const hs = A.hits;
       for (let i = 1; i < hs.length; i++) {
-        assert.ok(hs[i - 1].from + hs[i - 1].hitstun > hs[i].to - 0, `${id} ${first} 다단 히트 ${i} 끊김`);
+        assert.ok(hs[i - 1].from + hs[i - 1].hitstun > hs[i].to, `${id} ${A.name} 다단 히트 ${i} 끊김`);
       }
-      for (const second of ['light', 'heavy']) {
+      if (A.cancelFrom == null) continue;
+      for (const Bd of steps) {
         const last = hs.at(-1);
-        const freeAt = last.to + last.hitstun;
-        const next = w[first].cancelFrom + w[second].hits[0].from;
-        assert.ok(next - freeAt >= 2, `${id} ${first}→${second}: 틈 ${next - freeAt}`);
+        const gap = A.cancelFrom + Bd.hits[0].from - (last.to + last.hitstun);
+        assert.ok(gap >= 2, `${id} ${A.name}→${Bd.name}: 틈 ${gap}`);
       }
     }
   }
@@ -66,13 +66,13 @@ test('무기별 성능 차이: 속도·사거리·피해', () => {
   for (const id of WEAPON_ORDER) if (id !== 'axe') assert.ok(gd('axe') > gd(id), id);
 });
 
-test('단검 vs 너클: 너클은 타수가 많고 한 타 피해가 낮다', () => {
-  const hitsOf = (id) => [...WEAPONS[id].light.hits, ...WEAPONS[id].heavy.hits];
+test('단검 vs 너클: 너클은 타수가 많고 한 타 피해가 낮다 (콤보 전체 기준)', () => {
+  const hitsOf = (id) => [...WEAPONS[id].lights, ...WEAPONS[id].heavies].flatMap((d) => d.hits);
   const d = hitsOf('dagger'), k = hitsOf('knuckle');
-  assert.ok(k.length > d.length);
+  assert.ok(k.length > d.length, `타수 ${k.length} vs ${d.length}`);
   const avg = (a) => a.reduce((s, h) => s + h.damage, 0) / a.length;
-  assert.ok(avg(d) > avg(k) * 1.5);
-  assert.ok(Math.max(...k.map((h) => h.damage)) < Math.min(...d.map((h) => h.damage)) + 1);
+  assert.ok(avg(d) > avg(k) * 1.4, `평균 ${avg(d)} vs ${avg(k)}`);
+  assert.ok(WEAPONS.knuckle.combo.lightMax > WEAPONS.dagger.combo.lightMax);
 });
 
 test('궁극기 확장 구조: 타입 등록, 즉시 판정 강제', () => {

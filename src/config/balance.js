@@ -104,6 +104,12 @@ export const BALANCE = {
     perfectParried: 0,    // [TEMP] 완벽패링당함
   },
 
+  combo: {
+    // 콤보가 끝난 뒤 이 시간 안에 다시 공격하면 같은 콤보로 계속 센다 (빠졌다 다시 몰아치기 방지)
+    window: 26,           // [TEMP]
+    // 무기별 상한(lightMax/heavyMax/maxTotal)과 딜레이(fullLag/mixedLag)는 weapons.js 의 combo 항목
+  },
+
   round: {
     timeSeconds: 99,      // [TEMP]
     koDelay: 90,          // KO 후 결과까지 대기

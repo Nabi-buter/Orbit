@@ -82,3 +82,4 @@ kbd { display: inline-block; min-width: 1.6em; padding: .05em .35em; border: 1px
 @media (orientation: portrait) and (max-width: 760px) {
   .rotate-hint { display: block; color: var(--accent); font-size: .85em; text-align: center; }
 }
+.weapon-info p.combo-line { min-height: 0; color: var(--accent); margin-top: -.2em; }

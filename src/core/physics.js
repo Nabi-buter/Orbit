@@ -4,6 +4,7 @@
 
 import { BALANCE, STAGE } from '../config/balance.js';
 import { S, isFree } from './fighter.js';
+import { onAttackEnd, tickCombo } from './combo.js';
 
 const B = BALANCE;
 
@@ -125,8 +126,10 @@ export function advanceTimers(f, frame) {
     case S.ULTIMATE:
       f.attack.frame++;
       if (f.attack.frame >= f.attack.def.duration) {
+        const kind = f.attack.def.kind;
         f.state = S.IDLE;
         f.attack = null;
+        if (kind === 'light' || kind === 'heavy') onAttackEnd(f, frame);
       }
       break;
     case S.PLUNGE:
@@ -153,6 +156,7 @@ export function advanceTimers(f, frame) {
   }
 
   if (f.dashCooldown > 0) f.dashCooldown--;
+  tickCombo(f, frame, f.state === S.ATTACK);
 
   // 스태미나 회복
   if (f.state !== S.DASH && frame - f.lastStaminaUse >= B.stamina.regenDelay) {

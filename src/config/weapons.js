@@ -14,10 +14,16 @@
 //   walkScale / backWalkScale : 걷기 속도 배율
 //   dashCostScale             : 대시 스태미나 소모 배율
 //   dashScale                 : 대시 이동 거리 배율 (무적 없음 규칙은 동일)
+//
+// 콤보(combo) — src/core/combo.js 참고:
+//   lightMax / heavyMax : 약공 / 강공 최대 연속 횟수 (약공 연타 시 lightSteps 순서로 진행)
+//   maxTotal            : 약·강 혼합 시 전체 최대 횟수
+//   fullLag / mixedLag  : 콤보 종료 후 공격 불가 딜레이 (한 종류만 연타 / 섞음)
+// lightSteps / heavySteps : 2단계 이후의 변형 (1단계는 light / heavy 그대로)
 // =============================================================================
 
 import { BALANCE } from './balance.js';
-import { attack, singleHit } from '../core/attackDef.js';
+import { attack, singleHit, variant } from '../core/attackDef.js';
 import { buildUltimate } from '../core/ultimates.js';
 
 /** 특수강공: 무기마다 모션은 다르지만 피해량·판정은 모두 동일 (규칙) */
@@ -56,6 +62,14 @@ const DEFS = {
     desc: '속도·위력·사거리가 균형 잡힌 기본 무기. 처음 시작하기 좋다.',
     color: '#9fd3ff',
     mods: { walkScale: 1, backWalkScale: 1, dashCostScale: 1 },
+    combo: { lightMax: 3, heavyMax: 2, maxTotal: 4, fullLag: 40, mixedLag: 18 },   // [TEMP]
+    lightSteps: [
+      { name: '되베기', motion: 'slash-rev', startup: 1 },
+      { name: '찔러 마무리', motion: 'thrust', dmg: 1.3, push: 8, recovery: 6 },
+    ],
+    heavySteps: [
+      { name: '올려베기', motion: 'rising', dmg: 1.15, startup: 2, recovery: 4 },
+    ],
     light: attack({
       id: 'light', kind: 'light', motion: 'slash', cancelFrom: 12,
       hits: [singleHit({
@@ -86,6 +100,11 @@ const DEFS = {
     desc: '느리지만 한 방이 무겁다. 넓은 범위의 강공격으로 거리를 지배한다.',
     color: '#ffb36b',
     mods: { walkScale: 0.85, backWalkScale: 0.85, dashCostScale: 1.1 },
+    combo: { lightMax: 2, heavyMax: 1, maxTotal: 3, fullLag: 46, mixedLag: 24 },   // [TEMP]
+    lightSteps: [
+      { name: '우상단 베기', motion: 'slash-rev', dmg: 1.1, push: 6, recovery: 6 },
+    ],
+    heavySteps: [],
     light: attack({
       id: 'light', kind: 'light', motion: 'slash-wide', cancelFrom: 17,
       hits: [singleHit({
@@ -116,12 +135,20 @@ const DEFS = {
     desc: '매우 빠른 찌르기로 빈틈을 파고든다. 사거리가 짧다.',
     color: '#b8ffb0',
     mods: { walkScale: 1.15, backWalkScale: 1.08, dashCostScale: 0.8, dashScale: 1.2 },
+    combo: { lightMax: 3, heavyMax: 2, maxTotal: 4, fullLag: 34, mixedLag: 16 },   // [TEMP]
+    lightSteps: [
+      { name: '가르기', motion: 'slash' },
+      { name: '깊게 찌르기', motion: 'stab', dmg: 1.25, push: 6, recovery: 5 },
+    ],
+    heavySteps: [
+      { name: '돌려 베기', motion: 'slash-wide', dmg: 1.1, startup: 2, recovery: 4 },
+    ],
     light: attack({
       id: 'light', kind: 'light', motion: 'stab', cancelFrom: 9,
       hits: [singleHit({
         startup: 3, active: 2, recovery: 12,
         box: { x: 10, y: 45, w: 66, h: 45 },
-        damage: 36, guardDamage: 8, hitstun: 6, blockstun: 6, push: 8,
+        damage: 39, guardDamage: 9, hitstun: 6, blockstun: 6, push: 8,
       })],
     }),
     heavy: attack({
@@ -146,6 +173,13 @@ const DEFS = {
     desc: '가드 게이지를 크게 깎는 강타로 방어를 무너뜨린다.',
     color: '#ff8b8b',
     mods: { walkScale: 0.95, backWalkScale: 0.9, dashCostScale: 1 },
+    combo: { lightMax: 2, heavyMax: 2, maxTotal: 3, fullLag: 42, mixedLag: 22 },   // [TEMP]
+    lightSteps: [
+      { name: '옆치기', motion: 'slash-rev', dmg: 1.15, guard: 1.25, recovery: 6 },
+    ],
+    heavySteps: [
+      { name: '휘둘러 찍기', motion: 'sweep', dmg: 1.1, startup: 2, recovery: 4 },
+    ],
     light: attack({
       id: 'light', kind: 'light', motion: 'chop', cancelFrom: 15,
       hits: [singleHit({
@@ -176,6 +210,14 @@ const DEFS = {
     desc: '가장 긴 사거리. 거리를 유지하며 찌르기로 견제한다. 품에 파고들면 약하다.',
     color: '#d6a8ff',
     mods: { walkScale: 0.9, backWalkScale: 1.0, dashCostScale: 1.1 },
+    combo: { lightMax: 3, heavyMax: 2, maxTotal: 3, fullLag: 40, mixedLag: 20 },   // [TEMP]
+    lightSteps: [
+      { name: '재찌르기', motion: 'thrust', startup: 1 },
+      { name: '밀어 찌르기', motion: 'thrust', dmg: 1.3, push: 10, recovery: 6 },
+    ],
+    heavySteps: [
+      { name: '회전 베기', motion: 'slash-wide', dmg: 1.1, startup: 2, recovery: 4 },
+    ],
     light: attack({
       id: 'light', kind: 'light', motion: 'thrust', cancelFrom: 15,
       hits: [singleHit({
@@ -206,12 +248,24 @@ const DEFS = {
     desc: '초근접 연타. 한 대는 약하지만 끊임없이 몰아친다.',
     color: '#ffe36b',
     mods: { walkScale: 1.25, backWalkScale: 1.05, dashCostScale: 0.7, dashScale: 1.35 },
+    combo: { lightMax: 5, heavyMax: 3, maxTotal: 7, fullLag: 32, mixedLag: 14 },   // [TEMP]
+    lightSteps: [
+      { name: '잽', motion: 'jab' },
+      { name: '훅', motion: 'hook', dmg: 1.15 },
+      { name: '바디 블로', motion: 'body', dmg: 1.15, startup: 1 },
+      { name: '어퍼컷', motion: 'uppercut', dmg: 1.6, push: 10, recovery: 6 },
+    ],
+    heavySteps: [
+      { name: '러시', motion: 'rush', startup: 1 },
+      { name: '스트레이트', motion: 'straight', dmg: 1.2, push: 8, recovery: 6 },
+    ],
     light: attack({
-      id: 'light', kind: 'light', motion: 'jab-jab', cancelFrom: 12, duration: 20,
-      hits: [
-        { from: 3, to: 3, box: { x: 10, y: 55, w: 54, h: 35 }, damage: 18, guardDamage: 6, hitstun: 6, blockstun: 6, push: 2, ultGainScale: 0.6 },
-        { from: 7, to: 7, box: { x: 10, y: 55, w: 56, h: 35 }, damage: 20, guardDamage: 6, hitstun: 6, blockstun: 6, push: 6, ultGainScale: 0.6 },
-      ],
+      id: 'light', kind: 'light', motion: 'jab', cancelFrom: 9,
+      hits: [singleHit({
+        startup: 3, active: 1, recovery: 13,
+        box: { x: 10, y: 55, w: 56, h: 35 },
+        damage: 25, guardDamage: 7, hitstun: 6, blockstun: 6, push: 4, ultGainScale: 0.7,
+      })],
     }),
     heavy: attack({
       id: 'heavy', kind: 'heavy', motion: 'rush', cancelFrom: 24, duration: 35,
@@ -230,8 +284,28 @@ const DEFS = {
 
 export const WEAPON_ORDER = ['longsword', 'greatsword', 'dagger', 'axe', 'spear', 'knuckle'];
 
+/** 콤보 단계별 공격 목록: [1단계(기본), ...변형] */
+function buildSteps(base, steps, firstName) {
+  return [{ ...base, name: firstName }, ...steps.map((st) => variant(base, st))];
+}
+
+const FIRST_NAMES = {
+  longsword: ['베기', '내려베기'], greatsword: ['좌상단 베기', '대검 내려찍기'], dagger: ['찌르기', '이연 찌르기'],
+  axe: ['내려찍기', '도끼 찍기'], spear: ['찌르기', '휘두르기'], knuckle: ['잽', '돌진 연타'],
+};
+
 export const WEAPONS = Object.fromEntries(
-  Object.entries(DEFS).map(([id, w]) => [id, { id, ...w, ultimateSpec: w.ultimate, ultimate: buildUltimate(id, w.ultimate) }]),
+  Object.entries(DEFS).map(([id, w]) => {
+    const lights = buildSteps(w.light, w.lightSteps ?? [], FIRST_NAMES[id][0]);
+    const heavies = buildSteps(w.heavy, w.heavySteps ?? [], FIRST_NAMES[id][1]);
+    if (lights.length !== w.combo.lightMax || heavies.length !== w.combo.heavyMax) {
+      throw new Error(`${id}: 콤보 단계 수와 lightMax/heavyMax 불일치`);
+    }
+    return [id, {
+      id, ...w, light: lights[0], heavy: heavies[0], lights, heavies,
+      ultimateSpec: w.ultimate, ultimate: buildUltimate(id, w.ultimate),
+    }];
+  }),
 );
 
 export const DEFAULT_WEAPON = 'longsword';

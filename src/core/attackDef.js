@@ -47,3 +47,29 @@ export function contactFrame(def, dist, halfWidth = 25) {
   }
   return null;
 }
+
+/**
+ * 콤보 단계용 변형 공격 (기본 공격에서 파생).
+ * startup: 판정 지연(+프레임), recovery: 후딜 추가, hitstun: 경직 추가(연결 시점도 같이 늦춰 틈 규칙 유지)
+ */
+export function variant(base, { name, motion, dmg = 1, guard = dmg, startup = 0, recovery = 0, push = 0, reach = 0, hitstun = 0 } = {}) {
+  const shift = startup;
+  return {
+    ...base,
+    name: name ?? base.name,
+    motion: motion ?? base.motion,
+    duration: base.duration + shift + recovery + hitstun,
+    cancelFrom: base.cancelFrom == null ? null : base.cancelFrom + shift + hitstun,
+    moves: base.moves.map((m) => ({ ...m, from: m.from + shift, to: m.to + shift })),
+    hits: base.hits.map((h) => ({
+      ...h,
+      from: h.from + shift,
+      to: h.to + shift,
+      damage: Math.round(h.damage * dmg),
+      guardDamage: Math.round(h.guardDamage * guard),
+      push: h.push + push,
+      hitstun: h.hitstun + hitstun,
+      box: { ...h.box, w: h.box.w + reach },
+    })),
+  };
+}

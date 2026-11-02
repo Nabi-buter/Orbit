@@ -6,6 +6,7 @@
 
 import { BALANCE, STAGE } from '../config/balance.js';
 import { S, isGuarding, hurtbox, worldBox, overlap } from './fighter.js';
+import { resetCombo } from './combo.js';
 
 const B = BALANCE;
 
@@ -68,6 +69,7 @@ function applyPush(defender, attacker, push) {
 }
 
 function interrupt(f) {
+  if (f.attack && (f.attack.def.kind === 'light' || f.attack.def.kind === 'heavy')) resetCombo(f);
   f.attack = null;
   f.dash = null;
   f.slide = null;

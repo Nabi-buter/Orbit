@@ -5,6 +5,7 @@
 
 import { BALANCE } from '../config/balance.js';
 import { S, isFree } from './fighter.js';
+import { takeComboAttack } from './combo.js';
 
 const B = BALANCE;
 
@@ -137,16 +138,23 @@ export function processInput(f, opp, input, frame) {
   const free = isFree(f);
 
   // --- 약/강공격 (자유 상태 또는 접촉 후 연결 구간) ---
-  if ((action === 'light' || action === 'heavy') && (free || canChain(f))) {
-    consumeBuffer(f);
+  const chaining = canChain(f);
+  if ((action === 'light' || action === 'heavy') && (free || chaining)) {
     const dist = Math.abs(opp.x - f.x);
     if (action === 'heavy' && opp.state === S.GUARD_BREAK && dist <= B.special.triggerRange) {
+      // 특수강공은 콤보/딜레이와 무관
+      consumeBuffer(f);
       f.facing = opp.x >= f.x ? 1 : -1;
       startAttack(f, f.weapon.special);
-    } else {
-      startAttack(f, action === 'light' ? f.weapon.light : f.weapon.heavy);
+      return;
     }
-    return;
+    // 무기별 콤보 상한 / 숨 고르기 딜레이 확인 (불가하면 선입력은 남겨 둔다)
+    const def = takeComboAttack(f, action, frame, chaining && !free);
+    if (def) {
+      consumeBuffer(f);
+      startAttack(f, def);
+      return;
+    }
   }
 
   if (!free) return;
