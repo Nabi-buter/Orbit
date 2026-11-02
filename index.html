@@ -4,17 +4,13 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Orbit Duel</title>
-  <style>
-    html, body { margin: 0; height: 100%; background: #0b0c10; color: #ddd; font-family: sans-serif; }
-    body { display: flex; flex-direction: column; align-items: center; justify-content: center; }
-    canvas { width: min(100vw, calc(100vh * 16 / 9)); aspect-ratio: 16 / 9; display: block; }
-    #help { font-size: 13px; padding: 6px; opacity: .8; }
-  </style>
+  <link rel="stylesheet" href="src/ui/style.css">
 </head>
 <body>
-  <canvas id="game" width="1280" height="720"></canvas>
-  <div id="help">P1: A/D 이동 · W 점프 · S 가드 · J 약 · K 강 · L 대시 · I 궁극기 &nbsp;|&nbsp;
-    P2: ←/→ · ↑ · ↓ · Num1(,) 약 · Num2(.) 강 · Num3(/) 대시 · Num5(;) 궁극기 &nbsp;|&nbsp; F2 판정 표시 · Backspace 재시작</div>
+  <main id="stage">
+    <canvas id="game" width="1280" height="720" tabindex="0"></canvas>
+    <div id="overlay" hidden></div>
+  </main>
   <script type="module" src="src/main.js"></script>
 </body>
 </html>

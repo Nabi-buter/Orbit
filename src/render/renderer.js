@@ -34,7 +34,8 @@ export class Renderer {
     }
   }
 
-  draw(match) {
+  draw(match, opts = {}) {
+    this.opts = opts;
     const { ctx } = this;
     ctx.setTransform(1, 0, 0, 1, 0, 0);
     ctx.fillStyle = '#14161c';
@@ -111,7 +112,8 @@ export class Renderer {
         ctx.textAlign = left ? 'left' : 'right';
         ctx.fillText(`${label} ${Math.ceil(value)}`, left ? x0 + 4 : x0 + 496, y + h - 3);
       };
-      bar(24, 22, f.hp, F.maxHp, COLORS[i], `P${i + 1} 체력`);
+      const name = this.opts?.names?.[i] ?? `P${i + 1}`;
+      bar(24, 22, f.hp, F.maxHp, COLORS[i], `${name} [${f.weapon.name}] 체력`);
       bar(50, 12, f.stamina, F.maxStamina, '#ffe066', '스태미나');
       bar(66, 12, f.guard, F.maxGuard, '#7dffb0', '가드');
       bar(82, 12, f.ult, F.maxUlt, f.ult >= F.maxUlt ? '#ff9c2a' : '#c77dff', f.ult >= F.maxUlt ? '궁극기 준비!' : '궁극기');

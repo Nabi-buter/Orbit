@@ -1,0 +1,143 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import { BALANCE } from '../src/config/balance.js';
+import { WEAPONS, WEAPON_ORDER } from '../src/config/weapons.js';
+import { reachOf } from '../src/core/attackDef.js';
+import { registerUltimateType, buildUltimate } from '../src/core/ultimates.js';
+import { attack } from '../src/core/attackDef.js';
+import { S } from '../src/core/fighter.js';
+import { setup, run, tap, until, I } from './helpers.js';
+
+const B = BALANCE;
+
+test('무기 6종이 존재한다', () => {
+  assert.deepEqual(WEAPON_ORDER, ['longsword', 'greatsword', 'dagger', 'axe', 'spear', 'knuckle']);
+  for (const id of WEAPON_ORDER) assert.ok(WEAPONS[id]);
+});
+
+test('모든 무기·연결 조합에서 콤보 사이에 대응할 틈(≥2프레임)이 있다', () => {
+  for (const id of WEAPON_ORDER) {
+    const w = WEAPONS[id];
+    for (const first of ['light', 'heavy']) {
+      // 다단 히트 내부: 이전 판정의 경직 중에 다음 판정이 이어진다
+      const hs = w[first].hits;
+      for (let i = 1; i < hs.length; i++) {
+        assert.ok(hs[i - 1].from + hs[i - 1].hitstun > hs[i].to - 0, `${id} ${first} 다단 히트 ${i} 끊김`);
+      }
+      for (const second of ['light', 'heavy']) {
+        const last = hs.at(-1);
+        const freeAt = last.to + last.hitstun;
+        const next = w[first].cancelFrom + w[second].hits[0].from;
+        assert.ok(next - freeAt >= 2, `${id} ${first}→${second}: 틈 ${next - freeAt}`);
+      }
+    }
+  }
+});
+
+test('특수강공 피해는 모든 무기 동일, 모션은 무기별로 다르다', () => {
+  const dmg = new Set(WEAPON_ORDER.map((id) => WEAPONS[id].special.hits[0].damage));
+  assert.deepEqual([...dmg], [B.special.damage]);
+  const motions = new Set(WEAPON_ORDER.map((id) => WEAPONS[id].special.motion));
+  assert.equal(motions.size, 6);
+});
+
+test('무기별 성능 차이: 속도·사거리·피해', () => {
+  const W = WEAPONS;
+  const startup = (id, k) => W[id][k].hits[0].from;
+  const totalDmg = (id, k) => W[id][k].hits.reduce((s, h) => s + h.damage, 0);
+  // 대검: 가장 느리고 강공 피해 최고
+  for (const id of WEAPON_ORDER) {
+    if (id === 'greatsword') continue;
+    assert.ok(startup('greatsword', 'heavy') >= startup(id, 'heavy'));
+    assert.ok(totalDmg('greatsword', 'heavy') > totalDmg(id, 'heavy'));
+  }
+  // 창: 가장 긴 사거리
+  for (const id of WEAPON_ORDER) if (id !== 'spear') assert.ok(reachOf(W.spear.light) > reachOf(W[id].light));
+  // 단검·너클: 가장 빠른 약공, 짧은 사거리
+  for (const id of ['longsword', 'greatsword', 'axe', 'spear']) {
+    assert.ok(startup('dagger', 'light') < startup(id, 'light'));
+    assert.ok(startup('knuckle', 'light') < startup(id, 'light'));
+    assert.ok(reachOf(W.knuckle.light) < reachOf(W[id].light));
+  }
+  // 너클 사거리 < 단검 사거리
+  assert.ok(reachOf(W.knuckle.light) < reachOf(W.dagger.light));
+  // 도끼: 가드 압박(가드 게이지 피해) 최고
+  const gd = (id) => W[id].light.hits.reduce((s, h) => s + h.guardDamage, 0) + W[id].heavy.hits.reduce((s, h) => s + h.guardDamage, 0);
+  for (const id of WEAPON_ORDER) if (id !== 'axe') assert.ok(gd('axe') > gd(id), id);
+});
+
+test('단검 vs 너클: 너클은 타수가 많고 한 타 피해가 낮다', () => {
+  const hitsOf = (id) => [...WEAPONS[id].light.hits, ...WEAPONS[id].heavy.hits];
+  const d = hitsOf('dagger'), k = hitsOf('knuckle');
+  assert.ok(k.length > d.length);
+  const avg = (a) => a.reduce((s, h) => s + h.damage, 0) / a.length;
+  assert.ok(avg(d) > avg(k) * 1.5);
+  assert.ok(Math.max(...k.map((h) => h.damage)) < Math.min(...d.map((h) => h.damage)) + 1);
+});
+
+test('궁극기 확장 구조: 타입 등록, 즉시 판정 강제', () => {
+  for (const id of WEAPON_ORDER) {
+    const u = WEAPONS[id].ultimate;
+    assert.equal(u.kind, 'ultimate');
+    assert.ok(u.hits[0].from <= 1);
+    assert.ok(WEAPONS[id].ultimateSpec.type);
+  }
+  registerUltimateType('testWave', () => attack({ id: 'u', kind: 'ultimate', duration: 30, hits: [{ from: 0, to: 10, box: { x: 0, y: 0, w: 300, h: 50 }, damage: 1, guardDamage: 0, hitstun: 1, blockstun: 0, push: 0 }] }));
+  assert.equal(buildUltimate('x', { type: 'testWave' }).ultimateType, 'testWave');
+  registerUltimateType('slowWindup', () => attack({ id: 'u', kind: 'ultimate', duration: 30, hits: [{ from: 10, to: 12, box: { x: 0, y: 0, w: 1, h: 1 }, damage: 1, guardDamage: 0, hitstun: 1, blockstun: 0, push: 0 }] }));
+  assert.throws(() => buildUltimate('x', { type: 'slowWindup' }));
+});
+
+test('모든 무기: 적중·연결·일반 패링·완벽패링·가드 브레이크·특수강공 규칙 유지', () => {
+  for (const id of WEAPON_ORDER) {
+    // 적중 + 연결
+    let m = setup({ distance: 60, weapons: [id, 'longsword'] });
+    let [a, b] = m.fighters;
+    tap(m, 0, 'light');
+    until(m, () => a.attack?.connected);
+    assert.ok(b.hp < B.fighter.maxHp, `${id} 약공 적중`);
+    const first = a.attack;
+    let chained = false;
+    for (let k = 0; k < 40 && a.attack; k++) {
+      m.step([I({ heavy: k % 2 === 0 }), I()]);
+      if (a.attack && a.attack !== first) { chained = true; break; }
+    }
+    assert.ok(chained, `${id} 약→강 연결`);
+
+    // 일반 패링
+    m = setup({ distance: 60, weapons: [id, 'longsword'] });
+    [a, b] = m.fighters;
+    run(m, 30, I(), I({ guard: true }));
+    m.step([I({ heavy: true }), I({ guard: true })]);
+    const ev = run(m, 40, I(), I({ guard: true }));
+    const parry = ev.find((e) => e.type === 'parry');
+    assert.ok(parry, `${id} 일반 패링`);
+    const firstHit = WEAPONS[id].heavy.hits[0];
+    assert.equal(ev.filter((e) => e.type === 'parry').length, WEAPONS[id].heavy.hits.length);
+    assert.ok(B.fighter.maxHp - b.hp <= WEAPONS[id].heavy.hits.reduce((s, h) => s + Math.round(h.damage / 2), 0));
+
+    // 완벽패링 (강공 첫 판정 직전 가드)
+    m = setup({ distance: 60, weapons: [id, 'longsword'] });
+    [a, b] = m.fighters;
+    tap(m, 0, 'heavy');
+    run(m, firstHit.from - 3);
+    const ev2 = run(m, 6, I(), I({ guard: true }));
+    assert.ok(ev2.some((e) => e.type === 'perfect'), `${id} 완벽패링`);
+    assert.equal(a.state, S.PARRIED);
+
+    // 가드 브레이크 → 특수강공
+    m = setup({ distance: 60, weapons: [id, 'longsword'] });
+    [a, b] = m.fighters;
+    run(m, 30, I(), I({ guard: true }));
+    b.guard = 1; b.lastGuardUse = m.frame;
+    m.step([I({ light: true }), I({ guard: true })]);
+    until(m, () => b.state === S.GUARD_BREAK, I(), I({ guard: true }));
+    assert.equal(b.state, S.GUARD_BREAK, `${id} 가드 브레이크`);
+    until(m, () => a.state === S.IDLE);
+    const hp0 = b.hp;
+    tap(m, 0, 'heavy');
+    assert.equal(a.state, S.SPECIAL, `${id} 특수강공 발동`);
+    until(m, () => b.state === S.KNOCKBACK);
+    assert.equal(hp0 - b.hp, B.special.damage, `${id} 특수강공 피해 동일`);
+  }
+});

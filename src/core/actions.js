@@ -33,10 +33,14 @@ export function startAttack(f, def) {
   f.vx = 0;
 }
 
+export function dashCost(f) {
+  return B.dash.cost * (f.weapon.mods?.dashCostScale ?? 1);
+}
+
 function startDash(f, dir, frame) {
   f.state = S.DASH;
   f.dash = { dir, frame: 0 };
-  f.stamina -= B.dash.cost;
+  f.stamina -= dashCost(f);
   f.lastStaminaUse = frame;
   f.dashCooldown = B.dash.cooldown;
   f.attack = null;
@@ -148,7 +152,7 @@ export function processInput(f, opp, input, frame) {
   if (!free) return;
 
   // --- 대시 ---
-  if (action === 'dash' && f.dashCooldown <= 0 && f.stamina >= B.dash.cost) {
+  if (action === 'dash' && f.dashCooldown <= 0 && f.stamina >= dashCost(f)) {
     consumeBuffer(f);
     const dir = buf.dir || dirHeld || f.facing; // 방향 입력이 없으면 상대 쪽
     startDash(f, dir, frame);
@@ -173,7 +177,10 @@ export function processInput(f, opp, input, frame) {
   if (dirHeld !== 0) {
     f.state = S.WALK;
     const forward = dirHeld === f.facing;
-    f.vx = dirHeld * (forward ? B.fighter.walkSpeed : B.fighter.backWalkSpeed);
+    const mods = f.weapon.mods ?? {};
+    f.vx = dirHeld * (forward
+      ? B.fighter.walkSpeed * (mods.walkScale ?? 1)
+      : B.fighter.backWalkSpeed * (mods.backWalkScale ?? 1));
   } else {
     f.state = S.IDLE;
     f.vx = 0;

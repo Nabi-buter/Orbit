@@ -1,0 +1,60 @@
+:root {
+  --bg: #0b0c10; --panel: #161922ee; --line: #2c3242; --text: #e8eaf0; --muted: #9aa3b5;
+  --p1: #4aa3ff; --p2: #ff5a5a; --accent: #ffd34a;
+}
+* { box-sizing: border-box; }
+html, body { margin: 0; height: 100%; background: var(--bg); color: var(--text);
+  font-family: system-ui, -apple-system, "Segoe UI", "Noto Sans KR", sans-serif; overflow: hidden; }
+#stage { position: relative; width: min(100vw, calc(100vh * 16 / 9)); aspect-ratio: 16 / 9; margin: auto;
+  top: 50%; transform: translateY(-50%); container-type: inline-size; }
+#game { width: 100%; height: 100%; display: block; outline: none; }
+#overlay { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center;
+  background: #0b0c10cc; overflow: auto; }
+#overlay[hidden] { display: none; }
+.screen { width: 100%; max-width: 1100px; padding: 2.5cqw; display: flex; flex-direction: column; align-items: center; gap: 1.4cqw; }
+.logo { font-size: 7cqw; font-weight: 900; letter-spacing: .1em; }
+.logo span { color: var(--accent); }
+.tagline, .hint { color: var(--muted); margin: 0; font-size: 1.4cqw; }
+h2 { margin: 0; font-size: 2.6cqw; }
+.menu-list { display: flex; flex-direction: column; gap: .8cqw; min-width: 28cqw; }
+.menu-list.row { flex-direction: row; }
+.btn { font: inherit; font-size: 1.6cqw; padding: .9cqw 1.6cqw; border-radius: .6cqw; border: 1px solid var(--line);
+  background: #1f2430; color: var(--text); cursor: pointer; display: flex; flex-direction: column; align-items: center; }
+.btn small { color: var(--muted); font-size: 1.1cqw; }
+.btn:hover, .btn:focus-visible { border-color: var(--accent); outline: none; background: #2a3040; }
+.btn.primary { background: #3a2f0e; border-color: #8a6d16; }
+.btn.ghost { background: transparent; }
+.btn.small { font-size: 1.2cqw; padding: .5cqw 1cqw; }
+.btn.selected { border-color: var(--accent); color: var(--accent); }
+.btn:disabled { opacity: .5; cursor: default; }
+.select-cols { display: flex; gap: 2cqw; width: 100%; }
+.select-panel { flex: 1; background: var(--panel); border: 2px solid var(--line); border-radius: 1cqw; padding: 1.2cqw; display: flex; flex-direction: column; gap: .8cqw; }
+.select-panel.p1 { border-color: #2b5f99; } .select-panel.p2 { border-color: #993b3b; }
+.select-panel.is-ready { box-shadow: 0 0 0 3px var(--accent) inset; }
+.panel-head { display: flex; justify-content: space-between; align-items: baseline; font-size: 1.3cqw; color: var(--muted); }
+.panel-head b { font-size: 2cqw; color: var(--text); }
+.weapon-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: .6cqw; }
+.weapon-card { font: inherit; font-size: 1.3cqw; background: #1b1f2a; color: var(--text); border: 2px solid var(--line);
+  border-radius: .6cqw; padding: .4cqw; cursor: pointer; display: flex; flex-direction: column; align-items: center; }
+.weapon-card canvas { width: 100%; max-width: 96px; aspect-ratio: 3 / 2; }
+.weapon-card.selected { border-color: var(--wc); box-shadow: 0 0 1cqw -0.2cqw var(--wc); }
+.weapon-info h3 { margin: 0; font-size: 1.8cqw; }
+.weapon-info p { margin: .3cqw 0 .6cqw; color: var(--muted); font-size: 1.2cqw; min-height: 3em; }
+.stat { display: flex; align-items: center; gap: .6cqw; font-size: 1.1cqw; }
+.stat span { width: 6cqw; color: var(--muted); }
+.stat i { display: flex; gap: .25cqw; }
+.stat b { width: 2.2cqw; height: .7cqw; background: var(--accent); border-radius: 2px; }
+.stat b.off { background: #333a4a; }
+.select-bottom { display: flex; gap: 1cqw; align-items: center; width: 100%; justify-content: flex-end; flex-wrap: wrap; }
+.difficulty { display: flex; gap: .5cqw; align-items: center; margin-right: auto; font-size: 1.3cqw; }
+.start-btn { min-width: 18cqw; }
+.result-title { font-size: 6cqw; font-weight: 900; }
+.result-sub { color: var(--muted); font-size: 1.6cqw; margin: 0; }
+.result-stats { display: flex; gap: 3cqw; font-size: 1.3cqw; color: var(--muted); text-align: center; }
+.result-stats b { color: var(--text); }
+.help-body { width: 100%; font-size: 1.25cqw; }
+table.keys { width: 100%; border-collapse: collapse; }
+table.keys td, table.keys th { padding: .35cqw .6cqw; border-bottom: 1px solid var(--line); text-align: left; }
+kbd { display: inline-block; min-width: 1.8cqw; padding: .1cqw .4cqw; border: 1px solid #556; border-bottom-width: 3px;
+  border-radius: .3cqw; background: #222836; font-family: inherit; text-align: center; }
+.tips p { margin: .4cqw 0; color: var(--muted); } .tips b { color: var(--text); }

@@ -7,7 +7,13 @@
 ```bash
 npm start          # http://localhost:8080
 npm test           # 전투 규칙 자동 테스트
+node scripts/simulate.js 20 hard   # AI 대 AI 무기 상성 시뮬레이션
 ```
+
+## 모드 / 무기
+
+- **PvP**: 한 키보드 2인 로컬 대전 · **PvE**: AI 상대 (쉬움/보통/어려움)
+- 무기 6종: 장검 · 대검 · 단검 · 도끼 · 창 · 너클 (`src/config/weapons.js`)
 
 외부 의존성이 없다. (Node 18+ 필요: 정적 서버와 테스트 실행용)
 
@@ -23,7 +29,11 @@ npm test           # 전투 규칙 자동 테스트
 | `src/core/physics.js` | 이동·중력·충돌·타이머·게이지 회복 |
 | `src/core/combat.js` | 공격 판정, 피격/패링/완벽패링/가드 브레이크/특수강공 |
 | `src/core/match.js` | 1프레임 시뮬레이션 (`step(inputs)`), 승패 |
+| `src/core/ultimates.js` | 궁극기 타입 등록 구조 (무기별 궁극기 확장용) |
+| `src/ai/ai.js` | PvE AI (지연 인지·난이도 수치) |
 | `src/input/` | 키보드 → 프레임 입력 (전투 로직과 분리) |
+| `src/game/app.js` | 화면 전환과 게임 루프 |
+| `src/ui/` | 메뉴 화면 (DOM) |
 | `src/render/` | 캔버스 렌더링 (상태 읽기 전용) |
 
 전투 로직(`src/core`)은 DOM·입력 장치·네트워크를 전혀 모른다. 양쪽 플레이어의 프레임 입력만 받아

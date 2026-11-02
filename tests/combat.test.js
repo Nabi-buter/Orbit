@@ -113,14 +113,14 @@ test('짧은 경직: 연결 공격 사이에 피격자가 가드/대시로 대�
   const w = setup().fighters[0].weapon;
   for (const first of ['light', 'heavy']) {
     for (const second of ['light', 'heavy']) {
-      const h1 = w[first].hits[0];
-      const freeAt = h1.from + h1.hitstun;               // 가장 빠른 적중 기준 피격자 행동 가능 시점
+      const h1 = w[first].hits.at(-1);
+      const freeAt = h1.to + h1.hitstun;                 // 가장 늦은 적중 기준 피격자 행동 가능 시점
       const nextHit = w[first].cancelFrom + w[second].hits[0].from; // 가장 빠른 다음 판정
       assert.ok(nextHit - freeAt >= 2, `${first}→${second} 틈 부족 (${nextHit - freeAt})`);
     }
   }
   // 실제 시뮬레이션: 약→약 연결 사이에 가드 입력 → 두 번째 공격 패링
-  const m = setup({ distance: 85 });
+  const m = setup({ distance: 60 });
   const [a, b] = m.fighters;
   tap(m, 0, 'light');
   until(m, () => b.state === S.HITSTUN);
