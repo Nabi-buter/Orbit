@@ -83,3 +83,15 @@ kbd { display: inline-block; min-width: 1.6em; padding: .05em .35em; border: 1px
   .rotate-hint { display: block; color: var(--accent); font-size: .85em; text-align: center; }
 }
 .weapon-info p.combo-line { min-height: 0; color: var(--accent); margin-top: -.2em; }
+
+.net-error { color: #ff7a7a; margin: 0; }
+.join-row { display: flex; gap: .5em; }
+.code-input { font: inherit; font-size: 1.2em; flex: 1; min-width: 0; padding: .5em .7em; border-radius: .45em; border: 1px solid var(--line);
+  background: #11141c; color: var(--text); text-transform: uppercase; letter-spacing: .3em; text-align: center; }
+.code-input:focus { outline: none; border-color: var(--accent); }
+.room-code { font-size: 1.3em; color: var(--muted); }
+.room-code b { color: var(--accent); font-size: 1.8em; letter-spacing: .25em; margin-left: .3em; }
+.opp-weapon { display: flex; flex-direction: column; align-items: center; text-align: center; gap: .3em; padding: 1em 0; }
+.opp-weapon canvas { width: 60%; max-width: 192px; }
+.opp-weapon h3 { margin: 0; font-size: 1.5em; }
+.opp-weapon p { margin: 0; color: var(--muted); font-size: .9em; }

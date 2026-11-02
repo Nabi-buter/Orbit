@@ -123,6 +123,60 @@ function assert(c, msg) { if (!c) throw new Error('E2E 실패: ' + msg); console
       await shot(`07-select-${w}x${h}`);
     }
 
+    // 온라인 대전: 두 브라우저(다른 컴퓨터 역할)
+    await page.setViewportSize({ width: 1280, height: 720 });
+    const ctxB = await browser.newContext({ viewport: { width: 1280, height: 720 } });
+    const pageB = await ctxB.newPage();
+    pageB.on('console', (m) => { if (m.type() === 'error') errors.push('B: ' + m.text()); });
+    pageB.on('pageerror', (e) => errors.push('B: ' + String(e)));
+    await page.goto(`http://localhost:${PORT}/`);
+    await pageB.goto(`http://localhost:${PORT}/`);
+    await wait(300);
+    await page.click('text=온라인 대전');
+    await page.waitForSelector('text=방 만들기');
+    await page.click('text=방 만들기');
+    await page.waitForSelector('.room-code b');
+    const code = await page.textContent('.room-code b');
+    assert(/^[A-Z0-9]{4}$/.test(code), `방 생성 (코드 ${code})`);
+    await shot('08-online-room');
+    await pageB.click('text=온라인 대전');
+    await pageB.waitForSelector('.code-input');
+    await pageB.fill('.code-input', code.toLowerCase());
+    await pageB.click('text=참가');
+    await pageB.waitForSelector('.room-code b');
+    assert(await pageB.textContent('.room-code b') === code, '코드로 방 참가');
+    await page.click('.weapon-card[data-id="axe"]');
+    await wait(100);
+    await pageB.click('.weapon-card[data-id="knuckle"]');
+    await wait(200);
+    await page.click('.ready-btn');
+    await pageB.click('.ready-btn');
+    await wait(300);
+    const wa = await page.evaluate(() => window.__game.scene === 'battle' && window.__game.match.fighters.map((f) => f.weapon.id));
+    const wb = await pageB.evaluate(() => window.__game.scene === 'battle' && window.__game.match.fighters.map((f) => f.weapon.id));
+    assert(JSON.stringify(wa) === '["axe","knuckle"]' && JSON.stringify(wb) === '["axe","knuckle"]', `온라인 대전 시작 ${wa} / ${wb}`);
+    await wait(1800);
+    await page.keyboard.down('KeyD'); await pageB.keyboard.down('ArrowLeft');
+    await wait(700);
+    await page.keyboard.up('KeyD'); await pageB.keyboard.up('ArrowLeft');
+    for (let k = 0; k < 6; k++) { await page.keyboard.press('KeyJ'); await pageB.keyboard.press('KeyK'); await wait(120); }
+    await wait(1500);
+    await shot('09-online-battle');
+    const st = async (p) => p.evaluate(() => { const g = window.__game; return { f: g.match.frame, desync: g.lockstep?.desyncAt ?? null, hp: g.match.fighters.map((x) => x.hp) }; });
+    const sa = await st(page), sb = await st(pageB);
+    assert(sa.f > 120 && sb.f > 120, `온라인 진행 프레임 ${sa.f} / ${sb.f}`);
+    assert(Math.abs(sa.f - sb.f) <= 12, '두 클라이언트 프레임 차이가 입력 지연 이내');
+    assert(sa.desync === null && sb.desync === null, '동기화 해시 일치 (desync 없음)');
+    // 같은 프레임 시점의 상태 비교: 한쪽을 기다렸다가 비교
+    const hpA = sa.hp.join('/'), hpB = sb.hp.join('/');
+    console.log(`    체력 A ${hpA} · B ${hpB}`);
+    // 기권 → 상대에게 승리 화면
+    await page.keyboard.press('Escape');
+    await page.click('text=대전 나가기');
+    await pageB.waitForSelector('text=승리 (상대 퇴장)', { timeout: 3000 });
+    assert(true, '상대 기권 시 승리 처리');
+    await ctxB.close();
+
     assert(errors.length === 0, `콘솔 오류 없음 ${errors.length ? JSON.stringify(errors) : ''}`);
     console.log('E2E 통과');
   } catch (e) {

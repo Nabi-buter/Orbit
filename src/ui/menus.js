@@ -55,6 +55,7 @@ export class Menus {
   }
 
   show(node) {
+    this.keyHandler = null; // 화면마다 키 처리기를 새로 지정
     this.root.innerHTML = '';
     this.root.appendChild(node);
     this.root.hidden = false;
@@ -74,19 +75,20 @@ export class Menus {
     return false;
   }
 
-  title({ onPvP, onPvE, onHelp }) {
+  title({ onOnline, onPvP, onPvE, onHelp }) {
     const n = el('div', 'screen title-screen');
     n.append(
       el('div', 'logo', '<span>ORBIT</span> DUEL'),
       el('p', 'tagline', '거리 · 타이밍 · 심리전 — 2D 1:1 무기 격투'),
     );
     const list = el('div', 'menu-list');
-    const b1 = el('button', 'btn primary', '플레이어 대전 <small>PvP · 한 키보드 2인</small>');
+    const b0 = el('button', 'btn primary', '온라인 대전 <small>PvP · 서로 다른 컴퓨터</small>');
     const b2 = el('button', 'btn', '컴퓨터 대전 <small>PvE · AI 상대</small>');
+    const b1 = el('button', 'btn', '로컬 2인 대전 <small>한 키보드</small>');
     const b3 = el('button', 'btn ghost', '조작 방법');
-    b1.dataset.autofocus = '';
-    b1.onclick = onPvP; b2.onclick = onPvE; b3.onclick = onHelp;
-    list.append(b1, b2, b3);
+    b0.dataset.autofocus = '';
+    b0.onclick = onOnline; b1.onclick = onPvP; b2.onclick = onPvE; b3.onclick = onHelp;
+    list.append(b0, b2, b1, b3);
     n.append(list, el('p', 'hint', '방향키/WASD 로 이동 · Enter/J 로 선택'),
       el('p', 'rotate-hint', '키보드 게임입니다. 가로 화면 / PC 환경을 권장합니다.'));
     this.show(n);
@@ -214,16 +216,132 @@ export class Menus {
     };
   }
 
-  result({ title, subtitle, color, stats, onRematch, onSelect, onMain }) {
+  /**
+   * 온라인 로비. state: {phase:'connecting'|'connect'|'room', error, code, slot, connected, weapons, ready, rtt, peerRtt}
+   */
+  onlineLobby(state, cb) {
+    const n = el('div', 'screen online-screen');
+    n.append(el('h2', null, '온라인 대전'));
+    if (state.error) n.append(el('p', 'net-error', state.error));
+
+    if (state.phase === 'connecting') {
+      n.append(el('p', 'hint', '서버에 연결 중…'));
+      const back = el('button', 'btn ghost', '← 메인으로');
+      back.onclick = cb.onBack;
+      n.append(back);
+      this.show(n);
+      return;
+    }
+
+    if (state.phase === 'connect') {
+      const box = el('div', 'menu-list');
+      const create = el('button', 'btn primary', '방 만들기 <small>코드를 상대에게 알려 주세요</small>');
+      create.dataset.autofocus = '';
+      create.onclick = cb.onCreate;
+      const row = el('div', 'join-row');
+      const input = el('input', 'code-input');
+      input.placeholder = '방 코드 4자리';
+      input.maxLength = 4;
+      input.autocomplete = 'off';
+      const join = el('button', 'btn', '참가');
+      const doJoin = () => input.value.trim() && cb.onJoin(input.value.trim());
+      join.onclick = doJoin;
+      input.onkeydown = (e) => { e.stopPropagation(); if (e.key === 'Enter') doJoin(); };
+      row.append(input, join);
+      const back = el('button', 'btn ghost', '← 메인으로');
+      back.onclick = cb.onBack;
+      box.append(create, row, back);
+      n.append(box, el('p', 'hint', '같은 서버(이 페이지 주소)에 접속한 상대와 대전합니다.'));
+      this.show(n);
+      return;
+    }
+
+    // 방 안
+    const me = state.slot, op = 1 - state.slot;
+    const ping = state.rtt != null ? `핑 ${state.rtt}ms` : '';
+    n.append(el('div', 'room-code', `방 코드 <b>${state.code}</b>`),
+      el('p', 'hint', state.connected[op] ? `상대 접속됨 · ${ping}${state.peerRtt != null ? ` / 상대 ${state.peerRtt}ms` : ''}` : `상대를 기다리는 중… ${ping}`));
+
+    const cols = el('div', 'select-cols');
+    const mine = el('div', `select-panel p${me + 1}`);
+    mine.append(el('div', 'panel-head', `<b>나 (P${me + 1})</b><span>A/D 선택 · J 준비</span>`));
+    const grid = el('div', 'weapon-grid');
+    WEAPON_ORDER.forEach((id) => {
+      const c = el('button', 'weapon-card');
+      c.style.setProperty('--wc', WEAPONS[id].color);
+      c.innerHTML = `<canvas width="96" height="64"></canvas><span>${WEAPONS[id].name}</span>`;
+      c.dataset.id = id;
+      c.classList.toggle('selected', state.weapons[me] === id);
+      c.onclick = () => cb.onSelect(id);
+      grid.append(c);
+    });
+    const info = el('div', 'weapon-info');
+    const w = WEAPONS[state.weapons[me]];
+    info.innerHTML = `<h3 style="color:${w.color}">${w.name}</h3><p>${w.desc}</p>` +
+      `<p class="combo-line">약공 ${w.combo.lightMax}콤보 · 강공 ${w.combo.heavyMax}콤보 · 섞으면 최대 ${w.combo.maxTotal}</p>`;
+    const readyBtn = el('button', 'btn small ready-btn', state.ready[me] ? '준비 완료 ✓ (취소)' : '준비');
+    readyBtn.onclick = () => cb.onReady(!state.ready[me]);
+    readyBtn.disabled = !state.connected[op];
+    mine.append(grid, info, readyBtn);
+    mine.classList.toggle('is-ready', !!state.ready[me]);
+
+    const theirs = el('div', `select-panel p${op + 1}`);
+    const ow = WEAPONS[state.weapons[op]];
+    theirs.append(el('div', 'panel-head', `<b>상대 (P${op + 1})</b><span>${state.connected[op] ? (state.ready[op] ? '준비 완료' : '선택 중…') : '미접속'}</span>`));
+    if (state.connected[op]) {
+      const big = el('div', 'opp-weapon');
+      big.innerHTML = `<canvas width="192" height="128"></canvas><h3 style="color:${ow.color}">${ow.name}</h3><p>${ow.desc}</p>`;
+      theirs.append(big);
+    }
+    theirs.classList.toggle('is-ready', !!state.ready[op]);
+    cols.append(mine, theirs);
+    n.append(cols);
+
+    const bottom = el('div', 'select-bottom');
+    const leave = el('button', 'btn ghost', '방 나가기');
+    leave.onclick = cb.onLeave;
+    bottom.append(leave);
+    n.append(bottom, el('p', 'hint', '양쪽 모두 준비하면 대전이 시작됩니다.'));
+    this.show(n);
+    readyBtn.focus();
+    cb.onRendered?.(n);
+
+    this.keyHandler = (code) => {
+      const i = WEAPON_ORDER.indexOf(state.weapons[me]);
+      if (code === 'KeyA' || code === 'ArrowLeft') { cb.onSelect(WEAPON_ORDER[(i + 5) % 6]); return true; }
+      if (code === 'KeyD' || code === 'ArrowRight') { cb.onSelect(WEAPON_ORDER[(i + 1) % 6]); return true; }
+      if (code === 'KeyJ' || code === 'Enter') { if (state.connected[op]) cb.onReady(!state.ready[me]); return true; }
+      if (code === 'Escape') { cb.onLeave(); return true; }
+      return false;
+    };
+  }
+
+  /** 온라인 대전 중 메뉴 (시뮬레이션은 멈추지 않는다) */
+  onlineMenu({ onResume, onLeave }) {
+    const n = el('div', 'screen pause-screen');
+    n.append(el('h2', null, '메뉴'), el('p', 'hint', '온라인 대전 중에는 게임이 멈추지 않습니다.'));
+    const list = el('div', 'menu-list');
+    const r = el('button', 'btn primary', '계속하기');
+    r.dataset.autofocus = '';
+    r.onclick = onResume;
+    const l = el('button', 'btn ghost', '대전 나가기 (기권)');
+    l.onclick = onLeave;
+    list.append(r, l);
+    n.append(list);
+    this.show(n);
+  }
+
+  result({ title, subtitle, color, stats, onRematch, onSelect, onMain, labels }) {
     const n = el('div', 'screen result-screen');
     const h = el('div', 'result-title', title);
     h.style.color = color;
     n.append(h, el('p', 'result-sub', subtitle));
     if (stats) n.append(el('div', 'result-stats', stats));
     const list = el('div', 'menu-list row');
-    const b1 = el('button', 'btn primary', '다시 대전');
-    const b2 = el('button', 'btn', '무기 선택');
-    const b3 = el('button', 'btn ghost', '메인 화면');
+    const b1 = el('button', 'btn primary', labels?.[0] ?? '다시 대전');
+    const b2 = el('button', 'btn', labels?.[1] ?? '무기 선택');
+    const b3 = el('button', 'btn ghost', labels?.[2] ?? '메인 화면');
+    if (!onSelect) b2.hidden = true;
     b1.dataset.autofocus = '';
     b1.onclick = onRematch; b2.onclick = onSelect; b3.onclick = onMain;
     list.append(b1, b2, b3);

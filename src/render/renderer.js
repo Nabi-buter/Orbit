@@ -418,7 +418,22 @@ export class Renderer {
     ctx.font = '500 13px system-ui, sans-serif';
     ctx.fillStyle = '#ffffff70';
     ctx.textAlign = 'center';
-    ctx.fillText('Esc 일시정지 · F2 판정 · M 소리', W / 2, H - 14);
+    ctx.fillText(opts.net ? 'Esc 메뉴 · M 소리' : 'Esc 일시정지 · F2 판정 · M 소리', W / 2, H - 14);
+    if (opts.net) {
+      ctx.font = '600 13px system-ui, sans-serif';
+      ctx.fillStyle = '#9fd0ff';
+      ctx.fillText(opts.net.text, W / 2, 96);
+      if (opts.net.waiting) {
+        ctx.font = '800 22px system-ui, sans-serif';
+        ctx.fillStyle = '#ffd34a';
+        ctx.fillText('상대 입력을 기다리는 중…', W / 2, 200);
+      }
+      if (opts.net.desync) {
+        ctx.font = '800 16px system-ui, sans-serif';
+        ctx.fillStyle = '#ff6b6b';
+        ctx.fillText('⚠ 동기화 오류 감지 — 결과가 서로 다를 수 있습니다', W / 2, 120);
+      }
+    }
   }
 
   drawIntro(ctx, intro) {

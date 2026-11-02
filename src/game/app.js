@@ -12,6 +12,10 @@ import { Keyboard } from '../input/keyboard.js';
 import { Renderer, hitstopFor } from '../render/renderer.js';
 import { sfx, playEvent } from '../render/sfx.js';
 import { Menus } from '../ui/menus.js';
+import { NetClient } from '../net/client.js';
+import { Lockstep } from '../net/lockstep.js';
+import { drawWeaponIcon } from '../render/weaponArt.js';
+import { EMPTY_INPUT } from '../core/fighter.js';
 
 const STEP = 1000 / FPS;
 const INTRO_FRAMES = 96;
@@ -41,6 +45,7 @@ export class App {
     this.scene = 'title';
     this.match = null;
     this.menus.title({
+      onOnline: () => this.toOnline(),
       onPvP: () => this.toSelect('pvp'),
       onPvE: () => this.toSelect('pve'),
       onHelp: () => this.toHelp(),
@@ -83,6 +88,101 @@ export class App {
     this.canvas.focus();
   }
 
+  // --- 온라인 대전 ------------------------------------------------------------
+  async toOnline() {
+    this.scene = 'online';
+    this.mode = 'online';
+    this.match = null;
+    if (this.net?.connected && this.netState?.phase === 'room') { this.renderLobby(); return; }
+    this.netState = { phase: 'connecting', error: null };
+    this.renderLobby();
+    try {
+      this.net?.close();
+      const net = new NetClient(NetClient.defaultUrl());
+      this.net = net;
+      this.bindNet(net);
+      await net.connect();
+      if (this.net !== net) return;
+      this.netState = { phase: 'connect', error: null };
+    } catch (e) {
+      this.netState = { phase: 'connect', error: `${e.message} (npm start 로 실행한 서버 주소로 접속했는지 확인하세요)` };
+    }
+    if (this.scene === 'online') this.renderLobby();
+  }
+
+  bindNet(net) {
+    net
+      .on('joined', (m) => { Object.assign(this.netState, { phase: 'room', code: m.code, slot: m.slot, error: null }); })
+      .on('lobby', (m) => {
+        Object.assign(this.netState, { phase: 'room', code: m.code, connected: m.connected, weapons: m.weapons, ready: m.ready, playing: m.playing });
+        if (this.scene === 'online') this.renderLobby();
+      })
+      .on('error', (m) => { this.netState.error = m.msg; if (this.scene === 'online') this.renderLobby(); })
+      .on('ping', (m) => {
+        const changed = this.netState.rtt !== m.rtt;
+        this.netState.rtt = m.rtt; this.netState.peerRtt = m.peerRtt;
+        if (changed && this.scene === 'online' && this.netState.phase === 'room' && !this.netState.connected?.[1 - this.netState.slot]) this.renderLobby();
+      })
+      .on('start', (m) => this.startOnlineMatch(m))
+      .on('input', (m) => { if (this.lockstep && m.m === this.lockstep.matchId) this.lockstep.onRemoteInput(m.f, m.i); })
+      .on('hash', (m) => { if (this.lockstep && m.m === this.lockstep.matchId) this.lockstep.onRemoteHash(m.f, m.h); })
+      .on('peerLeft', () => {
+        if (this.scene === 'battle' && this.mode === 'online' && !this.match.over) this.toResult({ peerLeft: true });
+        else if (this.scene === 'online') this.renderLobby();
+      })
+      .on('close', () => {
+        if (this.net !== net) return;
+        this.netState = { phase: 'connect', error: '서버와 연결이 끊어졌습니다.' };
+        if (this.scene === 'battle' && this.mode === 'online') this.toResult({ disconnected: true });
+        else if (this.scene === 'online') this.toOnline();
+      });
+  }
+
+  renderLobby() {
+    this.menus.onlineLobby(this.netState, {
+      onBack: () => this.leaveOnline(),
+      onCreate: () => this.net.send({ t: 'create' }),
+      onJoin: (code) => this.net.send({ t: 'join', code }),
+      onSelect: (weapon) => this.net.send({ t: 'select', weapon }),
+      onReady: (ready) => this.net.send({ t: 'ready', ready }),
+      onLeave: () => { this.net.send({ t: 'leave' }); this.netState = { phase: 'connect', error: null }; this.renderLobby(); },
+      onRendered: (node) => {
+        node.querySelectorAll('.weapon-card').forEach((c) => drawWeaponIcon(c.querySelector('canvas'), c.dataset.id, WEAPONS[c.dataset.id].color));
+        const oc = node.querySelector('.opp-weapon canvas');
+        const ow = this.netState.weapons?.[1 - this.netState.slot];
+        if (oc && ow) drawWeaponIcon(oc, ow, WEAPONS[ow].color);
+      },
+    });
+  }
+
+  leaveOnline() {
+    this.net?.send({ t: 'leave' });
+    this.net?.close();
+    this.net = null;
+    this.lockstep = null;
+    this.toTitle();
+  }
+
+  startOnlineMatch(msg) {
+    this.mode = 'online';
+    this.weapons = msg.weapons;
+    this.slot = msg.slot;
+    this.netDelay = msg.delay;
+    this.lockstep = new Lockstep({ slot: msg.slot, delay: msg.delay, matchId: msg.matchId, send: (m) => this.net.send(m) });
+    this.onlineMenuOpen = false;
+    this.startMatch();
+  }
+
+  toggleOnlineMenu() {
+    if (this.match.over) return;
+    this.onlineMenuOpen = !this.onlineMenuOpen;
+    if (!this.onlineMenuOpen) { this.menus.clear(); return; }
+    this.menus.onlineMenu({
+      onResume: () => this.toggleOnlineMenu(),
+      onLeave: () => { this.onlineMenuOpen = false; this.net.send({ t: 'leave' }); this.lockstep = null; this.netState = { phase: 'connect', error: null }; this.toOnline(); },
+    });
+  }
+
   pause() {
     if (this.scene !== 'battle' || this.match.over) return;
     this.paused = true;
@@ -101,12 +201,33 @@ export class App {
     this.acc = 0;
   }
 
-  toResult() {
+  toResult(net = {}) {
     this.scene = 'result';
     const m = this.match;
     const names = this.playerNames();
     let title, color;
+    const online = this.mode === 'online';
+    if (online && (net.peerLeft || net.disconnected)) {
+      this.lockstep = null;
+      this.menus.result({
+        title: net.peerLeft ? '승리 (상대 퇴장)' : '연결 끊김',
+        color: net.peerLeft ? '#ffd34a' : '#ff6b6b',
+        subtitle: net.peerLeft ? '상대가 대전을 떠났습니다.' : '서버와의 연결이 끊어졌습니다.',
+        onRematch: () => this.toOnline(), onMain: () => this.leaveOnline(),
+        labels: ['온라인 로비', null, '메인 화면'],
+      });
+      return;
+    }
+    if (online) {
+      this.net?.send({ t: 'end', m: this.lockstep?.matchId });
+      this.lockstep = null;
+    }
     if (m.winner === 'draw') { title = '무승부'; color = '#e8e8e8'; }
+    else if (online) {
+      const won = m.winner === this.slot;
+      title = won ? '승리!' : '패배…';
+      color = won ? '#ffd34a' : '#ff6b6b';
+    }
     else if (this.mode === 'pve') {
       title = m.winner === 0 ? '승리!' : '패배…';
       color = m.winner === 0 ? '#ffd34a' : '#ff6b6b';
@@ -114,6 +235,14 @@ export class App {
     const reason = m.endReason === 'ko' ? 'K.O.' : '시간 종료 — 남은 체력 판정';
     const statRow = (f, i) => `<div><b>${names[i]}</b> · ${WEAPONS[this.weapons[i]].name}<br>` +
       `체력 ${Math.ceil(f.hp)} · 적중 ${f.stats.hitsLanded} · 패링 ${f.stats.parries} · 완벽패링 ${f.stats.perfects}</div>`;
+    if (online) {
+      this.menus.result({
+        title, color, subtitle: reason, stats: m.fighters.map(statRow).join(''),
+        onRematch: () => this.toOnline(), onMain: () => this.leaveOnline(),
+        labels: ['로비로 (재대결·무기 변경)', null, '나가기'],
+      });
+      return;
+    }
     this.menus.result({
       title, color,
       subtitle: reason,
@@ -125,6 +254,7 @@ export class App {
   }
 
   playerNames() {
+    if (this.mode === 'online') return this.slot === 0 ? ['나', '상대'] : ['상대', '나'];
     return this.mode === 'pve' ? ['플레이어', `CPU (${DIFFICULTY[this.difficulty].label})`] : ['P1', 'P2'];
   }
 
@@ -135,9 +265,11 @@ export class App {
     if (this.scene === 'battle') {
       if (e.code === 'Escape' || e.code === 'KeyP') {
         e.preventDefault();
-        this.paused ? this.resume() : this.pause();
+        if (this.mode === 'online') this.toggleOnlineMenu();
+        else this.paused ? this.resume() : this.pause();
         return;
       }
+      if (this.onlineMenuOpen && this.menus.handleKey(e.code)) { e.preventDefault(); return; }
       if (this.paused && this.menus.handleKey(e.code)) e.preventDefault();
       if (!this.paused && e.code === 'F2') { e.preventDefault(); this.renderer.showBoxes = !this.renderer.showBoxes; }
       return;
@@ -165,9 +297,19 @@ export class App {
         names: this.playerNames(), paused: this.paused, dt,
         frozen: this.paused || this.hitstop > 0,
         intro: this.introText(),
+        net: this.mode === 'online' && this.scene === 'battle' ? this.netInfo() : null,
       });
     } else this.renderer.drawBackdrop(dt);
     requestAnimationFrame((t) => this.loop(t));
+  }
+
+  netInfo() {
+    const ls = this.lockstep;
+    return {
+      text: `온라인 · 핑 ${this.net?.rtt ?? '-'}ms · 입력 지연 ${this.netDelay}f`,
+      waiting: !!ls && ls.stalled > 20,
+      desync: ls?.desyncAt != null,
+    };
   }
 
   introText() {
@@ -188,12 +330,32 @@ export class App {
     }
     // 히트스톱: 시뮬레이션 정지(양쪽 동일). 짧은 입력은 래치되어 유지된다
     if (this.hitstop > 0) { this.hitstop--; return; }
-    const p1 = this.keyboard.sample(0);
-    const p2 = this.ai ? this.ai.think(m, 1) : this.keyboard.sample(1);
-    const events = m.step([p1, p2]);
+    let inputs;
+    if (this.mode === 'online') {
+      const ls = this.lockstep;
+      if (!ls) return;
+      if (ls.needsLocal()) {
+        // 온라인에서는 내 캐릭터를 P1/P2 어느 키 배치로도 조작할 수 있다
+        let mine = { ...EMPTY_INPUT };
+        if (!this.onlineMenuOpen) {
+          const a = this.keyboard.sample(0), b = this.keyboard.sample(1);
+          for (const k of Object.keys(mine)) mine[k] = a[k] || b[k];
+        }
+        ls.pushLocal(mine);
+        this.keyboard.endFrame();
+      }
+      inputs = ls.next();
+      if (!inputs) return; // 상대 입력 대기
+    } else {
+      const p1 = this.keyboard.sample(0);
+      const p2 = this.ai ? this.ai.think(m, 1) : this.keyboard.sample(1);
+      inputs = [p1, p2];
+      this.keyboard.endFrame();
+    }
+    const events = m.step(inputs);
+    this.lockstep?.afterStep(m);
     this.renderer.pushEvents(events, m);
     this.hitstop = hitstopFor(events);
-    this.keyboard.endFrame();
     if (m.over) this.toResult();
   }
 }

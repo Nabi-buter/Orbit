@@ -5,7 +5,7 @@
   "description": "2D 횡스크롤 1대1 무기 격투 게임 (브라우저)",
   "type": "module",
   "scripts": {
-    "start": "node scripts/serve.js",
+    "start": "node server/server.js",
     "test": "node --test tests/*.test.js"
   }
 }
