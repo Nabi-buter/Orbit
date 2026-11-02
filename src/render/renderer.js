@@ -19,8 +19,8 @@ export const AY = (y) => Math.round((GY - y) / PX);
 
 export const TEAM = [
   // 마네킹형 회색 몸 + 팀 색 어깨 패드/눈빛
-  { body: '#c9cad6', light: '#eeeef6', shade: '#8e90a6', joint: '#545670', pad: '#4b5d8f', visor: '#8fbcff', outline: '#16121f', main: '#5d93d9', ui: '#78a6dd' },
-  { body: '#d0c8c8', light: '#f4eeee', shade: '#9a8c90', joint: '#5e4f58', pad: '#8f4e4b', visor: '#ff9a86', outline: '#16121f', main: '#d9655b', ui: '#e07f6a' },
+  { team: 0, body: '#c9cad6', light: '#eeeef6', shade: '#8e90a6', joint: '#545670', pad: '#4b5d8f', visor: '#8fbcff', outline: '#16121f', main: '#5d93d9', ui: '#78a6dd' },
+  { team: 1, body: '#d0c8c8', light: '#f4eeee', shade: '#9a8c90', joint: '#5e4f58', pad: '#8f4e4b', visor: '#ff9a86', outline: '#16121f', main: '#d9655b', ui: '#e07f6a' },
 ];
 
 export const UI = {

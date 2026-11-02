@@ -8,6 +8,7 @@ import { S } from '../core/fighter.js';
 import { drawWeapon, drawFist, weaponSprite } from './weaponArt.js';
 import { line, disc, px, rect, PX } from './pixel.js';
 import { evalMotion, backHand, STANCE } from './motions.js';
+import { drawBot } from './botRig.js';
 
 const SWING = {
   slash: [1.9, -0.6], 'slash-wide': [1.7, -0.9], overhead: [2.4, -0.9], 'overhead-big': [2.7, -1.15],
@@ -211,7 +212,7 @@ function joint(a, b, bend) {
  * @param pal {body, light, shade, joint, pad, visor, outline, weapon}
  * @returns {hand:[x,y], wAngle, pose} 무기 궤적 계산용
  */
-export function drawFighter(ctx, f, ax, ay, pal, frame, opts = {}) {
+export function drawFighterLegacy(ctx, f, ax, ay, pal, frame, opts = {}) {
   const pose = computePose(f, frame);
   const facing = f.facing;
   const spin = pose.spin || 0;
@@ -347,4 +348,12 @@ export function weaponTip(f, hand, wAngle) {
   const s = weaponSprite(f.weapon.id, '#fff');
   const len = f.weapon.id === 'knuckle' ? 3 : s.w - s.pivot[0] - 2;
   return [hand[0] + f.facing * Math.cos(wAngle) * len, hand[1] - Math.sin(wAngle) * len];
+}
+
+/**
+ * 캐릭터 그리기 — 첨부 캐릭터 시트 기반 스프라이트 (src/render/botRig.js).
+ * 이전의 선·원으로 그리던 방식은 drawFighterLegacy 로 남겨 둔다.
+ */
+export function drawFighter(ctx, f, ax, ay, pal, frame, opts = {}) {
+  return drawBot(ctx, f, ax, ay, pal, frame, opts);
 }

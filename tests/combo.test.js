@@ -244,3 +244,38 @@ test('강공 연타: 약공처럼 이어지지만, 헛치면 약공보다 늦게
   const H = WEAPONS.longsword.heavy;
   assert.ok(h.at >= Math.min(BALANCE.combo.heavyWhiffDelay, H.duration - H.cancelFrom) - 1, `강공 지연 ${h.at}`);
 });
+
+test('콤보 중간에 피격자가 약공으로 역공해도 연결 공격이 먼저 들어간다 (가장 빠른 단검 기준)', () => {
+  for (const id of WEAPON_ORDER) {
+    const m = setup({ distance: 55, weapons: [id, 'dagger'] });
+    const [a, b] = m.fighters;
+    m.step([I({ light: true }), I()]);
+    const first = a.attack;
+    let counterHit = false, chainHit = false, wasHit = false;
+    for (let k = 0; k < 90 && !chainHit; k++) {
+      // 공격자는 다음 약공을 예약, 피격자는 첫 피격 후 경직이 풀리는 즉시 약공 연타
+      if (b.state === S.HITSTUN) wasHit = true;
+      const ev = m.step([I({ light: k % 2 === 0 }), I({ light: wasHit && b.state !== S.HITSTUN && k % 2 === 1 })]);
+      b.x = a.x + 55;
+      for (const e of ev) {
+        if (e.type === 'hit' && e.attacker === 1) counterHit = true;
+        if (e.type === 'hit' && e.attacker === 0 && a.attack !== first) chainHit = true;
+      }
+    }
+    assert.ok(chainHit, `${id}: 연결 공격 적중`);
+    assert.ok(!counterHit, `${id}: 역공이 먼저 들어가면 안 됨`);
+  }
+});
+
+test('콤보 사이 틈에서 가드는 가능하다', () => {
+  const m = setup({ distance: 55, weapons: ['longsword', 'longsword'] });
+  const [a, b] = m.fighters;
+  m.step([I({ light: true }), I()]);
+  let parried = false;
+  for (let k = 0; k < 90; k++) {
+    const ev = m.step([I({ light: k % 2 === 0 }), I({ guard: b.state !== S.HITSTUN || k > 0 })]);
+    b.x = a.x + 55;
+    if (ev.some((e) => e.type === 'parry' || e.type === 'perfect')) { parried = true; break; }
+  }
+  assert.ok(parried);
+});

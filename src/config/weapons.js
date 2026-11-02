@@ -355,6 +355,11 @@ function enforceGaps(steps) {
       d.cancelFrom = need;
       d.duration = Math.max(d.duration, need + 2);
     }
+    // 반대로 틈이 너무 크면(느린 무기) 피격자가 콤보 중간에 자유롭게 역공한다 →
+    // 피격/가드 경직을 늘려 틈을 정확히 minGap 으로 맞춘다 (가드·대시는 가능, 약공 역공은 불가)
+    const stun = d.cancelFrom + minStart - last.to - BALANCE.combo.minGap;
+    if (last.hitstun < stun) last.hitstun = stun;
+    if (last.blockstun < stun) last.blockstun = stun;
   }
 }
 
@@ -383,7 +388,10 @@ export function buildWeapon(id, kn = KNOBS[id]) {
   const w = DEFS[id];
   const k = kn.speed ?? 1;
   const tune = (d) => tempo(scaleDef(d, kn), k, BALANCE.timing);
-  const lights = buildSteps(w.light, w.lightSteps ?? [], FIRST_NAMES[id][0], kn.combo.lightMax).map(tune);
+  // 약공 연결 단계는 예비 동작 길이를 첫 타와 같게 맞춘다 (차이는 후딜로) →
+  // 연결 타격이 항상 같은 박자에 들어가 콤보 중간 역공이 끼어들지 못한다
+  const flat = (w.lightSteps ?? []).map((st) => ({ ...st, startup: 0, recovery: (st.recovery ?? 0) + (st.startup ?? 0) }));
+  const lights = buildSteps(w.light, flat, FIRST_NAMES[id][0], kn.combo.lightMax).map(tune);
   const heavies = buildSteps(w.heavy, w.heavySteps ?? [], FIRST_NAMES[id][1], kn.combo.heavyMax).map(tune);
   enforceGaps([...lights, ...heavies]);
   const plungeDef = {

@@ -9,13 +9,19 @@ import { TEAM } from '../src/render/renderer.js';
 const ctx = document.getElementById('c').getContext('2d');
 ctx.fillStyle = '#d8d8e0'; ctx.fillRect(0, 0, 240, 60);
 const poses = [
-  ['longsword', S.IDLE, null, 1], ['greatsword', S.IDLE, null, 1], ['knuckle', S.IDLE, null, 0],
-  ['longsword', S.WALK, null, 1], ['axe', S.ATTACK, 'heavy', 1], ['spear', S.DASH, null, 0],
+  ['longsword', S.ATTACK, 'light', 1, 'windup'], ['longsword', S.ATTACK, 'light', 1, 'hit'], ['longsword', S.GUARD, null, 0],
+  ['greatsword', S.ATTACK, 'heavy', 0, 'windup'], ['greatsword', S.ATTACK, 'heavy', 0, 'hit'], ['spear', S.ATTACK, 'light', 1, 'hit'],
+  ['knuckle', S.ATTACK, 'light', 0, 'hit'], ['dagger', S.HITSTUN, null, 1], ['axe', S.PARRIED, null, 0],
+  ['longsword', S.GUARD_BREAK, null, 1], ['spear', S.KNOCKBACK, null, 0], ['axe', S.KO, null, 1],
 ];
-poses.forEach(([w, st, atk, team], i) => {
-  const f = createFighter({ id: team, x: 37 * i, facing: 1, weapon: WEAPONS[w] });
-  f.state = st; if (st === S.DASH) f.dash = { dir: 1, frame: 3 };
-  if (atk) f.attack = { def: WEAPONS[w][atk], frame: WEAPONS[w][atk].hits[0].to };
-  drawFighter(ctx, f, 18 + i * 38, 56, { ...TEAM[team], weapon: WEAPONS[w].color }, 0);
+document.getElementById('c').width = 40 * poses.length;
+document.getElementById('c').style.width = 40 * poses.length * 6 + 'px';
+document.getElementById('c').style.height = 60 * 6 + 'px';
+ctx.fillStyle = '#d8d8e0'; ctx.fillRect(0, 0, 40 * poses.length, 60);
+poses.forEach(([w, st, atk, team, ph], i) => {
+  const f = createFighter({ id: team, x: 0, facing: 1, weapon: WEAPONS[w] });
+  f.state = st; f.timer = 20;
+  if (atk) { const d = WEAPONS[w][atk]; f.attack = { def: d, frame: ph === 'windup' ? d.hits[0].from - 2 : d.hits[0].to }; }
+  drawFighter(ctx, f, 20 + i * 40, 56, { ...TEAM[team], weapon: WEAPONS[w].color }, 0);
 });
 </script></body></html>

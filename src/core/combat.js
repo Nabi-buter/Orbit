@@ -110,6 +110,8 @@ export function applyHits(events, frame) {
 
 function resolve(A, D, hit, kind, frame) {
   const G = B.guard;
+  // 경직은 판정이 끝나는 시점 기준: 판정 초반에 닿든 끝에 닿든 콤보 틈이 같도록 남은 판정 프레임만큼 더한다
+  const late = kind !== 'plunge' && A.attack && hit.to != null ? Math.max(0, hit.to - A.attack.frame) : 0;
   const maxHp = D.maxHp ?? B.fighter.maxHp;
   const gTaken = D.weapon.guardTaken ?? 1; // 무기별 가드 게이지 감소량 배율
   const scale = hit.ultGainScale ?? 1;
@@ -163,7 +165,7 @@ function resolve(A, D, hit, kind, frame) {
     D.guard -= hit.guardDamage * gTaken;
     D.lastGuardUse = frame;
     D.state = S.BLOCKSTUN;
-    D.timer = hit.blockstun;
+    D.timer = hit.blockstun + late;
     applyPush(D, A, hit.push * 0.8);
     if (A.attack) A.attack.connected = true; // 공격권 유지: 연결 가능
     gainUlt(A, B.ultGain.dealGuarded * scale);
@@ -188,7 +190,7 @@ function resolve(A, D, hit, kind, frame) {
 
   interrupt(D); // 피격 시 공격/이동/대시 즉시 취소
   D.state = S.HITSTUN;
-  D.timer = hit.hitstun + (D.y > 0 ? B.hit.airHitstunBonus : 0);
+  D.timer = hit.hitstun + late + (D.y > 0 ? B.hit.airHitstunBonus : 0);
   if (D.y > 0) D.vy = Math.min(D.vy, 2);
   D.vx = 0;
   applyPush(D, A, hit.push);

@@ -157,9 +157,9 @@ const MODES = [
   { id: 'local', label: '로컬 2인' },
   { id: 'online', label: '온라인' },
 ];
-const CUSTOM = ['머리', '몸통', '어깨', '색상'];
-
-const secs = (f) => `${(f / 60).toFixed(2)}초`;
+function speedWord(startup) {
+  return startup <= 8 ? '빠름' : startup <= 13 ? '보통' : '느림';
+}
 function reachWord(w) {
   const r = reachOf(w.heavy);
   return r < 140 ? '짧음' : r < 185 ? '보통' : '긺';
@@ -244,7 +244,7 @@ export class LoadoutScreen {
 
   draw(ctx) {
     this.t++;
-    background(ctx, 0.35);
+    background(ctx, 0.62);
     const w = WEAPONS[this.weapon];
     const team = TEAM[this.player];
 
@@ -260,37 +260,28 @@ export class LoadoutScreen {
 
     // 가운데: 캐릭터 + 바닥 조명
     const cx = 208;
-    ctx.globalAlpha = 0.12; rect(ctx, cx - 40, 40, 80, 122, '#dfe8f0'); ctx.globalAlpha = 1;
-    rect(ctx, cx - 46, 161, 92, 2, '#8a909e');
-    ctx.globalAlpha = 0.35; rect(ctx, cx - 30, 163, 60, 2, '#000'); ctx.globalAlpha = 1;
+    ctx.globalAlpha = 0.35; rect(ctx, cx - 30, 161, 60, 2, '#000'); ctx.globalAlpha = 1;
     this.puppet.tick();
     this.puppet.draw(ctx, cx, 161, 2);
 
     // 왼쪽: 무기 정보 (실제 수치)
-    const L = w.light, H = w.heavy;
+    const L = w.light;
     text(ctx, w.name, 14, 36, UI.paper, { size: 16, shadow: UI.ink });
     rect(ctx, 14, 56, 18, 2, UI.gold);
-    wrap(w.desc, 100).slice(0, 3).forEach((l, i) => text(ctx, l, 14, 63 + i * 12, UI.dim, { size: 11, forceRaster: true }));
+    wrap(w.desc, 110).slice(0, 3).forEach((l, i) => text(ctx, l, 14, 63 + i * 12, UI.dim, { size: 11, forceRaster: true }));
     const rows = [
-      ['약공', secs(L.hits[0].from)],
-      ['강공', secs(H.hits[0].from)],
+      ['속도', speedWord(L.hits[0].from)],
       ['사거리', reachWord(w)],
       ['콤보', `약 ${w.combo.lightMax} · 강 ${w.combo.heavyMax}`],
     ];
     rows.forEach(([k, v], i) => {
-      const y = 106 + i * 13;
+      const y = 112 + i * 13;
       text(ctx, k, 14, y, UI.dim, { size: 11 });
       text(ctx, v, 58, y, UI.paper, { size: 11 });
     });
 
-    // 오른쪽: 외형(준비 중) + 대전 설정
-    text(ctx, '외형', 312, 36, UI.dim, { size: 11 });
-    text(ctx, '준비 중', PW - 12, 36, '#565c69', { size: 11, align: 'right' });
-    CUSTOM.forEach((label, i) => {
-      const y = 52 + i * 13;
-      text(ctx, label, 312, y, '#5d636f', { size: 11 });
-      text(ctx, '<   >', PW - 12, y + 2, '#3f4450', { align: 'right' });
-    });
+    // 오른쪽: 대전 설정 (외형 꾸미기는 아직 없음 → 한 줄 안내만)
+    text(ctx, '외형 꾸미기는 준비 중', cx, 40, '#565c69', { size: 11, align: 'center' });
     if (this.mode === 'pve') {
       const dh = this.hover === this.diffRow, ch = this.hover === this.cpuRow;
       text(ctx, '난이도', 312, 128, UI.dim, { size: 11 });
@@ -303,13 +294,10 @@ export class LoadoutScreen {
 
     // 하단: 어두운 띠 + 무기 거치대
     ctx.globalAlpha = 0.82; rect(ctx, 0, 166, PW, PH - 166, UI.ink); ctx.globalAlpha = 1;
-    rect(ctx, 14, 170, PW - 28, 2, '#5b616e');
-    rect(ctx, 14, 172, PW - 28, 1, '#0d0f13');
     for (const c of this.cards) {
       const on = c.id === this.weapon;
       const hov = this.hover === c;
       const cxx = c.x + c.w / 2;
-      rect(ctx, cxx, 170, 1, 4, '#3f4450'); // 거치 고리
       if (!on && !hov) ctx.globalAlpha = 0.5;
       drawWeaponIcon(ctx, c.id, WEAPONS[c.id].color, cxx, 186 - (on ? 2 : 0));
       ctx.globalAlpha = 1;
@@ -334,7 +322,7 @@ export class HelpScreen {
   constructor({ onBack }) { this.onBack = onBack; this.back = { x: 10, y: 220, w: 60, h: 14, onClick: onBack }; }
   get buttons() { return [this.back]; }
   draw(ctx) {
-    background(ctx, 0.78);
+    background(ctx, 0.9);
     text(ctx, '조작법', 20, 12, UI.paper, { size: 14 });
     rect(ctx, 20, 30, 18, 2, UI.gold);
     const rows = [['이동', 'left', 'right'], ['점프', 'up'], ['가드·패링', 'guard'], ['약공', 'light'], ['강공', 'heavy'], ['대시', 'dash'], ['궁극기', 'ult']];
@@ -347,21 +335,24 @@ export class HelpScreen {
         text(ctx, keys.replace('←', '<').replace('→', '>').replace('↑', 'UP').replace('↓', 'DN'), p === 0 ? 104 : 160, y + 2, UI.dim);
       });
     });
+    // 오른쪽: 짧은 요령 (화면 폭 안에서 줄바꿈)
+    const tx = 220, tw = PW - tx - 14;
+    rect(ctx, tx - 12, 42, 1, 150, '#2a2e38');
     const tips = [
-      ['패링', '가드를 짧게: 맞기 직전이면 완벽패링.'],
-      ['', '연달아 누르면 판정이 짧아지고 실패 경직이 길어진다.'],
-      ['막기', '가드를 길게: 피해 절반, 자세 게이지 소모.'],
-      ['자세', '0이 되면 무너짐 → 상대 강공이 피니셔.'],
-      ['콤보', '약 → 약 → 약 → 강이 기본. 끝나면 상대 차례.'],
-      ['궁극기', '즉시 발동. 막기 불가, 완벽패링만 통한다.'],
+      ['패링', '맞기 직전에 가드를 짧게. 연달아 누르면 잘 안 된다.'],
+      ['막기', '가드를 길게. 피해 절반, 자세가 깎인다.'],
+      ['자세', '0이 되면 무너진다. 그때 강공이 마무리.'],
+      ['콤보', '끝나면 상대 차례. 욕심내지 말 것.'],
+      ['궁극기', '막기 불가. 완벽패링만 통한다.'],
     ];
-    tips.forEach(([k, v], i) => {
-      const y = 56 + i * 16;
-      if (k) text(ctx, k, 222, y, UI.gold, { size: 11 });
-      text(ctx, v, 262, y, UI.paper, { size: 11, forceRaster: true });
-    });
-    text(ctx, 'ESC 일시정지 · F2 판정 표시 · M 소리', 20, 168, UI.dim, { size: 11 });
-    text(ctx, '방향키 두 번: 대시 · 온라인에서는 두 키 배치 모두 사용', 20, 184, UI.dim, { size: 11 });
+    let ty = 42;
+    for (const [k, v] of tips) {
+      text(ctx, k, tx, ty, UI.gold, { size: 11 });
+      for (const line of wrap(v, tw - 40)) { text(ctx, line, tx + 40, ty, UI.paper, { size: 11, forceRaster: true }); ty += 13; }
+      ty += 5;
+    }
+    text(ctx, 'ESC 일시정지 · M 소리 · F2 판정', 20, 168, UI.dim, { size: 11 });
+    text(ctx, '방향키 두 번 = 대시', 20, 182, UI.dim, { size: 11 });
     const bw = keycap(ctx, 'ESC', this.back.x, this.back.y + 1);
     text(ctx, '돌아가기', this.back.x + bw + 5, this.back.y, UI.paper, { size: 11 });
   }

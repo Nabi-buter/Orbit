@@ -48,7 +48,7 @@ export const BALANCE = {
     cost: 30,             // [TEMP] 스태미나 소모
     duration: 12,         // [TEMP] 대시 지속 프레임 (무적 없음)
     speed: 12,            // [TEMP] 12 * 12 = 약 144px 이동
-    cooldown: 34,         // [TEMP] 대시 시작 후 재사용 대기
+    cooldown: 60,         // [TEMP] 대시 시작 후 재사용 대기 (34→60: 연속 대시로 거리를 좁히는 플레이 억제)
     allowDoubleTap: true, // 방향키 두 번 입력으로도 대시
     doubleTapWindow: 12,  // [TEMP]
   },
@@ -118,7 +118,7 @@ export const BALANCE = {
     whiffDelay: 12,       // [TEMP] 헛친 약공은 cancelFrom + 이 프레임부터 다음 단계 (헛친 연타 너프)
     heavyWhiffDelay: 20,  // [TEMP] 헛친 강공은 약공보다 더 늦게 이어진다 (강공 = 느리고 강한 기술)
     // 콤보 단계 사이: 가장 늦게 맞아도 피격자가 이만큼 먼저 움직일 수 있다 (가드/완벽패링/대시 틈)
-    minGap: 4,            // [TEMP] (기존 데이터 최소 2 → 4)
+    minGap: 3,            // [TEMP] 콤보 사이 피격자 자유 시간 (정확히 이 값으로 맞춤: 가드·대시 가능, 약공 역공 불가)
     // 콤보가 끝나면(상한 도달) 공격권은 상대에게 넘어간다:
     // 어떤 무기의 상대라도 "가장 느린 약공"으로 먼저 공격할 수 있는 여유 프레임.
     // 무기별 콤보 종료 딜레이(fullLag/mixedLag)는 이 값에서 자동 계산된다 (weapons.js finalizeTiming)

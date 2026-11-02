@@ -74,6 +74,9 @@ function rng(seed) {
   };
 }
 
+/** AI 앞 대시 빈도 제한 (프레임) */
+const AI_DASH_IN = { opening: 120, gap: 150, jitter: 90 };
+
 export class AIController {
   constructor(difficulty = 'normal', seed = (Math.random() * 1e9) | 0) {
     this.p = DIFFICULTY[difficulty] ?? DIFFICULTY.normal;
@@ -110,6 +113,17 @@ export class AIController {
   }
 
   tapAt(frame, key, extra = {}, thenHold = 0) { this.taps.push({ frame, key, extra, thenHold }); }
+  /**
+   * 앞 대시(파고들기)는 사람처럼 가끔만: 개시 직후에는 쓰지 않고, 한 번 쓰면 한동안 걸어서 간격을 잰다.
+   * (연속 대시로 플레이어 공간을 순식간에 지우는 것 방지)
+   */
+  canDashIn(frame) {
+    return frame >= (this.dashInAt ?? AI_DASH_IN.opening);
+  }
+  dashIn(frame, fwd) {
+    this.dashInAt = frame + AI_DASH_IN.gap + Math.floor(this.random() * AI_DASH_IN.jitter);
+    this.tapAt(frame, 'dash', { [fwd]: true });
+  }
   holdFor(key, frame, n) { this.hold[key] = Math.max(this.hold[key] ?? 0, frame + n); }
   release(key) { delete this.hold[key]; }
 
@@ -226,8 +240,8 @@ export class AIController {
         this.release('guard');
         if (dist <= lr) this.tapAt(frame, 'light');
         else if (dist <= hr && lockLeft > me.weapon.heavy.hits[0].from) this.tapAt(frame, 'heavy');
-        else if (me.stamina >= dashCost(me) && me.dashCooldown <= 0 && lockLeft > BALANCE.dash.duration + 4) {
-          this.tapAt(frame, 'dash', { [fwd]: true });
+        else if (me.stamina >= dashCost(me) && me.dashCooldown <= 0 && this.canDashIn(frame) && lockLeft > BALANCE.dash.duration + 4) {
+          this.dashIn(frame, fwd);
           this.tapAt(frame + BALANCE.dash.duration - 2, 'light');
         } else this.holdFor(fwd, frame, 8);
       }
@@ -289,9 +303,9 @@ export class AIController {
     if (dist <= heavyReach && remaining > heavySu + 1) { this.release('guard'); this.tapAt(frame, 'heavy'); return; }
     const dashDist = BALANCE.dash.speed * BALANCE.dash.duration;
     if (dist - dashDist <= lightReach && remaining > BALANCE.dash.duration + lightSu + 1 &&
-        me.stamina >= dashCost(me) && me.dashCooldown <= 0) {
+        me.stamina >= dashCost(me) && me.dashCooldown <= 0 && this.canDashIn(frame)) {
       this.release('guard');
-      this.tapAt(frame, 'dash', { [fwd]: true });
+      this.dashIn(frame, fwd);
       this.tapAt(frame + BALANCE.dash.duration - 2, 'light');
     }
   }
@@ -426,9 +440,9 @@ export class AIController {
     // 상대 사거리가 더 긴데 그 안쪽(내 사거리 밖)에 서 있으면: 파고들기 / 물러나 헛치기 유도 / 가드
     if (dist > lightReach + 15 && dist <= oppReach + 25 && oppReach > heavyReach) {
       const r0 = this.random();
-      if (r0 < 0.45 && me.stamina > dashCost(me) + 10 && me.dashCooldown <= 0) {
+      if (r0 < 0.3 && me.stamina > dashCost(me) + 10 && me.dashCooldown <= 0 && this.canDashIn(frame)) {
         // 파고들기: 대시 직후 빠른 공격
-        this.tapAt(frame, 'dash', { [fwd]: true });
+        this.dashIn(frame, fwd);
         this.tapAt(frame + BALANCE.dash.duration - 3, this.chance(0.7) ? 'light' : 'heavy');
       }
       else if (r0 < 0.7) this.retreat(me, frame, 10);
@@ -438,8 +452,8 @@ export class AIController {
 
     if (dist > heavyReach + 30) {
       // 접근: 걷기 또는 대시
-      if (this.chance(0.18) && me.stamina > dashCost(me) + 30 && dist > heavyReach + 120) {
-        this.tapAt(frame, 'dash', { [fwd]: true });
+      if (this.chance(0.1) && me.stamina > dashCost(me) + 30 && dist > heavyReach + 160 && this.canDashIn(frame)) {
+        this.dashIn(frame, fwd);
       } else {
         this.holdFor(fwd, frame, P.thinkEvery + 2);
       }
