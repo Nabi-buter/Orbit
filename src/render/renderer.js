@@ -250,7 +250,8 @@ export class Renderer {
     ctx.translate(ox - camArt, oy);
 
     if (match.fighters.some((f) => f.state === S.ULTIMATE)) {
-      ctx.globalAlpha = 0.35; rect(ctx, 0, 0, PW, PH, '#000'); ctx.globalAlpha = 1;
+      // 카메라 이동·흔들림이 적용된 좌표계이므로 화면 전체(여유 2px)를 덮도록 카메라 위치에 맞춘다
+      ctx.globalAlpha = 0.35; rect(ctx, camArt - ox - 2, -oy - 2, PW + 4, PH + 4, '#000'); ctx.globalAlpha = 1;
     }
     match.fighters.forEach((f) => this.drawShadow(ctx, f));
     match.fighters.forEach((f, i) => this.trails[i].forEach((t) => {
