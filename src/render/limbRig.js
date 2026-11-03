@@ -11,6 +11,7 @@
 
 import { BOT_RIG } from './botSprites.js';
 import { drawWeapon, drawFist } from './weaponArt.js';
+import { makeSprite, sset, blit } from './pixel.js';
 import { GRIP, GUARD_POSE } from './motions.js';
 import { S } from '../core/fighter.js';
 
@@ -26,6 +27,19 @@ const PX_PER = 3.4;
 const HAND_DROP = 4;          // 시트 캐릭터는 팔이 낮게 달려 있어 손 높이를 조금 내린다
 /** 장검은 한손 반 자루: 뒷손이 폼멜 쪽을 함께 잡는다 */
 const GRIP_ART = { ...Object.fromEntries(Object.entries(GRIP).map(([k, v]) => [k, v / PX_PER])), longsword: 2.5 };
+
+const PELVIS = [10, CUT];     // 상체가 기우는 축 (골반 가운데)
+
+/** 몸통 위쪽(머리·가슴·골반)만 잘라 낸 스프라이트 — 기울일 때 통째로 회전 (픽셀을 밀지 않아 목이 늘어나지 않음) */
+const upperCache = new WeakMap();
+function upperOf(core) {
+  let s = upperCache.get(core);
+  if (s) return s;
+  s = makeSprite(core.w, CUT + 1, PELVIS);
+  for (let y = 0; y <= CUT; y++) for (let x = 0; x < core.w; x++) { const c = core.px[y * core.w + x]; if (c) sset(s, x, y, c); }
+  upperCache.set(core, s);
+  return s;
+}
 
 const sub = (a, b) => [a[0] - b[0], a[1] - b[1]];
 const len = (v) => Math.hypot(v[0], v[1]);
@@ -97,19 +111,28 @@ export function drawLimbRig(ctx, f, ax, ay, pal, P, core, pose, opts = {}) {
   const toScreen = (p) => [ax + facing * p[0], ay + p[1]];
 
   // --- 몸 자세: 기울기 · 웅크림 · 내딛기(체중 이동) --------------------------------
-  const lean = Math.max(-0.55, Math.min(0.55, pose.lean ?? 0));
-  const tanL = Math.tan(lean);
-  const drop = Math.max(-2, Math.min(9, (pose.crouch ?? 0) / 3));
-  const stride = Math.max(-12, Math.min(34, pose.stride ?? 0)) / 3;   // 아트 px
+  const lean = Math.max(-0.5, Math.min(0.5, pose.lean ?? 0));
+  const walking = f.state === S.WALK;
+  // 걷기: 보폭 대신 걸음 주기 (발이 번갈아 앞뒤로, 몸이 살짝 오르내림)
+  const phase = f.x * 0.075;
+  const gait = walking ? Math.sin(phase) : 0;
+  let drop = Math.max(-2, Math.min(9, (pose.crouch ?? 0) / 3));
+  if (walking) drop += Math.abs(Math.cos(phase)) * 0.8;
+  const stride = walking ? 0 : Math.max(-12, Math.min(34, pose.stride ?? 0)) / 3;   // 아트 px
   const hipShift = stride * 0.35;                                  // 앞발 쪽으로 실리는 체중
   const airborne = f.y > 0 || f.state === S.JUMP || f.state === S.PLUNGE;
-  /** 시트 좌표 → 로컬 (골반 위는 기울기만큼 밀고, 전체를 웅크림만큼 내림) */
-  const body = (sx, sy) => [sx - FOOT[0] + hipShift + (CUT - sy) * tanL, sy - FOOT[1] + drop];
+  /** 상체는 골반을 축으로 통째로 회전 (기울기), 전체를 웅크림만큼 내림 */
+  const pelvis = [PELVIS[0] - FOOT[0] + hipShift, PELVIS[1] - FOOT[1] + drop];
+  const cosL = Math.cos(lean), sinL = Math.sin(lean);
+  const body = (sx, sy) => {
+    const vx = sx - PELVIS[0], vy = sy - PELVIS[1];
+    return [pelvis[0] + vx * cosL - vy * sinL, pelvis[1] + vx * sinL + vy * cosL];
+  };
 
   const hipB = body(...HIP.back), hipF = body(...HIP.front);
   const ANKLE = -2; // 발목은 바닥보다 2px 위, 발은 그 아래로 앞으로 뻗음
-  let footB = [FEET.back[0] - FOOT[0] - stride * 0.15, ANKLE];
-  let footF = [FEET.front[0] - FOOT[0] + stride * 0.65, ANKLE];
+  let footB = [FEET.back[0] - FOOT[0] - stride * 0.15 - gait * 3.5, ANKLE - (walking ? Math.max(0, -Math.cos(phase)) * 2 : 0)];
+  let footF = [FEET.front[0] - FOOT[0] + stride * 0.65 + gait * 3.5, ANKLE - (walking ? Math.max(0, Math.cos(phase)) * 2 : 0)];
   if (airborne) {
     // 공중: 무릎을 접어 발이 엉덩이 아래로
     footB = [hipB[0] - 2, hipB[1] + 13];
@@ -168,11 +191,13 @@ export function drawLimbRig(ctx, f, ax, ay, pal, P, core, pose, opts = {}) {
   const backArmFront = support != null;
   if (!backArmFront) arm(back, shB2, armB);
   leg(back, hipB, legB);
-  for (let y = 0; y <= CUT; y++) for (let x = 0; x < core.w; x++) {
-    const c = core.px[y * core.w + x];
-    if (!c) continue;
-    const [lx, ly] = body(x, y);
-    put(Math.round(lx), Math.round(ly), c);
+  {
+    // 상체: 골반 축 회전 (RotSprite 회전이라 윤곽이 깨지지 않음)
+    const up = upperOf(core);
+    const [px, py] = toScreen(pelvis);
+    const ang = Math.abs(lean) < 0.03 ? 0 : lean;
+    if (facing > 0) blit(ctx, up, px, py, ang, false);
+    else blit(ctx, up, px, py, Math.PI - ang, true);
   }
   leg(front, hipF, legF);
   const hand = toScreen(armF.end);

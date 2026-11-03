@@ -8,7 +8,9 @@ import { TEAM } from '../src/render/renderer.js';
 const q = new URLSearchParams(location.search);
 const id = q.get('w'), which = q.get('a') ?? 'l0', step = Number(q.get('s') ?? 3);
 const w = WEAPONS[id];
-const def = which[0] === 'u' ? w.ultimate : (which[0] === 'l' ? w.lights : w.heavies)[Number(which.slice(1))];
+// a=walk|idle: 이동 상태 (프레임마다 x 를 옮기며)
+const loco = which === 'walk' || which === 'idle';
+const def = loco ? { duration: 48, hits: [] } : which[0] === 'u' ? w.ultimate : (which[0] === 'l' ? w.lights : w.heavies)[Number(which.slice(1))];
 const CW = 76, CH = 64, n = Math.ceil(def.duration / step);
 const c = document.getElementById('c'); c.width = CW * n; c.height = CH;
 c.style.width = CW * n * 4 + 'px'; c.style.height = CH * 4 + 'px';
@@ -18,8 +20,9 @@ for (let k = 0; k < n; k++) {
   const frame = k * step;
   const active = def.hits.some((h) => frame >= h.from && frame <= h.to);
   ctx.fillStyle = active ? '#4a3d20' : (k % 2 ? '#262b36' : '#2b303b'); ctx.fillRect(k * CW, 0, CW, CH);
-  f.state = S.ATTACK; f.attack = { def, frame };
-  drawFighter(ctx, f, k * CW + 24, CH - 4, { ...TEAM[0], weapon: w.color }, 0, { smooth: false });
+  if (loco) { f.state = which === 'walk' ? S.WALK : S.IDLE; f.attack = null; f.x = frame * 4.2; f.vx = which === 'walk' ? 4.2 : 0; }
+  else { f.state = S.ATTACK; f.attack = { def, frame }; }
+  drawFighter(ctx, f, k * CW + 24, CH - 4, { ...TEAM[0], weapon: w.color }, loco ? frame : 0, { smooth: false });
   ctx.fillStyle = '#8a909e'; ctx.font = '7px monospace'; ctx.fillText(frame, k * CW + 2, 8);
 }
 document.title = 'ready';

@@ -26,10 +26,10 @@ export const BALANCE = {
   timing: { windup: 1.45, recovery: 0.8 },   // [TEMP]
 
   fighter: {
-    maxHp: 800,           // [TEMP] 1200→600(목숨 2개 도입)→800: 한 목숨 싸움을 조금 더 길게
+    maxHp: 1000,          // [TEMP] 1200→600(목숨 2개)→800→1000: 경기를 길게, 궁극기 비중 ↑
     maxStamina: 100,
     maxGuard: 70,         // [TEMP] 100→70: 자세가 더 빨리 무너진다
-    maxUlt: 55,           // [TEMP] 100→70→55: 궁극기가 더 자주 나온다 (충전량은 그대로)
+    maxUlt: 45,           // [TEMP] 100→70→55→45: 궁극기가 더 자주 나온다 (충전량은 그대로)
     width: 50,            // 피격 판정(허트박스) 폭
     height: 120,          // 피격 판정 높이
     walkSpeed: 4.2,       // [TEMP] 전진 속도(px/프레임)
@@ -99,8 +99,8 @@ export const BALANCE = {
 
   ultimate: {
     // 궁극기는 즉시 시전, 일반 공격으로 취소 불가, 일반 패링 불가, 완벽패링으로만 끊김.
-    cost: 55,             // = fighter.maxUlt
-    damageScale: 1.3,     // [TEMP] 궁극기 피해 배율 (무기별 궁극기 수치에 곱함)
+    cost: 45,             // = fighter.maxUlt
+    damageScale: 1.45,    // [TEMP] 궁극기 피해 배율 (무기별 궁극기 수치에 곱함) 1.3→1.45
   },
 
   ultGain: {

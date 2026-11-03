@@ -134,7 +134,9 @@ export function drawBot(ctx, f, ax, ay, pal, frame, opts = {}) {
   const showWeapon = !opts.silhouette;
 
   // --- 1) 시트 프레임 그대로 ------------------------------------------------
-  const fr = sheetFrame(f, frame);
+  // 대기·걷기·대시·점프도 관절 리그로 그린다 → 무기를 든 자세에서 공격으로 끊김 없이 이어짐
+  // (시트 프레임 재생은 opts.sheet 로만)
+  const fr = opts.sheet ? sheetFrame(f, frame) : null;
   if (fr) {
     const a = anchorOf(fr.rows);
     const spr = toSprite(fr.rows, P, a, `${key}|${FRAME_ID.get(fr)}`);
