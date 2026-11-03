@@ -5,8 +5,8 @@
 
 export const CONTROLS = [
   {
-    // P1: 왼손 WASD + F(가드) + Shift(대시), 오른손 J K I
-    left: ['KeyA'], right: ['KeyD'], up: ['KeyW'], guard: ['KeyF'],
+    // P1: 왼손 WASD(S 가드) + Shift(대시), 오른손 J K I
+    left: ['KeyA'], right: ['KeyD'], up: ['KeyW'], guard: ['KeyS'],
     light: ['KeyJ'], heavy: ['KeyK'], dash: ['ShiftLeft'], ult: ['KeyI'],
   },
   {
