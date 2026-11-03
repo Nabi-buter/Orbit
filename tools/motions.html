@@ -21,7 +21,7 @@ import { createFighter, S } from '../src/core/fighter.js';
 import { drawFighter } from '../src/render/fighterArt.js';
 import { TEAM } from '../src/render/renderer.js';
 
-const SCALE = 3, CW = 64, CH = 56, STRIP = 10;
+const SCALE = 3, CW = 72, CH = 60, STRIP = 12;
 const out = document.getElementById('out');
 const players = [];
 for (const id of WEAPON_ORDER) {
@@ -43,7 +43,7 @@ for (const id of WEAPON_ORDER) {
     const pal = { ...TEAM[0], weapon: w.color };
     const draw = (ctx, frame, ox) => {
       f.state = S.ATTACK; f.attack = { def, frame };
-      drawFighter(ctx, f, ox + 22, CH - 4, pal, 0);
+      drawFighter(ctx, f, ox + 22, CH - 4, pal, 0, { smooth: false });
     };
     const sctx = strip.getContext('2d');
     for (let k = 0; k < STRIP; k++) {

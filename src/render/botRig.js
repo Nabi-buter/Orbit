@@ -13,7 +13,7 @@ import { makeSprite, sset, blit, PX } from './pixel.js';
 import { BOT_FRAMES, BOT_RIG } from './botSprites.js';
 import { drawWeapon, drawFist } from './weaponArt.js';
 import { computePose } from './fighterArt.js';
-import { STANCE } from './motions.js';
+import { STANCE, GRIP, backHand } from './motions.js';
 
 /** 팀별 팔레트 (같은 그림, 색만 다름) */
 export const BOT_PALETTES = [
@@ -63,6 +63,42 @@ function drawPart(ctx, sprite, sx, sy, angle, facing) {
 
 function rot([x, y], a) { const c = Math.cos(a), s = Math.sin(a); return [x * c - y * s, x * s + y * c]; }
 
+// -----------------------------------------------------------------------------
+// 포즈 부드럽게: 상태가 바뀔 때(대기 ↔ 가드 ↔ 피격 ↔ 공격) 손·무기·몸을 몇 프레임에 걸쳐 따라가게 한다.
+// 공격 중에는 모션 자체가 곡선이므로 거의 그대로, 피격은 빠르게(충격감), 그 외는 부드럽게.
+// -----------------------------------------------------------------------------
+const smoothState = new WeakMap();
+const angLerp = (a, b, t) => { let d = b - a; while (d > Math.PI) d -= Math.PI * 2; while (d < -Math.PI) d += Math.PI * 2; return a + d * t; };
+function followRate(f) {
+  switch (f.state) {
+    case S.ATTACK: case S.SPECIAL: case S.ULTIMATE: return 0.75;
+    case S.HITSTUN: case S.PARRIED: case S.GUARD_BREAK: case S.KNOCKBACK: return 0.6;
+    case S.KO: return 1;
+    default: return 0.32;
+  }
+}
+function smoothPose(f, frame, pose, wAngle) {
+  let st = smoothState.get(f);
+  const target = { a: wAngle, h: pose.hand, h2: pose.hand2, lean: pose.lean, crouch: pose.crouch };
+  if (!st || frame - st.frame > 3 || frame < st.frame) {
+    st = { frame, ...target, h: [...target.h], h2: [...target.h2] };
+    smoothState.set(f, st);
+    return st;
+  }
+  // 같은 프레임에 여러 번 그려도(일시정지 등) 한 번만 진행
+  for (let n = st.frame; n < frame; n++) {
+    const k = followRate(f);
+    st.a = angLerp(st.a, target.a, k);
+    st.h = [lerp(st.h[0], target.h[0], k), lerp(st.h[1], target.h[1], k)];
+    st.h2 = [lerp(st.h2[0], target.h2[0], k), lerp(st.h2[1], target.h2[1], k)];
+    st.lean = lerp(st.lean, target.lean, k);
+    st.crouch = lerp(st.crouch, target.crouch, k);
+  }
+  st.frame = frame;
+  return st;
+}
+const lerp = (a, b, t) => a + (b - a) * t;
+
 /** 상태 → 시트 프레임 (없으면 null = 리그 사용) */
 function sheetFrame(f, frame) {
   switch (f.state) {
@@ -106,6 +142,7 @@ export function drawBot(ctx, f, ax, ay, pal, frame, opts = {}) {
     const hand = toScreen(ax, ay, facing, fist[0] - a[0], fist[1] - a[1]);
     let wAngle = STANCE[weaponId]?.a ?? 0.8;
     if (f.state === S.DASH || f.state === S.JUMP) wAngle = 0.2;
+    if (opts.smooth !== false) wAngle = smoothPose(f, frame, pose, wAngle).a;
     drawPart(ctx, spr, ax, ay, 0, facing);
     if (showWeapon) {
       if (weaponId === 'knuckle') drawFist(ctx, pal.weapon, hand[0], hand[1], facing);
@@ -117,6 +154,13 @@ export function drawBot(ctx, f, ax, ay, pal, frame, opts = {}) {
   // --- 2) 컷아웃 리그 --------------------------------------------------------
   // 몸통은 회전하지 않는다(도트가 찢어짐). 대신 허리 위 줄을 높이에 비례해 밀어서 기울이고,
   // 웅크리면 상체를 내리고 다리 줄을 눌러 줄인다 → 발은 항상 땅에 붙어 있다.
+  if (opts.smooth !== false) {
+    const sm = smoothPose(f, frame, pose, pose.wAngle);
+    // 양손 무기: 뒷손이 자루를 잡고 있던 자세면 부드럽게 한 뒤에도 자루 위에 붙인다
+    const onGrip = GRIP[weaponId] && (() => { const g = backHand(weaponId, { a: pose.wAngle, h: pose.hand }); return Math.hypot(g[0] - pose.hand2[0], g[1] - pose.hand2[1]) < 1; })();
+    pose.wAngle = sm.a; pose.hand = sm.h; pose.lean = sm.lean; pose.crouch = sm.crouch;
+    pose.hand2 = onGrip ? backHand(weaponId, { a: sm.a, h: sm.h }) : sm.h2;
+  }
   const R = BOT_RIG;
   const foot = R.foot, hip = R.hip;
   const ko = f.state === S.KO;

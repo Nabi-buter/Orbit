@@ -40,11 +40,20 @@ function bladeColumn(s, x, mid, hw, fuller = false) {
 
 function longsword(accent) {
   const H = 9, mid = 4;
-  const s = makeSprite(32, H, [6, mid]);
+  const s = makeSprite(33, H, [7, mid]);
   pommel(s, 0, mid, accent);
-  for (let x = 2; x <= 6; x++) sset(s, x, mid, x % 2 ? G : GL);
-  for (let y = mid - 3; y <= mid + 3; y++) { sset(s, 7, y, y === mid + 3 ? D : L); sset(s, 8, y, y === mid + 3 ? D : M); }
-  for (let x = 9; x <= 30; x++) bladeColumn(s, x, mid, x >= 30 ? 0 : x >= 28 ? (x === 28 ? 1 : 0) : 1);
+  // 감은 손잡이 (밝고 어두운 줄이 번갈아)
+  for (let x = 2; x <= 7; x++) { sset(s, x, mid, x % 2 ? G : GL); if (x % 2) sset(s, x, mid - 1, GL); }
+  // 코등이: 양 끝이 살짝 굽은 십자
+  for (let y = mid - 3; y <= mid + 3; y++) { sset(s, 8, y, y === mid + 3 ? D : L); sset(s, 9, y, y === mid + 3 ? D : M); }
+  sset(s, 7, mid - 3, M); sset(s, 7, mid + 3, D);
+  // 칼날: 가운데 홈(풀러)이 칼끝 근처까지
+  for (let x = 10; x <= 31; x++) {
+    const hw = x >= 31 ? 0 : x >= 29 ? 1 : 1;
+    bladeColumn(s, x, mid, hw);
+    if (x >= 11 && x <= 25) sset(s, x, mid, x % 6 === 0 ? M : D);
+  }
+  sset(s, 32, mid, L);
   return s;
 }
 
@@ -90,7 +99,9 @@ function axe(accent) {
     for (let r = t; r <= b; r++) {
       const edge = r === b || x >= 33;
       const nearEdge = r === b - 1 || (x === 32 && r >= b - 2);
-      sset(s, x, mid + r, edge ? W : nearEdge ? L : r <= t + 1 ? D : M);
+      // 날 쪽은 밝은 베벨 두 줄, 몸통은 어두운 쇠 + 가운데 한 줄 반사
+      const glint = x === 29 && r > t + 1 && r < b - 2;
+      sset(s, x, mid + r, edge ? W : nearEdge ? L : glint ? M : r <= t + 1 ? GL : D);
     }
   }
   return s;

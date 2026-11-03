@@ -141,3 +141,11 @@ test('모든 무기: 적중·연결·일반 패링·완벽패링·가드 브레�
     assert.equal(hp0 - b.hp, B.special.damage, `${id} 특수강공 피해 동일`);
   }
 });
+
+test('막기만 해도 약공 콤보 하나로는 가득 찬 가드가 무너지지 않는다', () => {
+  for (const id of WEAPON_ORDER) {
+    const w = WEAPONS[id];
+    const total = w.lights.reduce((s, d) => s + d.hits.reduce((t, h) => t + h.guardDamage, 0), 0);
+    assert.ok(total < BALANCE.fighter.maxGuard, `${id}: 약공 콤보 가드 피해 ${total} ≥ ${BALANCE.fighter.maxGuard}`);
+  }
+});

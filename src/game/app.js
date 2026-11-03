@@ -156,10 +156,10 @@ export class App {
       title = m.winner === mine ? 'WIN!' : 'LOSE';
       color = m.winner === mine ? UI.gold : UI.red;
     } else { title = `P${m.winner + 1} WIN!`; color = TEAM[m.winner].ui; }
-    const reason = m.endReason === 'ko' ? `K.O. · ${m.round}라운드` : '시간 종료 · 남은 목숨·체력 판정';
-    const lines = m.fighters.flatMap((f, i) => [
-      [`${names[i]} · ${WEAPONS[this.weapons[i]].name}`, TEAM[i].ui],
-      [`체력 ${Math.ceil(f.hp)} · 적중 ${f.stats.hitsLanded} · 완벽패링 ${f.stats.perfects}`, UI.dim],
+    const reason = m.endReason === 'ko' ? (m.round > 1 ? `${m.round}라운드 끝에 K.O.` : 'K.O.') : '시간 종료';
+    // 기록은 짧게: 무기 · 적중 · 완벽패링
+    const lines = m.fighters.map((f, i) => [
+      `${WEAPONS[this.weapons[i]].name}  적중 ${f.stats.hitsLanded}  완벽패링 ${f.stats.perfects}`, TEAM[i].ui,
     ]);
     const items = online
       ? [['로비로 (재대결)', () => this.toOnline(), true], ['나가기', () => this.leaveOnline()]]

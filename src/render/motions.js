@@ -101,9 +101,22 @@ export const MOTIONS = {
 // -----------------------------------------------------------------------------
 // 키프레임 평가
 // -----------------------------------------------------------------------------
+// 실제 무기처럼 보이도록:
+//   1) 준비: 기본 자세 → 시작 자세까지 들어 올린 뒤, 무게만큼 더 젖혀(코일) 잠깐 버틴다
+//   2) 휘두름: 판정 몇 프레임 전부터 출발해 가속하며 판정 구간을 통과
+//   3) 따라가기: 판정이 끝나도 무게만큼 더 흘러간 뒤(오버슈트) 멈춘다
+//   4) 회수: 무거울수록 늦게, 천천히 기본 자세로
+// 판정 프레임(weapons.js)은 그대로이고, 보이는 궤적만 바뀐다.
+
+/** 무기 무게감 0(가벼움) ~ 1(무거움) */
+export const WEIGHT = { knuckle: 0.1, dagger: 0.2, spear: 0.45, longsword: 0.5, axe: 0.8, greatsword: 1 };
+
 const lerp = (a, b, t) => a + (b - a) * t;
-const easeOut = (t) => 1 - (1 - t) * (1 - t);
-const easeInOut = (t) => (t < 0.5 ? 2 * t * t : 1 - 2 * (1 - t) * (1 - t));
+const clamp01 = (t) => Math.max(0, Math.min(1, t));
+const smooth = (t) => { t = clamp01(t); return t * t * (3 - 2 * t); };
+const easeOutCubic = (t) => { t = clamp01(t); return 1 - (1 - t) ** 3; };
+/** 휘두름: 처음엔 느리게 출발해 판정 근처에서 가장 빠름 */
+const swingEase = (t) => { t = clamp01(t); return t < 0.6 ? 0.5 * (t / 0.6) ** 2 : 0.5 + 0.5 * easeOutCubic((t - 0.6) / 0.4); };
 
 function mix(p, q, t) {
   return {
@@ -116,25 +129,65 @@ function mix(p, q, t) {
   };
 }
 
+/** p 에서 q 방향의 반대쪽으로 k 만큼 더 (코일), 또는 같은 방향으로 더 (오버슈트) */
+function extend(p, q, k) {
+  const r = mix(p, q, 1 + k);
+  r.h2 = q.h2; // 뒷손은 과장하지 않음
+  // 큰 궤적(머리 위 → 아래)은 비율만큼 더하면 과해지므로 각도·손 이동량에 상한
+  const da = r.a - q.a, maxA = 0.4;
+  if (Math.abs(da) > maxA) r.a = q.a + Math.sign(da) * maxA;
+  for (const i of [0, 1]) {
+    const dh = r.h[i] - q.h[i];
+    if (Math.abs(dh) > 6) r.h[i] = q.h[i] + Math.sign(dh) * 6;
+  }
+  return r;
+}
+
 /** 공격 진행 프레임에 맞는 포즈 (모션 데이터가 없으면 null) */
 export function evalMotion(weaponId, def, frame) {
   const m = MOTIONS[weaponId]?.[def.name];
   if (!m) return null;
+  const W = WEIGHT[weaponId] ?? 0.5;
   const idle = { ...STANCE[weaponId], lean: 0, stride: 0, crouch: 0 };
   const hits = def.hits, beats = m.beats;
   const beat = (i) => beats[Math.min(i, beats.length - 1)];
-  const f0 = hits[0].from - 1;
-  if (frame < f0) return mix(idle, beat(0).from, easeInOut(Math.max(0, frame / Math.max(1, f0))));
-  let prevEnd = f0;
-  for (let i = 0; i < hits.length; i++) {
-    const s0 = hits[i].from - 1, s1 = hits[i].to + 2;
-    if (frame < s0) return mix(beat(i - 1).to, beat(i).from, easeInOut((frame - prevEnd) / Math.max(1, s0 - prevEnd)));
-    if (frame <= s1) return mix(beat(i).from, beat(i).to, easeOut(Math.min(1, ((frame - s0) / Math.max(1, s1 - s0)) * 1.3)));
-    prevEnd = s1;
+  const lead = Math.round(1 + W * 3);        // 판정 몇 프레임 전부터 휘두르기 시작
+  const follow = Math.round(2 + W * 6);      // 판정 뒤 흘러가는 프레임
+  const coilK = 0.06 + W * 0.12;             // 젖히는 정도
+  const overK = 0.05 + W * 0.1;              // 지나치는 정도
+
+  // 1) 준비
+  const s0 = Math.max(1, hits[0].from - lead);
+  if (frame < s0) {
+    const t = frame / s0;
+    const first = beat(0).from;
+    const coil = extend(beat(0).to, first, coilK); // to → from 방향으로 더 = 뒤로 젖힘
+    if (t < 0.7) return mix(idle, first, smooth(t / 0.7));
+    return mix(first, coil, easeOutCubic((t - 0.7) / 0.3));
   }
-  // 후딜레이: 마지막 자세를 잠시 유지한 뒤 기본 자세로
+  let prevEnd = s0, prevPose = extend(beat(0).to, beat(0).from, coilK);
+  for (let i = 0; i < hits.length; i++) {
+    const b = beat(i);
+    const start = i === 0 ? s0 : Math.max(prevEnd, hits[i].from - lead);
+    const contact = hits[i].to;
+    const end = contact + follow;
+    const nextFrom = i + 1 < hits.length ? hits[i + 1].from - lead : Infinity;
+    // 판정 사이: 이전 자세 → 다음 시작 자세
+    if (frame < start) return mix(prevPose, b.from, smooth((frame - prevEnd) / Math.max(1, start - prevEnd)));
+    // 2) 휘두름 (시작 자세 또는 코일 → 끝 자세)
+    const from = i === 0 ? prevPose : b.from;
+    if (frame <= contact) return mix(from, b.to, swingEase((frame - start) / Math.max(1, contact - start)));
+    // 3) 따라가기 (다단 히트는 다음 타 직전까지만)
+    const over = extend(b.from, b.to, overK);
+    const fEnd = Math.min(end, nextFrom);
+    if (frame <= fEnd) return mix(b.to, over, easeOutCubic((frame - contact) / Math.max(1, fEnd - contact)));
+    prevEnd = fEnd;
+    prevPose = mix(b.to, over, easeOutCubic((fEnd - contact) / Math.max(1, end - contact)));
+  }
+  // 4) 회수: 무게만큼 버틴 뒤 기본 자세로
   const t = (frame - prevEnd) / Math.max(1, def.duration - prevEnd);
-  return mix(beat(hits.length - 1).to, idle, easeInOut(Math.max(0, (t - 0.3) / 0.7)));
+  const hold = 0.1 + W * 0.25;
+  return mix(prevPose, idle, smooth((t - hold) / (1 - hold)));
 }
 
 /** 뒷손 위치: 지정값 > 양손 무기 자루 > 몸 옆 */

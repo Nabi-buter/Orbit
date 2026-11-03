@@ -22,6 +22,6 @@ poses.forEach(([w, st, atk, team, ph], i) => {
   const f = createFighter({ id: team, x: 0, facing: 1, weapon: WEAPONS[w] });
   f.state = st; f.timer = 20;
   if (atk) { const d = WEAPONS[w][atk]; f.attack = { def: d, frame: ph === 'windup' ? d.hits[0].from - 2 : d.hits[0].to }; }
-  drawFighter(ctx, f, 20 + i * 40, 56, { ...TEAM[team], weapon: WEAPONS[w].color }, 0);
+  drawFighter(ctx, f, 20 + i * 40, 56, { ...TEAM[team], weapon: WEAPONS[w].color }, 0, { smooth: false });
 });
 </script></body></html>

@@ -1,0 +1,18 @@
+<!doctype html>
+<html lang="ko">
+<head><meta charset="utf-8"><title>무기 스프라이트 확대</title>
+<style>body{margin:0;background:#1b1f28;padding:12px}canvas{image-rendering:pixelated;width:1920px;height:600px}</style></head>
+<body>
+<canvas id="c" width="320" height="100"></canvas>
+<script type="module">
+// 무기 6종을 여러 각도로 회전해 그린다 (RotSprite 회전 확인용)
+import { WEAPONS, WEAPON_ORDER } from '../src/config/weapons.js';
+import { drawWeapon } from '../src/render/weaponArt.js';
+const ctx = document.getElementById('c').getContext('2d');
+ctx.fillStyle = '#2b303b'; ctx.fillRect(0, 0, 320, 100);
+const angles = [0, 0.5, 1.2, 2.2];
+WEAPON_ORDER.forEach((id, i) => angles.forEach((a, j) => {
+  drawWeapon(ctx, id, WEAPONS[id].color, 14 + i * 52 + j * 3, 22 + j * 22, a, 1);
+}));
+</script>
+</body></html>

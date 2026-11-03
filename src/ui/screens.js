@@ -17,7 +17,7 @@ import { reachOf } from '../core/attackDef.js';
 
 const CONFIRM = ['Enter', 'NumpadEnter', 'Space', 'KeyJ'];
 const BACK = ['Escape', 'Backspace'];
-const VERSION = 'v0.10 테스트 빌드';
+const VERSION = 'v0.11';
 
 function hit(b, x, y) { return x >= b.x && y >= b.y && x < b.x + b.w && y < b.y + b.h; }
 
@@ -49,24 +49,52 @@ function keycap(ctx, label, x, y, color = UI.paper) {
   return w;
 }
 
+/** 메뉴 커서: 작은 칼 모양, 살짝 앞뒤로 흔들림 */
+function cursor(ctx, x, y, t) {
+  x += Math.round(Math.sin(t * 0.15) * 1.2);
+  // 자루 → 코등이 → 칼날 → 칼끝 (오른쪽을 가리킴)
+  rect(ctx, x, y + 3, 2, 1, '#8a6a2c');
+  rect(ctx, x + 2, y + 2, 1, 3, UI.gold);
+  rect(ctx, x + 3, y + 2, 5, 1, '#fff4c8');
+  rect(ctx, x + 3, y + 3, 5, 1, '#d8dbe4');
+  rect(ctx, x + 3, y + 4, 4, 1, '#8a909e');
+  rect(ctx, x + 8, y + 3, 1, 1, '#fff4c8');
+}
+
+/** 손으로 그린 듯한 테두리 상자: 모서리 깎임 + 위쪽 밝은 줄 + 리벳 두 개 */
+export function frameBox(ctx, x, y, w, h) {
+  ctx.globalAlpha = 0.94;
+  rect(ctx, x + 1, y + 1, w - 2, h - 2, '#16181f');
+  ctx.globalAlpha = 1;
+  rect(ctx, x + 2, y, w - 4, 1, '#4a505e');
+  rect(ctx, x + 2, y + h - 1, w - 4, 1, '#0b0c10');
+  rect(ctx, x, y + 2, 1, h - 4, '#3a3f4b');
+  rect(ctx, x + w - 1, y + 2, 1, h - 4, '#0b0c10');
+  rect(ctx, x + 1, y + 1, 1, 1, '#3a3f4b'); rect(ctx, x + w - 2, y + 1, 1, 1, '#3a3f4b');
+  rect(ctx, x + 1, y + h - 2, 1, 1, '#0b0c10'); rect(ctx, x + w - 2, y + h - 2, 1, 1, '#0b0c10');
+  rect(ctx, x + 2, y + 1, w - 4, 1, '#232733');
+  rect(ctx, x + 4, y + 4, 2, 2, '#2c303b'); rect(ctx, x + w - 6, y + 4, 2, 2, '#2c303b');
+}
+
 /**
- * 텍스트 메뉴: 선택 항목은 노랑 + 왼쪽 막대. 박스 없음.
+ * 텍스트 메뉴: 선택 항목은 칼 모양 커서 + 노랑. 박스 없음.
  * items: [{label, sub?, onClick, disabled?}]
  */
 class TextMenu {
   constructor(items, x, y, { gap = 17, size = 13, width = 150 } = {}) {
     this.items = items; this.x = x; this.y = y; this.gap = gap; this.size = size; this.width = width;
-    this.focus = 0; this.hover = -1;
+    this.focus = 0; this.hover = -1; this.t = 0;
   }
-  rows() { return this.items.map((it, i) => ({ ...it, x: this.x - 6, y: this.y + i * this.gap - 3, w: this.width, h: this.gap - 2 })); }
+  rows() { return this.items.map((it, i) => ({ ...it, x: this.x - 12, y: this.y + i * this.gap - 3, w: this.width, h: this.gap - 2 })); }
   draw(ctx) {
+    this.t++;
     this.items.forEach((it, i) => {
       const y = this.y + i * this.gap;
       const on = (this.hover >= 0 ? this.hover : this.focus) === i;
-      const c = it.disabled ? '#565c69' : on ? UI.gold : UI.paper;
-      if (on && !it.disabled) rect(ctx, this.x - 6, y - 1, 2, this.size, UI.gold);
-      const w = text(ctx, it.label, this.x + (on ? 2 : 0), y, c, { size: this.size, shadow: UI.ink });
-      if (it.sub) text(ctx, it.sub, this.x + (on ? 2 : 0) + w + 6, y + 2, UI.dim, { size: 11 });
+      const c = it.disabled ? '#565c69' : on ? UI.gold : '#c9ccd4';
+      if (on && !it.disabled) cursor(ctx, this.x - 12, y + Math.round(this.size / 2) - 4, this.t);
+      const w = text(ctx, it.label, this.x, y, c, { size: this.size, shadow: UI.ink });
+      if (it.sub && on) text(ctx, it.sub, this.x + w + 6, y + 2, UI.dim, { size: 11 });
     });
   }
   move(d) {
@@ -121,7 +149,7 @@ export class TitleScreen {
       { label: '플레이', onClick: onPlay },
       { label: '온라인 대전', onClick: onOnline },
       { label: '조작법', onClick: onHelp },
-    ], 30, 128);
+    ], 40, 126);
     this.left = new Puppet('longsword', 0, 1);
     this.right = new Puppet('spear', 1, -1, 120);
     this.t = 0;
@@ -129,20 +157,19 @@ export class TitleScreen {
   get buttons() { return this.menu.rows(); }
   draw(ctx) {
     this.t++;
-    background(ctx, 0.15);
-    // 오른쪽: 훈련봇 두 대의 대련
+    background(ctx, 0.25);
+    // 가운데 오른쪽: 훈련봇 두 대의 대련 (배경처럼)
     this.left.tick(); this.right.tick();
-    this.left.draw(ctx, 290, 203);
-    this.right.draw(ctx, 352, 203);
-    // 왼쪽: 어두운 띠 + 로고
-    ctx.globalAlpha = 0.86; rect(ctx, 0, 0, 200, PH, UI.ink); ctx.globalAlpha = 1;
-    rect(ctx, 200, 0, 1, PH, '#2a2e38');
-    text(ctx, 'ORBIT', 28, 40, UI.paper, { scale: 4, shadow: '#000' });
-    text(ctx, 'DUEL', 30, 72, UI.gold, { scale: 4, shadow: '#000' });
-    rect(ctx, 30, 108, 24, 2, UI.gold);
-    text(ctx, '훈련장 1:1 무기 대결', 60, 103, UI.dim, { size: 11 });
+    this.left.draw(ctx, 262, 203);
+    this.right.draw(ctx, 324, 203);
+    // 왼쪽 아래로 갈수록 어둡게 (글자 읽히게, 띠 없이)
+    for (let i = 0; i < 12; i++) { ctx.globalAlpha = 0.07; rect(ctx, 0, 0, 200 - i * 12, PH, UI.ink); }
+    ctx.globalAlpha = 1;
+    // 로고: 살짝 엇갈린 두 줄, 그림자
+    text(ctx, 'ORBIT', 24, 34, UI.paper, { scale: 4, shadow: '#000' });
+    text(ctx, 'DUEL', 46, 64, UI.gold, { scale: 4, shadow: '#000' });
     this.menu.draw(ctx);
-    text(ctx, VERSION, 30, PH - 16, '#565c69', { size: 11 });
+    text(ctx, VERSION, PW - 8, PH - 12, '#3f4450', { align: 'right' });
   }
   onKey(e) { return this.menu.onKey(e); }
   onClick(x, y) { return this.menu.onClick(x, y); }
@@ -267,7 +294,6 @@ export class LoadoutScreen {
     // 왼쪽: 무기 정보 (실제 수치)
     const L = w.light;
     text(ctx, w.name, 14, 36, UI.paper, { size: 16, shadow: UI.ink });
-    rect(ctx, 14, 56, 18, 2, UI.gold);
     wrap(w.desc, 110).slice(0, 3).forEach((l, i) => text(ctx, l, 14, 63 + i * 12, UI.dim, { size: 11, forceRaster: true }));
     const rows = [
       ['속도', speedWord(L.hits[0].from)],
@@ -280,8 +306,6 @@ export class LoadoutScreen {
       text(ctx, v, 58, y, UI.paper, { size: 11 });
     });
 
-    // 오른쪽: 대전 설정 (외형 꾸미기는 아직 없음 → 한 줄 안내만)
-    text(ctx, '외형 꾸미기는 준비 중', cx, 40, '#565c69', { size: 11, align: 'center' });
     if (this.mode === 'pve') {
       const dh = this.hover === this.diffRow, ch = this.hover === this.cpuRow;
       text(ctx, '난이도', 312, 128, UI.dim, { size: 11 });
@@ -324,7 +348,6 @@ export class HelpScreen {
   draw(ctx) {
     background(ctx, 0.9);
     text(ctx, '조작법', 20, 12, UI.paper, { size: 14 });
-    rect(ctx, 20, 30, 18, 2, UI.gold);
     const rows = [['이동', 'left', 'right'], ['점프', 'up'], ['가드·패링', 'guard'], ['약공', 'light'], ['강공', 'heavy'], ['대시', 'dash'], ['궁극기', 'ult']];
     text(ctx, 'P1', 104, 42, TEAM[0].ui); text(ctx, 'P2', 160, 42, TEAM[1].ui);
     rows.forEach(([label, ...acts], i) => {
@@ -369,21 +392,27 @@ export class MenuOverlay {
   constructor(o) {
     this.o = o;
     this.onBack = o.onBack;
-    const top = o.lines?.length ? 96 + o.lines.length * 12 + 10 : 100;
-    this.menu = new TextMenu(o.items.map(([label, fn]) => ({ label, onClick: fn })), 34, top, { size: 12, gap: 16, width: 180 });
+    const korean = /[^\x00-\x7f]/.test(o.title);
+    this.titleH = korean ? 22 : 30;
+    const linesH = (o.lines?.length ?? 0) * 12 + (o.subtitle ? 14 : 0);
+    this.box = { w: 176, h: 20 + this.titleH + linesH + o.items.length * 15 + 10 };
+    this.box.x = Math.round((PW - this.box.w) / 2);
+    this.box.y = Math.round((PH - this.box.h) / 2) - 6;
+    const top = this.box.y + 14 + this.titleH + linesH + 4;
+    this.menu = new TextMenu(o.items.map(([label, fn]) => ({ label, onClick: fn })), this.box.x + Math.round(this.box.w / 2) - 32, top, { size: 12, gap: 15, width: 90 });
   }
   get buttons() { return this.menu.rows(); }
   draw(ctx) {
-    ctx.globalAlpha = 0.55; rect(ctx, 0, 0, PW, PH, UI.ink); ctx.globalAlpha = 1;
-    ctx.globalAlpha = 0.85; rect(ctx, 0, 0, 230, PH, UI.ink); ctx.globalAlpha = 1;
-    rect(ctx, 230, 0, 1, PH, '#2a2e38');
-    const o = this.o;
+    ctx.globalAlpha = 0.5; rect(ctx, 0, 0, PW, PH, UI.ink); ctx.globalAlpha = 1;
+    const o = this.o, b = this.box;
+    frameBox(ctx, b.x, b.y, b.w, b.h);
     const korean = /[^\x00-\x7f]/.test(o.title);
-    if (korean) text(ctx, o.title, 32, 34, o.titleColor ?? UI.paper, { size: 20, shadow: '#000' });
-    else text(ctx, o.title, 32, 34, o.titleColor ?? UI.paper, { scale: 4, shadow: '#000' });
-    rect(ctx, 34, 68, 22, 2, o.titleColor ?? UI.gold);
-    if (o.subtitle) text(ctx, o.subtitle, 34, 76, UI.dim, { size: 11 });
-    (o.lines ?? []).forEach(([t, c], i) => text(ctx, t, 34, 94 + i * 12 + (i >> 1) * 4, c ?? UI.paper, { size: 11 }));
+    const cx = b.x + b.w / 2;
+    if (korean) text(ctx, o.title, cx, b.y + 12, o.titleColor ?? UI.paper, { size: 16, align: 'center', shadow: '#000' });
+    else text(ctx, o.title, cx, b.y + 12, o.titleColor ?? UI.paper, { scale: 3, align: 'center', shadow: '#000' });
+    let y = b.y + 14 + this.titleH;
+    if (o.subtitle) { text(ctx, o.subtitle, cx, y, UI.dim, { size: 11, align: 'center' }); y += 14; }
+    (o.lines ?? []).forEach(([t, c]) => { text(ctx, t, cx, y, c ?? UI.paper, { size: 11, align: 'center' }); y += 12; });
     this.menu.draw(ctx);
   }
   onKey(e) {

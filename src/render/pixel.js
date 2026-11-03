@@ -112,17 +112,70 @@ export function blit(ctx, s, x, y, angle = 0, flipY = false) {
     }
     return;
   }
-  const cos = Math.cos(angle), sin = Math.sin(angle);
-  const R = Math.ceil(Math.hypot(Math.max(pxv, s.w - pxv), Math.max(pyv, s.h - pyv))) + 1;
-  for (let dy = -R; dy <= R; dy++) for (let dx = -R; dx <= R; dx++) {
-    // 역회전으로 원본 좌표 찾기
-    const sx = Math.round(dx * cos + dy * sin + pxv);
-    let syl = -dx * sin + dy * cos;
-    if (flipY) syl = -syl;
-    const sy = Math.round(syl + pyv);
-    const c = sget(s, sx, sy);
-    if (c) { ctx.fillStyle = c; ctx.fillRect(x + dx, y + dy, 1, 1); }
+  const r = rotated(s, angle, flipY);
+  for (let j = 0; j < r.h; j++) for (let i = 0; i < r.w; i++) {
+    const c = r.px[j * r.w + i];
+    if (c) { ctx.fillStyle = c; ctx.fillRect(x + i - r.pivot[0], y + j - r.pivot[1], 1, 1); }
   }
+}
+
+// -----------------------------------------------------------------------------
+// RotSprite 방식 회전: Scale2x 를 세 번(8배) 적용해 대각선을 매끄럽게 만든 뒤 회전·샘플링.
+// 단순 최근접 회전보다 칼날·팔 윤곽이 덜 깨진다. 각도는 5° 단위로 캐시.
+// -----------------------------------------------------------------------------
+const ROT_STEPS = 72;
+const rotCache = new WeakMap();
+const upCache = new WeakMap();
+
+function scale2x(src) {
+  const w = src.w * 2, h = src.h * 2;
+  const o = { w, h, px: new Array(w * h).fill(null) };
+  const g = (x, y) => (x >= 0 && y >= 0 && x < src.w && y < src.h ? src.px[y * src.w + x] : null);
+  for (let y = 0; y < src.h; y++) for (let x = 0; x < src.w; x++) {
+    const P = g(x, y), A = g(x, y - 1), B = g(x + 1, y), C = g(x - 1, y), D = g(x, y + 1);
+    let e0 = P, e1 = P, e2 = P, e3 = P;
+    if (C === A && C !== D && A !== B) e0 = A;
+    if (A === B && A !== C && B !== D) e1 = B;
+    if (D === C && D !== B && C !== A) e2 = C;
+    if (B === D && B !== A && D !== C) e3 = D;
+    o.px[(2 * y) * w + 2 * x] = e0; o.px[(2 * y) * w + 2 * x + 1] = e1;
+    o.px[(2 * y + 1) * w + 2 * x] = e2; o.px[(2 * y + 1) * w + 2 * x + 1] = e3;
+  }
+  return o;
+}
+
+function upscaled(s) {
+  let u = upCache.get(s);
+  if (!u) { u = scale2x(scale2x(scale2x(s))); upCache.set(s, u); }
+  return u;
+}
+
+function rotated(s, angle, flipY) {
+  const step = (Math.PI * 2) / ROT_STEPS;
+  const idx = ((Math.round(angle / step) % ROT_STEPS) + ROT_STEPS) % ROT_STEPS;
+  let m = rotCache.get(s);
+  if (!m) { m = new Map(); rotCache.set(s, m); }
+  const key = idx * 2 + (flipY ? 1 : 0);
+  let r = m.get(key);
+  if (r) return r;
+  const a = idx * step;
+  const [pxv, pyv] = s.pivot;
+  const R = Math.ceil(Math.hypot(Math.max(pxv, s.w - pxv), Math.max(pyv, s.h - pyv))) + 1;
+  const u = upscaled(s), K = 8;
+  const cos = Math.cos(a), sin = Math.sin(a);
+  r = { w: 2 * R + 1, h: 2 * R + 1, px: new Array((2 * R + 1) ** 2).fill(null), pivot: [R, R] };
+  for (let dy = -R; dy <= R; dy++) for (let dx = -R; dx <= R; dx++) {
+    // 목적 픽셀 중심을 역회전 → 원본(8배) 좌표
+    const lx = dx * cos + dy * sin;
+    let ly = -dx * sin + dy * cos;
+    if (flipY) ly = -ly;
+    const ux = Math.floor((lx + pxv + 0.5) * K), uy = Math.floor((ly + pyv + 0.5) * K);
+    if (ux < 0 || uy < 0 || ux >= u.w || uy >= u.h) continue;
+    const c = u.px[uy * u.w + ux];
+    if (c) r.px[(dy + R) * r.w + dx + R] = c;
+  }
+  m.set(key, r);
+  return r;
 }
 
 // -----------------------------------------------------------------------------

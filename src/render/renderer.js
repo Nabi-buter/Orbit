@@ -71,6 +71,7 @@ export class Renderer {
     this.swings = [[], []];
     this.prevState = [null, null];
     this.hpTrail = [Infinity, Infinity];
+    this.hitCount = [{ n: 0, last: -999 }, { n: 0, last: -999 }];
     this.hpTrailDelay = [0, 0];
   }
 
@@ -113,6 +114,14 @@ export class Renderer {
       const dir = D && match ? Math.sign(D.x - match.fighters[e.attacker].x) || 1 : 1;
       switch (e.type) {
         case 'hit': {
+          // 연속 적중 수: 상대가 경직에서 풀리기 전에 이어지면 누적
+          const hc = this.hitCount[e.attacker];
+          if (hc) {
+            const frame = match?.frame ?? 0;
+            const D2 = match?.fighters[e.defender];
+            hc.n = frame - hc.last < 45 && D2 && (D2.state === S.HITSTUN || frame - hc.last < 30) ? hc.n + 1 : 1;
+            hc.last = frame;
+          }
           const big = e.kind === 'heavy' || e.kind === 'plunge' || e.kind === 'ultimate';
           // 베기 자국 + 별 섬광 + 공격 방향으로 튀는 파편 (원형 링은 제거)
           fx.hitImpact(x, y, dir, e.kind === 'ultimate' ? 3 : big ? 2 : 1, '#f08a3c');
@@ -403,14 +412,13 @@ export class Renderer {
         const c = fill ? (u >= 1 && this.time % 16 < 8 ? '#fff4c8' : UI.gold) : '#3a3f4b';
         rect(ctx, cx - 1, 22, 3, 1, c); rect(ctx, cx - 2, 23, 5, 2, c); rect(ctx, cx - 1, 25, 3, 1, c);
       }
-      // 콤보 단계 / 숨 고르기
-      const c = f.combo;
-      if (f.state === S.ATTACK && c.total > 0 && f.attack.def.name) {
-        const max = f.weapon.combo[c.lastType === 'heavy' ? 'heavyMax' : 'lightMax'];
-        const n = c[c.lastType];
-        text(ctx, `${f.attack.def.name} ${n}/${max}`, X, 41, n >= max ? '#f6b26b' : UI.paper, { size: 11, align: al, shadow: UI.ink });
-      } else if (c.lock > 0 && f.state !== S.KO) {
-        text(ctx, '숨 고르기', X, 41, UI.dim, { size: 11, align: al, shadow: UI.ink });
+      // 연속 적중 (격투 게임식 HIT 카운터) — 기술 이름 같은 디버그 정보는 띄우지 않는다
+      const hc = this.hitCount[i];
+      if (hc.n >= 2 && match.frame - hc.last < 70) {
+        const pop = match.frame - hc.last < 4 ? 1 : 0;
+        const nx = X + s * 2;
+        const w = text(ctx, String(hc.n), nx, 44 - pop, UI.gold, { scale: 2, align: al, shadow: UI.ink });
+        text(ctx, 'HIT', nx + s * (w + 3), 49, UI.paper, { align: al, shadow: UI.ink });
       } else if (f.parry.lock > 0) {
         text(ctx, '헛패링', X, 41, UI.dim, { size: 11, align: al, shadow: UI.ink });
       }
@@ -422,12 +430,6 @@ export class Renderer {
     // 시간
     const t = Math.ceil(match.timeLeft / 60);
     text(ctx, String(t).padStart(2, '0'), PW / 2, 12, t <= 10 ? UI.red : UI.paper, { scale: 2, align: 'center', shadow: UI.ink });
-    // 조작 안내는 시작 후 잠깐만
-    if (match.frame < 300) {
-      ctx.globalAlpha = Math.min(1, (300 - match.frame) / 60);
-      text(ctx, opts.net ? 'ESC 메뉴' : 'ESC 일시정지 · F2 판정 표시', PW / 2, 46, UI.dim, { size: 11, align: 'center', shadow: UI.ink });
-      ctx.globalAlpha = 1;
-    }
     if (opts.net) {
       text(ctx, opts.net.text, PW / 2, 31, UI.cyan, { size: 11, align: 'center', shadow: UI.ink });
       if (opts.net.waiting) text(ctx, '상대 입력을 기다리는 중…', PW / 2, 70, UI.gold, { size: 12, align: 'center', shadow: UI.ink });

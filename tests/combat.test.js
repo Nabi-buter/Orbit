@@ -19,7 +19,7 @@ test('약공격 적중: 피해, 짧은 경직, 게이지 충전', () => {
   const m = setup({ distance: 90 });
   const [a, b] = m.fighters;
   tap(m, 0, 'light');
-  const ev = run(m, 10);
+  const ev = run(m, a.weapon.light.hits[0].to + 2);
   assert.equal(ev.filter((e) => e.type === 'hit').length, 1);
   assert.equal(b.hp, B.fighter.maxHp - a.weapon.light.hits[0].damage);
   assert.ok(a.ult > 0 && b.ult > 0, '공격/피격 양쪽 궁극기 게이지 충전');
@@ -38,7 +38,7 @@ test('중거리에서는 약공격이 헛치고 강공격이 적중한다 (빠�
   const [a, b] = m.fighters;
   // P1 강공, P2 같은 프레임에 약공
   m.step([I({ heavy: true }), I({ light: true })]);
-  const ev = run(m, 30);
+  const ev = run(m, a.weapon.heavy.hits[0].to + 2);
   const hitsOnB = ev.filter((e) => e.type === 'hit' && e.defender === 1);
   const hitsOnA = ev.filter((e) => e.type === 'hit' && e.defender === 0);
   assert.equal(hitsOnA.length, 0, 'P2 약공격은 닿지 않음');
@@ -198,7 +198,7 @@ test('일반 패링: 피해 50%, 가드 게이지 소모, 공격권 유지', () 
   run(m, 30, I(), I({ guard: true })); // 미리 오래 누르고 있음 → 완벽 타이밍 아님
   const guard0 = b.guard;
   m.step([I({ light: true }), I({ guard: true })]);
-  const ev = run(m, 10, I(), I({ guard: true }));
+  const ev = run(m, a.weapon.light.hits[0].to + 2, I(), I({ guard: true }));
   assert.ok(ev.some((e) => e.type === 'parry'));
   const L = a.weapon.light.hits[0];
   assert.equal(b.hp, B.fighter.maxHp - Math.round(L.damage * 0.5));
@@ -229,7 +229,7 @@ test('완벽패링: 극소 피해, 공격 끊김, 반격 기회', () => {
   assert.ok(b.guard < B.fighter.maxGuard, '가드 게이지 소모');
   // 반격: 약공격이 공격자 경직 중에 적중
   m.step([I(), I({ light: true })]);
-  const ev2 = run(m, 10);
+  const ev2 = run(m, b.weapon.light.hits[0].to + 2);
   assert.ok(ev2.some((e) => e.type === 'hit' && e.attacker === 1));
 });
 
@@ -351,7 +351,7 @@ test('가드/패링 시에도 궁극기 게이지가 충전된다', () => {
   m.step([I(), I({ guard: true })]);
   run(m, 30, I(), I({ guard: true }));
   m.step([I({ light: true }), I({ guard: true })]);
-  run(m, 10, I(), I({ guard: true }));
+  run(m, a.weapon.light.hits[0].to + 2, I(), I({ guard: true }));
   assert.ok(b.ult > 0);
 });
 
@@ -359,7 +359,7 @@ test('동시 공격은 상쇄(양쪽 피격)된다 – 처리 순서 불공정 �
   const m = setup({ distance: 90 });
   const [a, b] = m.fighters;
   m.step([I({ light: true }), I({ light: true })]);
-  run(m, 10);
+  run(m, a.weapon.light.hits[0].to + 2);
   assert.equal(a.hp, b.hp);
   assert.ok(a.hp < B.fighter.maxHp);
 });
