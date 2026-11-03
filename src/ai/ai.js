@@ -420,7 +420,9 @@ export class AIController {
     if (this.hold.guard && this.hold.guard <= frame + 2) this.release('guard');
 
     // 궁극기
-    if (me.ult >= BALANCE.ultimate.cost && dist <= 150) {
+    // 무기마다 궁극기 사거리가 다르다: 첫 판정이 바로(4프레임 안) 닿는 거리에서만 쓴다
+    const ultContact = me.ult >= BALANCE.ultimate.cost ? contactFrame(me.weapon.ultimate, dist) : null;
+    if (ultContact !== null && ultContact <= 4) {
       const oppVulnerable = STUNNED_OPP.has(seen.state) || seen.state === S.ATTACK;
       if (this.chance(oppVulnerable ? 0.8 : 0.12)) { this.release('guard'); this.tapAt(frame, 'ult'); return; }
     }

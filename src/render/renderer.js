@@ -46,7 +46,7 @@ export function hitstopFor(events) {
   for (const e of events) {
     let h = HITSTOP[e.type] ?? 0;
     if (e.type === 'hit' && (e.kind === 'heavy' || e.kind === 'plunge')) h = 9;
-    if (e.type === 'hit' && e.kind === 'ultimate') h = 14;
+    if (e.type === 'hit' && e.kind === 'ultimate') h = e.last ? 14 : 3; // 연타 중간은 짧게, 마무리는 길게
     n = Math.max(n, h);
   }
   return n;
@@ -140,10 +140,13 @@ export class Renderer {
           fx.sparks(x, y, '#ffd08a', big ? 7 : 4, big ? 2.4 : 1.7, { dir: dir > 0 ? 0 : Math.PI, spread: 1.2, life: 10 });
           fx.addShake(big ? 1 : 0);
           if (e.kind === 'ultimate') {
+            // 무기별 마무리 일격에서만 큰 효과 (연타 중간 타는 일반 큰 타격)
             const A = match?.fighters[e.attacker];
-            fx.ultImpact(A?.weapon.id, x, y, dir, GROUND - 1, TEAM[e.attacker]?.ui ?? UI.gold);
-            fx.screenFlash(TEAM[e.attacker]?.main ?? '#f08a3c', 0.2);
-            fx.addShake(1);
+            if (e.last) {
+              fx.ultImpact(A?.weapon.id, x, y, dir, GROUND - 1, TEAM[e.attacker]?.ui ?? UI.gold);
+              fx.screenFlash(TEAM[e.attacker]?.main ?? '#f08a3c', 0.2);
+              fx.addShake(1);
+            }
           }
           break;
         }

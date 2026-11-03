@@ -41,7 +41,8 @@ test('궁극기: 원거리 시전은 반응 가능한 시간(≥12f) 뒤에 닿�
   for (const id of WEAPON_ORDER) {
     const m = new Match({ weapons: [id, id] });
     const u = m.fighters[0].weapon.ultimate;
-    assert.ok(contactFrame(u, 230) >= 12, `${id}: 230px 에서 ${contactFrame(u, 230)}f`);
+    const far = contactFrame(u, 230);
+    assert.ok(far === null || far >= 12, `${id}: 230px 에서 ${far}f`); // 닿지 않거나, 반응할 시간이 있다
     assert.ok(contactFrame(u, 60) <= 1, `${id}: 근거리 즉시 적중`);
     const lunge = Math.max(...u.moves.map((mv) => mv.vx));
     assert.ok(B.dash.speed > lunge);

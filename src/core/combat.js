@@ -94,6 +94,8 @@ export function applyHits(events, frame) {
       attacker: A.id,
       defender: D.id,
       kind,
+      index,
+      last: index === (A.attack?.def.hits.length ?? 1) - 1, // 마지막 판정(마무리 일격)인가
       x: (ev.box.x + ev.box.w / 2 + D.x) / 2,
       y: Math.min(D.y + 70, ev.box.y + ev.box.h / 2),
       frame,

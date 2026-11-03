@@ -322,19 +322,20 @@ test('궁극기: 100%에서만 발동, 즉시 0% 초기화, 일반 공격에 취
 });
 
 test('궁극기는 일반 패링으로 막을 수 없다', () => {
-  const m = setup({ distance: 150 });
+  const m = setup({ distance: 80 });
   const [a, b] = m.fighters;
   m.step([I(), I({ guard: true })]);
   run(m, 30, I(), I({ guard: true }));
   a.ult = 100;
   m.step([I({ ult: true }), I({ guard: true })]);
-  const ev = run(m, 25, I(), I({ guard: true }));
+  const ev = run(m, a.weapon.ultimate.duration, I(), I({ guard: true }));
   assert.ok(ev.some((e) => e.type === 'hit' && e.kind === 'ultimate'));
-  assert.equal(b.hp, B.fighter.maxHp - a.weapon.ultimate.hits[0].damage);
+  // 가드 중이어도 모든 판정이 그대로 들어간다
+  assert.equal(b.hp, B.fighter.maxHp - a.weapon.ultimate.hits.reduce((t, h) => t + h.damage, 0));
 });
 
 test('궁극기 완벽패링: 궁극기 끊김, 극소 피해, 게이지 반환 없음', () => {
-  const m = setup({ distance: 150 });
+  const m = setup({ distance: 80 });
   const [a, b] = m.fighters;
   a.ult = 100;
   m.step([I({ ult: true }), I({ guard: true })]); // 같은 순간 가드 입력

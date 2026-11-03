@@ -77,9 +77,9 @@ export const KNOBS = {
   // 규칙: 모든 무기 강공 콤보 ≥ 2, 강공 콤보 < 약공 콤보
   longsword: { combo: { lightMax: 3, heavyMax: 2, maxTotal: 4 }, reach: 1.01, damage: 1.05, speed: 1.28, hp: 1, guardTaken: 1, windup: 1.25 },
   greatsword: { combo: { lightMax: 3, heavyMax: 2, maxTotal: 3 }, reach: 1, damage: 0.9, speed: 1.26, hp: 0.9, guardTaken: 1, windup: 1.3 },
-  dagger: { combo: { lightMax: 3, heavyMax: 2, maxTotal: 5 }, reach: 1.04, damage: 1.1, speed: 1.53, hp: 1.05, guardTaken: 1 },
+  dagger: { combo: { lightMax: 3, heavyMax: 2, maxTotal: 5 }, reach: 1.04, damage: 1.1, speed: 1.53, hp: 1.07, guardTaken: 1 },
   axe: { combo: { lightMax: 3, heavyMax: 2, maxTotal: 3 }, reach: 1.05, damage: 1.16, speed: 1.44, hp: 1.1, guardTaken: 1, windup: 1.3 },
-  spear: { combo: { lightMax: 3, heavyMax: 2, maxTotal: 3 }, reach: 0.9, damage: 0.78, speed: 1.05, hp: 1.14, guardTaken: 1, windup: 1.1 },
+  spear: { combo: { lightMax: 3, heavyMax: 2, maxTotal: 3 }, reach: 0.9, damage: 0.78, speed: 1.05, hp: 1.08, guardTaken: 1, windup: 1.1 },
   knuckle: { combo: { lightMax: 5, heavyMax: 3, maxTotal: 8 }, reach: 1.15, damage: 1.02, speed: 1.52, hp: 1.03, guardTaken: 0.91 },
 };
 
@@ -118,7 +118,7 @@ const DEFS = {
     }),
     plunge: plunge({ damage: 70, guardDamage: 20, landingLag: 22 }),
     special: specialAttack('special-thrust'),
-    ultimate: { type: 'placeholderLunge', motion: 'ult-longsword' },
+    ultimate: { type: 'crossSlash', motion: 'ult-longsword' },
   },
 
   // ---------------------------------------------------------------------------
@@ -155,7 +155,7 @@ const DEFS = {
     }),
     plunge: plunge({ damage: 95, guardDamage: 28, landingLag: 28, w: 110 }),
     special: specialAttack('special-cleave'),
-    ultimate: { type: 'placeholderLunge', motion: 'ult-greatsword' },
+    ultimate: { type: 'earthSplitter', motion: 'ult-greatsword' },
   },
 
   // ---------------------------------------------------------------------------
@@ -192,7 +192,7 @@ const DEFS = {
     }),
     plunge: plunge({ damage: 55, guardDamage: 14, landingLag: 16, fallSpeed: 18, w: 60 }),
     special: specialAttack('special-flurry'),
-    ultimate: { type: 'placeholderLunge', motion: 'ult-dagger' },
+    ultimate: { type: 'shadowFlurry', motion: 'ult-dagger' },
   },
 
   // ---------------------------------------------------------------------------
@@ -229,7 +229,7 @@ const DEFS = {
     }),
     plunge: plunge({ damage: 85, guardDamage: 34, landingLag: 24, w: 90 }),
     special: specialAttack('special-crush'),
-    ultimate: { type: 'placeholderLunge', motion: 'ult-axe' },
+    ultimate: { type: 'leapCleave', motion: 'ult-axe' },
   },
 
   // ---------------------------------------------------------------------------
@@ -266,7 +266,7 @@ const DEFS = {
     }),
     plunge: plunge({ damage: 65, guardDamage: 18, landingLag: 24, w: 70 }),
     special: specialAttack('special-pierce'),
-    ultimate: { type: 'placeholderLunge', motion: 'ult-spear' },
+    ultimate: { type: 'piercingLunge', motion: 'ult-spear' },
   },
 
   // ---------------------------------------------------------------------------
@@ -306,7 +306,7 @@ const DEFS = {
     }),
     plunge: plunge({ damage: 50, guardDamage: 14, landingLag: 16, fallSpeed: 18, w: 60 }),
     special: specialAttack('special-uppercut'),
-    ultimate: { type: 'placeholderLunge', motion: 'ult-knuckle' },
+    ultimate: { type: 'stormRush', motion: 'ult-knuckle' },
   },
 };
 

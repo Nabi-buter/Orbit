@@ -149,3 +149,20 @@ test('막기만 해도 약공 콤보 하나로는 가득 찬 가드가 무너지
     assert.ok(total < BALANCE.fighter.maxGuard, `${id}: 약공 콤보 가드 피해 ${total} ≥ ${BALANCE.fighter.maxGuard}`);
   }
 });
+
+test('궁극기는 무기마다 다르다: 타입·이름·판정 수, 창이 가장 멀리 즉시 닿음', async () => {
+  const { contactFrame } = await import('../src/core/attackDef.js');
+  const types = new Set(WEAPON_ORDER.map((id) => WEAPONS[id].ultimate.ultimateType));
+  assert.equal(types.size, WEAPON_ORDER.length);
+  for (const id of WEAPON_ORDER) assert.ok(WEAPONS[id].ultimate.name, id);
+  // 타수: 너클 > 단검 > 나머지
+  const n = (id) => WEAPONS[id].ultimate.hits.length;
+  assert.ok(n('knuckle') > n('dagger') && n('dagger') > n('longsword'));
+  // 150px 에서 즉시 닿는 것은 창뿐
+  for (const id of WEAPON_ORDER) assert.equal(contactFrame(WEAPONS[id].ultimate, 150) <= 2, id === 'spear', id);
+  // 한 번 걸리면 끝까지: 판정 사이 경직이 다음 판정까지 이어진다
+  for (const id of WEAPON_ORDER) {
+    const hs = WEAPONS[id].ultimate.hits;
+    for (let i = 1; i < hs.length; i++) assert.ok(hs[i - 1].from + hs[i - 1].hitstun >= hs[i].from, `${id} ${i}`);
+  }
+});

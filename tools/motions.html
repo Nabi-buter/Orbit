@@ -29,10 +29,10 @@ for (const id of WEAPON_ORDER) {
   const h = document.createElement('h2');
   h.textContent = `${w.name} (${id})`;
   out.append(h);
-  for (const def of [...w.lights, ...w.heavies]) {
+  for (const def of [...w.lights, ...w.heavies, w.ultimate]) {
     const row = document.createElement('div');
     row.className = 'row';
-    row.innerHTML = `<b>${def.kind === 'light' ? '약' : '강'} · ${def.name}</b>`;
+    row.innerHTML = `<b>${def.kind === 'light' ? '약' : def.kind === 'ultimate' ? '궁' : '강'} · ${def.name}</b>`;
     const live = document.createElement('canvas');
     live.width = CW; live.height = CH; live.style.width = CW * SCALE + 'px';
     const strip = document.createElement('canvas');

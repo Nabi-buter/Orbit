@@ -121,6 +121,56 @@ export const MOTIONS = {
 };
 
 // -----------------------------------------------------------------------------
+// 궁극기 모션 (판정 하나당 beat 하나, src/core/ultimates.js 와 짝)
+// -----------------------------------------------------------------------------
+const alt = (n, even, odd) => Array.from({ length: n }, (_, i) => (i % 2 ? odd : even));
+Object.assign(MOTIONS.longsword, {
+  // X 자: 오른쪽 위 → 왼쪽 아래, 이어서 왼쪽 아래 → 오른쪽 위로 크게
+  '십자 베기': { beats: [
+    { from: P(2.3, 4, 108, { lean: -0.1 }), to: P(-0.9, 36, 66, { lean: 0.3, stride: 16, crouch: 4 }) },
+    { from: P(-1.25, 30, 58, { lean: 0.28, crouch: 8, stride: 16 }), to: P(2.0, 30, 116, { lean: 0.12, stride: 20, crouch: -4 }) },
+  ] },
+});
+Object.assign(MOTIONS.greatsword, {
+  // 손잡이로 짧게 쳐 붙잡고 → 머리 위 끝까지 들어 올렸다가 바닥까지 내려찍기
+  '대지 가르기': { beats: [
+    { from: P(0.4, 8, 86), to: P(0.1, 32, 84, { lean: 0.22, stride: 10 }) },
+    { from: P(3.0, -8, 120, { lean: -0.32, crouch: -4 }), to: P(-1.45, 34, 50, { lean: 0.5, stride: 24, crouch: 20 }) },
+  ] },
+});
+Object.assign(MOTIONS.dagger, {
+  // 좌우로 번갈아 베다가 마지막에 몸을 던져 깊게 찌름
+  '그림자 난도': { beats: [
+    ...alt(5,
+      { from: P(1.1, 18, 98, { lean: 0.15 }), to: P(-0.9, 42, 74, { lean: 0.32, stride: 18 }) },
+      { from: P(-0.9, 22, 70, { lean: 0.2, crouch: 4 }), to: P(1.0, 44, 100, { lean: 0.3, stride: 18 }) }),
+    { from: P(0, 6, 84, { crouch: 8, lean: 0.05 }), to: P(0.05, 56, 86, { lean: 0.5, stride: 28 }) },
+  ] },
+});
+Object.assign(MOTIONS.axe, {
+  // 자루로 받아치고 → 뛰어올라 머리 위에서 두 손으로 내려찍기
+  '도약 쪼개기': { beats: [
+    { from: P(0.7, 12, 92), to: P(-0.2, 36, 80, { lean: 0.22, stride: 10 }) },
+    { from: P(3.1, -4, 124, { lean: -0.3, crouch: -8, stride: 10 }), to: P(-1.35, 32, 50, { lean: 0.52, stride: 22, crouch: 20 }) },
+  ] },
+});
+Object.assign(MOTIONS.spear, {
+  // 뒤로 크게 당겼다가 온몸을 실어 한 줄로 꿰뚫기
+  '관통': { beats: [
+    { from: P(0.05, -16, 82, { crouch: 8, lean: -0.18 }), to: P(0, 58, 86, { lean: 0.52, stride: 32 }) },
+  ] },
+});
+Object.assign(MOTIONS.knuckle, {
+  // 양손 번갈아 몰아치기 8번 → 낮게 숙였다가 어퍼컷
+  '폭풍 연타': { beats: [
+    ...alt(8,
+      { from: P(0, 16, 92, { h2: [10, 88] }), to: P(0, 48, 94, { h2: [10, 88], lean: 0.25, stride: 14 }) },
+      { from: P(0, 16, 92, { h2: [12, 90] }), to: P(0, 16, 90, { h2: [48, 96], lean: 0.25, stride: 14 }) }),
+    { from: P(0, 14, 60, { h2: [10, 88], crouch: 16, lean: 0.12 }), to: P(0, 30, 130, { h2: [8, 86], crouch: -6, lean: -0.05, stride: 10 }) },
+  ] },
+});
+
+// -----------------------------------------------------------------------------
 // 키프레임 평가
 // -----------------------------------------------------------------------------
 // 실제 무기처럼 보이도록:
