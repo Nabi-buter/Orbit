@@ -52,6 +52,18 @@ function assert(c, msg) { if (!c) throw new Error('E2E 실패: ' + msg); console
     assert(await scene() === 'loadout', '플레이 → 로드아웃 (가운데 캐릭터 + 하단 무기)');
     await shot(page, '02-loadout');
 
+    // Q / E 로 모드 전환
+    await key('KeyE');
+    assert(await page.evaluate(() => window.__game.screen.mode) === 'local', 'E → 로컬 2인');
+    await key('KeyE');
+    assert(await page.evaluate(() => window.__game.screen.mode) === 'online', 'E → 온라인');
+    await key('KeyE');
+    assert(await page.evaluate(() => window.__game.screen.mode) === 'pve', 'E → AI 대전 (순환)');
+    await key('KeyQ');
+    assert(await page.evaluate(() => window.__game.screen.mode) === 'online', 'Q → 온라인 (역순)');
+    await key('KeyQ'); await key('KeyQ');
+    assert(await page.evaluate(() => window.__game.screen.mode) === 'pve', 'Q → AI 대전');
+
     // 하단 무기 6종 마우스 선택 확인
     const cards = await page.evaluate(() => window.__game.screen.cards.map((c) => [c.id, c.x + c.w / 2, c.y + c.h / 2]));
     assert(cards.length === 6 && new Set(cards.map((c) => c[2])).size === 1, '무기 6종이 하단 1열');

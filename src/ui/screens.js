@@ -210,7 +210,7 @@ export class LoadoutScreen {
   layout() {
     const slot = 58, x0 = Math.round((PW - slot * 6) / 2);
     this.cards = WEAPON_ORDER.map((id, i) => ({ id, x: x0 + i * slot, y: 168, w: slot, h: 40 }));
-    let tx = PW - 12;
+    let tx = PW - 24; // 오른쪽 끝에 E 키 자리
     this.modeTabs = this.o.lockMode ? [] : [...MODES].reverse().map((m) => {
       const w = textW(m.label, { size: 11 });
       tx -= w;
@@ -242,9 +242,11 @@ export class LoadoutScreen {
     if (k.left.includes(e.code)) { this.cycleWeapon(-1); return true; }
     if (k.right.includes(e.code)) { this.cycleWeapon(1); return true; }
     if (k.ok.includes(e.code)) { this.confirm(); return true; }
-    if (!this.o.lockMode && (e.code === 'KeyW' || e.code === 'ArrowUp' || e.code === 'Tab')) {
+    // 모드 선택: Q 이전 · E 다음 (W·↑·Tab 도 다음)
+    const modeStep = e.code === 'KeyQ' ? -1 : ['KeyE', 'KeyW', 'ArrowUp', 'Tab'].includes(e.code) ? 1 : 0;
+    if (!this.o.lockMode && modeStep) {
       const i = MODES.findIndex((m) => m.id === this.mode);
-      this.mode = MODES[(i + 1) % MODES.length].id;
+      this.mode = MODES[(i + modeStep + MODES.length) % MODES.length].id;
       e.preventDefault?.();
       return true;
     }
@@ -283,6 +285,11 @@ export class LoadoutScreen {
       const on = m.id === this.mode;
       text(ctx, m.label, m.x + 2, m.y + 1, on ? UI.paper : this.hover === m ? '#c4c8d2' : UI.dim, { size: 11 });
       if (on) rect(ctx, m.x + 2, m.y + 14, m.w - 4, 2, UI.gold);
+    }
+    if (this.modeTabs.length) {
+      // 모드 전환 키 안내: Q ← 탭들 → E
+      keycap(ctx, 'Q', this.modeTabs[0].x - 13, 7, UI.dim);
+      keycap(ctx, 'E', this.modeTabs.at(-1).x + this.modeTabs.at(-1).w + 3, 7, UI.dim);
     }
 
     // 가운데: 캐릭터 + 바닥 조명
@@ -335,7 +342,7 @@ export class LoadoutScreen {
     text(ctx, '대전 시작', sb.x + kw + 5, sb.y, this.hover === sb ? UI.gold : UI.paper, { size: 11 });
     const bw = keycap(ctx, 'ESC', this.back.x, this.back.y + 1);
     text(ctx, '뒤로', this.back.x + bw + 5, this.back.y, UI.dim, { size: 11 });
-    text(ctx, this.player === 1 ? '← → 무기' : 'A D 무기 · W 모드', PW / 2, 221, '#5d636f', { size: 11, align: 'center' });
+    text(ctx, this.player === 1 ? '← → 무기' : 'A D 무기 · Q E 모드', PW / 2, 221, '#5d636f', { size: 11, align: 'center' });
   }
 }
 
