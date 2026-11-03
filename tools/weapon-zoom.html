@@ -1,18 +1,25 @@
 <!doctype html>
 <html lang="ko">
 <head><meta charset="utf-8"><title>무기 스프라이트 확대</title>
-<style>body{margin:0;background:#1b1f28;padding:12px}canvas{image-rendering:pixelated;width:1920px;height:600px}</style></head>
+<style>body{margin:0;background:#1b1f28;padding:12px}canvas{image-rendering:pixelated;width:1920px;height:1080px}</style></head>
 <body>
-<canvas id="c" width="320" height="100"></canvas>
+<canvas id="c" width="320" height="180"></canvas>
 <script type="module">
-// 무기 6종을 여러 각도로 회전해 그린다 (RotSprite 회전 확인용)
+// 위: 무기 6종 그대로(가로) / 아래: 각 무기를 따로 떨어뜨려 여러 각도로 회전 (RotSprite 확인)
 import { WEAPONS, WEAPON_ORDER } from '../src/config/weapons.js';
-import { drawWeapon } from '../src/render/weaponArt.js';
+import { drawWeapon, weaponSprite } from '../src/render/weaponArt.js';
 const ctx = document.getElementById('c').getContext('2d');
-ctx.fillStyle = '#2b303b'; ctx.fillRect(0, 0, 320, 100);
-const angles = [0, 0.5, 1.2, 2.2];
+ctx.fillStyle = '#2b303b'; ctx.fillRect(0, 0, 320, 180);
+let x = 6;
+WEAPON_ORDER.forEach((id, i) => {
+  const s = weaponSprite(id, WEAPONS[id].color);
+  drawWeapon(ctx, id, WEAPONS[id].color, x + s.pivot[0], i % 2 ? 34 : 14, 0, 1);
+  x += i % 2 ? s.w + 4 : 0;
+  if (i % 2 === 0) x += 0;
+});
+const angles = [0.6, 1.4, 2.4];
 WEAPON_ORDER.forEach((id, i) => angles.forEach((a, j) => {
-  drawWeapon(ctx, id, WEAPONS[id].color, 14 + i * 52 + j * 3, 22 + j * 22, a, 1);
+  drawWeapon(ctx, id, WEAPONS[id].color, 26 + i * 50, 92 + j * 32, a, 1);
 }));
 </script>
 </body></html>
