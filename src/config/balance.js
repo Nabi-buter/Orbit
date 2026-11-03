@@ -25,7 +25,7 @@ export const BALANCE = {
   timing: { windup: 1.45, recovery: 0.8 },   // [TEMP]
 
   fighter: {
-    maxHp: 600,           // [TEMP] 목숨 2개 도입으로 1200→600 (한 목숨 약 18초, 경기 전체 약 55초)
+    maxHp: 800,           // [TEMP] 1200→600(목숨 2개 도입)→800: 한 목숨 싸움을 조금 더 길게
     maxStamina: 100,
     maxGuard: 70,         // [TEMP] 100→70: 자세가 더 빨리 무너진다
     maxUlt: 55,           // [TEMP] 100→70→55: 궁극기가 더 자주 나온다 (충전량은 그대로)

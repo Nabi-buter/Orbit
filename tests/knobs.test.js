@@ -36,7 +36,7 @@ test('체력 배율: 무기별 최대 체력', () => {
   const m = setup({ weapons: ['knuckle', 'longsword'] });
   assert.equal(m.fighters[0].maxHp, Math.round(BALANCE.fighter.maxHp * KNOBS.knuckle.hp));
   assert.equal(m.fighters[0].hp, m.fighters[0].maxHp);
-  assert.equal(m.fighters[1].maxHp, BALANCE.fighter.maxHp);
+  assert.equal(m.fighters[1].maxHp, Math.round(BALANCE.fighter.maxHp * KNOBS.longsword.hp));
 });
 
 test('가드 감소량 배율: 같은 공격을 막아도 무기에 따라 가드 게이지가 다르게 준다', () => {

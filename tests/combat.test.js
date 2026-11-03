@@ -21,7 +21,7 @@ test('약공격 적중: 피해, 짧은 경직, 게이지 충전', () => {
   tap(m, 0, 'light');
   const ev = run(m, a.weapon.light.hits[0].to + 2);
   assert.equal(ev.filter((e) => e.type === 'hit').length, 1);
-  assert.equal(b.hp, B.fighter.maxHp - a.weapon.light.hits[0].damage);
+  assert.equal(b.hp, b.maxHp - a.weapon.light.hits[0].damage);
   assert.ok(a.ult > 0 && b.ult > 0, '공격/피격 양쪽 궁극기 게이지 충전');
 });
 
@@ -43,7 +43,7 @@ test('중거리에서는 약공격이 헛치고 강공격이 적중한다 (빠�
   const hitsOnA = ev.filter((e) => e.type === 'hit' && e.defender === 0);
   assert.equal(hitsOnA.length, 0, 'P2 약공격은 닿지 않음');
   assert.equal(hitsOnB.length, 1, 'P1 강공격 적중');
-  assert.ok(b.hp < B.fighter.maxHp);
+  assert.ok(b.hp < b.maxHp);
 });
 
 test('헛친 약공격은 후딜레이 중 반격당한다 (읽고 내민 강공이 후딜에 들어감)', () => {
@@ -201,7 +201,7 @@ test('일반 패링: 피해 50%, 가드 게이지 소모, 공격권 유지', () 
   const ev = run(m, a.weapon.light.hits[0].to + 2, I(), I({ guard: true }));
   assert.ok(ev.some((e) => e.type === 'parry'));
   const L = a.weapon.light.hits[0];
-  assert.equal(b.hp, B.fighter.maxHp - Math.round(L.damage * 0.5));
+  assert.equal(b.hp, b.maxHp - Math.round(L.damage * 0.5));
   assert.equal(b.guard, guard0 - L.guardDamage);
   assert.equal(a.attack.connected, true, '공격자는 연결 가능 (공격권 유지)');
   assert.notEqual(a.state, S.PARRIED);
@@ -223,7 +223,7 @@ test('완벽패링: 극소 피해, 공격 끊김, 반격 기회', () => {
   run(m, H.from - 3);
   const ev = run(m, 6, I(), I({ guard: true }));
   assert.ok(ev.some((e) => e.type === 'perfect'));
-  assert.equal(b.hp, B.fighter.maxHp - Math.round(B.fighter.maxHp / 50));
+  assert.equal(b.hp, b.maxHp - Math.round(b.maxHp / 50));
   assert.equal(a.state, S.PARRIED);
   assert.equal(a.attack, null);
   assert.ok(b.guard < B.fighter.maxGuard, '가드 게이지 소모');
@@ -331,7 +331,7 @@ test('궁극기는 일반 패링으로 막을 수 없다', () => {
   const ev = run(m, a.weapon.ultimate.duration, I(), I({ guard: true }));
   assert.ok(ev.some((e) => e.type === 'hit' && e.kind === 'ultimate'));
   // 가드 중이어도 모든 판정이 그대로 들어간다
-  assert.equal(b.hp, B.fighter.maxHp - a.weapon.ultimate.hits.reduce((t, h) => t + h.damage, 0));
+  assert.equal(b.hp, b.maxHp - a.weapon.ultimate.hits.reduce((t, h) => t + h.damage, 0));
 });
 
 test('궁극기 완벽패링: 궁극기 끊김, 극소 피해, 게이지 반환 없음', () => {
@@ -342,7 +342,7 @@ test('궁극기 완벽패링: 궁극기 끊김, 극소 피해, 게이지 반환 
   const ev = run(m, 10, I(), I({ guard: true }));
   assert.ok(ev.some((e) => e.type === 'perfect' && e.kind === 'ultimate'));
   assert.equal(a.state, S.PARRIED);
-  assert.equal(b.hp, B.fighter.maxHp - Math.round(B.fighter.maxHp / 50));
+  assert.equal(b.hp, b.maxHp - Math.round(b.maxHp / 50));
   assert.equal(a.ult, B.ultGain.perfectParried);
 });
 
@@ -362,7 +362,7 @@ test('동시 공격은 상쇄(양쪽 피격)된다 – 처리 순서 불공정 �
   m.step([I({ light: true }), I({ light: true })]);
   run(m, a.weapon.light.hits[0].to + 2);
   assert.equal(a.hp, b.hp);
-  assert.ok(a.hp < B.fighter.maxHp);
+  assert.ok(a.hp < a.maxHp);
 });
 
 test('KO 및 시간 종료 판정 (목숨 2개)', () => {

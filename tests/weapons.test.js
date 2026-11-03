@@ -95,7 +95,7 @@ test('모든 무기: 적중·연결·일반 패링·완벽패링·가드 브레�
     let [a, b] = m.fighters;
     tap(m, 0, 'light');
     until(m, () => a.attack?.connected);
-    assert.ok(b.hp < B.fighter.maxHp, `${id} 약공 적중`);
+    assert.ok(b.hp < b.maxHp, `${id} 약공 적중`);
     const first = a.attack;
     let chained = false;
     for (let k = 0; k < 40 && a.attack; k++) {
@@ -114,7 +114,7 @@ test('모든 무기: 적중·연결·일반 패링·완벽패링·가드 브레�
     assert.ok(parry, `${id} 일반 패링`);
     const firstHit = WEAPONS[id].heavy.hits[0];
     assert.equal(ev.filter((e) => e.type === 'parry').length, WEAPONS[id].heavy.hits.length);
-    assert.ok(B.fighter.maxHp - b.hp <= WEAPONS[id].heavy.hits.reduce((s, h) => s + Math.round(h.damage / 2), 0));
+    assert.ok(b.maxHp - b.hp <= WEAPONS[id].heavy.hits.reduce((s, h) => s + Math.round(h.damage / 2), 0));
 
     // 완벽패링 (강공 첫 판정 직전 가드)
     m = setup({ distance: 60, weapons: [id, 'longsword'] });

@@ -4,6 +4,7 @@ import { Match } from '../src/core/match.js';
 import { AIController, DIFFICULTY } from '../src/ai/ai.js';
 import { EMPTY_INPUT } from '../src/core/fighter.js';
 import { WEAPON_ORDER } from '../src/config/weapons.js';
+import { I } from './helpers.js';
 
 function play(w1, w2, d = 'normal', seed = 1, p1 = null) {
   const m = new Match({ weapons: [w1, w2] });
@@ -68,4 +69,45 @@ test('난이도가 높을수록 강하다 (어려움 vs 쉬움)', () => {
     if (m.winner === (flip ? 0 : 1)) hardWins++;
   }
   assert.ok(hardWins >= N * 0.6, `어려움 승리 ${hardWins}/${N}`);
+});
+
+test('AI 는 단순한 습관(가만히 / 약공 연타 / 강공 연타 / 가드만)을 몇 초 안에 알아챈다', async () => {
+  const { PatternDetector } = await import('../src/ai/predictor.js');
+  const feed = (fn, frames = 200) => {
+    const d = new PatternDetector();
+    let atk = null;
+    for (let f = 0; f < frames; f++) {
+      const s = fn(f);
+      if (s.start) atk = { id: f };
+      d.observe({ state: s.state, atk: s.state === 'attack' ? atk : null, def: s.state === 'attack' ? { kind: s.kind } : null }, f);
+    }
+    return d.get(frames)?.pattern ?? null;
+  };
+  assert.equal(feed(() => ({ state: 'idle' })), 'idle');
+  assert.equal(feed(() => ({ state: 'guard' })), 'turtle');
+  assert.equal(feed((f) => ({ state: f % 30 < 20 ? 'attack' : 'idle', kind: 'light', start: f % 30 === 0 })), 'lightSpam');
+  assert.equal(feed((f) => ({ state: f % 60 < 50 ? 'attack' : 'idle', kind: 'heavy', start: f % 60 === 0 }), 240), 'heavySpam');
+  // 섞어서 플레이하면 습관으로 보지 않는다
+  assert.equal(feed((f) => ({ state: f % 40 < 15 ? 'attack' : f % 40 < 30 ? 'guard' : 'walk', kind: f % 80 < 40 ? 'light' : 'heavy', start: f % 40 === 0 })), null);
+});
+
+test('습관 공략: 어려움 AI 는 가만히·가드만 하는 상대를 피해 없이 이기고, 강공 연타를 완벽패링으로 받아친다', () => {
+  for (const [name, bot] of [['idle', () => I()], ['turtle', () => I({ guard: true })]]) {
+    const m = new Match({ weapons: ['longsword', 'axe'] });
+    const ai = new AIController('hard', 3);
+    while (!m.over && m.frame < 60 * 90) m.step([bot(), ai.think(m, 1)]);
+    assert.equal(m.winner, 1, name);
+    assert.equal(m.fighters[1].hp, m.fighters[1].maxHp, `${name}: AI 무피해`);
+  }
+  const m = new Match({ weapons: ['greatsword', 'longsword'] });
+  const ai = new AIController('hard', 5);
+  let perfects = 0, k = 0;
+  while (!m.over && m.frame < 60 * 90) {
+    const [b, a] = m.fighters;
+    const toward = a.x > b.x ? 'right' : 'left';
+    const ev = m.step([I({ heavy: k++ % 6 === 0, [toward]: Math.abs(a.x - b.x) > 150 }), ai.think(m, 1)]);
+    perfects += ev.filter((e) => e.type === 'perfect' && e.defender === 1).length;
+  }
+  assert.ok(ai.activePattern(m.frame) === 'heavySpam' || perfects > 0);
+  assert.ok(perfects >= 3, `완벽패링 ${perfects}`);
 });

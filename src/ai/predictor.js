@@ -106,3 +106,72 @@ export class OpponentModel {
 export const STYLE_LABEL = {
   unknown: '분석 중', rusher: '돌격형', poker: '견제형', turtle: '수비형', jumper: '점프형', counter: '반격형', balanced: '균형형',
 };
+
+// =============================================================================
+// 빠른 패턴 감지 (최근 몇 초만 본다)
+// -----------------------------------------------------------------------------
+// OpponentModel 은 오래 쌓아 확률을 낸다. 여기서는 "사람이 바로 눈치채는" 단순한 습관을
+// 최근 구간에서 즉시 잡아낸다. 습관이 바뀌면 구간이 지나며 자연히 풀린다.
+//   idle       아무것도 안 함 (가만히 서 있음)
+//   lightSpam  약공만 연타
+//   heavySpam  강공만 연타
+//   turtle     가드만 함
+// =============================================================================
+export const PATTERNS = ['idle', 'lightSpam', 'heavySpam', 'turtle'];
+export const PATTERN_LABEL = { idle: '가만히 있음', lightSpam: '약공 연타', heavySpam: '강공 연타', turtle: '가드만 함' };
+
+const WINDOW = 240; // 최근 4초
+
+export class PatternDetector {
+  constructor() {
+    this.log = [];       // 프레임마다 {st, start}
+    this.prevAtk = null;
+    this.current = null; // 확정된 패턴
+    this.since = 0;
+  }
+
+  /** 보이는 상대 상태 한 프레임 기록 */
+  observe(seen, frame) {
+    let start = null;
+    if (seen.atk && seen.atk !== this.prevAtk && seen.state === S.ATTACK) start = seen.def?.kind === 'heavy' ? 'heavy' : 'light';
+    this.prevAtk = seen.atk;
+    this.log.push({ st: seen.state, start });
+    if (this.log.length > WINDOW) this.log.shift();
+    const next = this.classify();
+    if (next !== this.current) { this.current = next; this.since = frame; }
+  }
+
+  /** 최근 n 프레임 통계 */
+  stats(n) {
+    const part = this.log.slice(-n);
+    let light = 0, heavy = 0, guard = 0, idle = 0;
+    for (const e of part) {
+      if (e.start === 'light') light++;
+      if (e.start === 'heavy') heavy++;
+      if (e.st === S.GUARD || e.st === S.BLOCKSTUN) guard++;
+      if (e.st === S.IDLE) idle++;
+    }
+    return { n: part.length, light, heavy, guard, idle };
+  }
+
+  classify() {
+    if (this.log.length < 120) return null; // 2초는 봐야 판단
+    const a = this.stats(180), b = this.stats(240), c = this.stats(150);
+    // 이미 잡은 습관은 느슨한 기준으로 유지 (한두 번 다른 행동을 섞어도 바로 풀지 않음)
+    const keep = {
+      lightSpam: b.light >= 3 && b.light > b.heavy * 2,
+      heavySpam: b.heavy >= 2 && b.heavy > b.light,
+      turtle: c.guard / c.n >= 0.5 && c.light + c.heavy <= 2,
+      idle: c.idle / c.n >= 0.7 && c.light + c.heavy === 0,
+    };
+    if (this.current && keep[this.current]) return this.current;
+    if (a.light >= 4 && a.heavy <= 1) return 'lightSpam';
+    if (b.heavy >= 3 && b.light <= 1) return 'heavySpam';
+    if (c.guard / c.n >= 0.7 && c.light + c.heavy <= 1) return 'turtle';
+    if (c.idle / c.n >= 0.85 && c.light + c.heavy === 0 && c.guard === 0) return 'idle';
+    return null;
+  }
+
+  /** 확정된 패턴과 그 패턴이 이어진 프레임 수 */
+  get(frame) { return this.current ? { pattern: this.current, held: frame - this.since } : null; }
+}

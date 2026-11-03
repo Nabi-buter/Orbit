@@ -13,7 +13,7 @@ import { reachOf, contactFrame } from '../core/attackDef.js';
 import { S, EMPTY_INPUT, isFree } from '../core/fighter.js';
 import { dashCost } from '../core/actions.js';
 import { comboAllows } from '../core/combo.js';
-import { OpponentModel } from './predictor.js';
+import { OpponentModel, PatternDetector } from './predictor.js';
 
 export const DIFFICULTY = {
   easy: {
@@ -30,6 +30,7 @@ export const DIFFICULTY = {
     evadeChance: 0.1,    // 대시/점프 회피 확률
     preGuard: 0.08,      // 근거리에서 미리 가드할 확률
     adapt: 0.25,         // 상대 패턴 예측을 행동에 반영하는 정도
+    exploitDelay: 90,    // 습관을 확인한 뒤 공략을 시작하기까지(프레임)
   },
   normal: {
     label: '보통',
@@ -45,6 +46,7 @@ export const DIFFICULTY = {
     evadeChance: 0.18,
     preGuard: 0.18,
     adapt: 0.55,
+    exploitDelay: 20,
   },
   hard: {
     label: '어려움',
@@ -60,6 +62,7 @@ export const DIFFICULTY = {
     evadeChance: 0.22,
     preGuard: 0.25,
     adapt: 0.8,
+    exploitDelay: 0,
   },
 };
 
@@ -88,6 +91,7 @@ export class AIController {
     this.lastTap = {};      // key → 마지막 누른 프레임 (엣지 생성용)
     this.watchedAttack = null;
     this.model = new OpponentModel();
+    this.patterns = new PatternDetector(); // 최근 몇 초의 단순한 습관 (가만히 / 약공 연타 / 강공 연타 / 가드만)
     this.oppAttackStarts = []; // 인지한 상대 공격 시작 시각 (연타 리듬 학습)
     this.rhythmPlanned = -1;
   }
@@ -146,6 +150,7 @@ export class AIController {
     if (this.history.length > 90) this.history.shift();
     const seen = this.perceive(frame);
     this.model.observe(seen, me, frame); // 상대 패턴 학습 (보이는 정보만)
+    this.patterns.observe(seen, frame);
 
     this.react(me, opp, seen, frame);
     if (frame >= this.nextThink) {
@@ -183,7 +188,12 @@ export class AIController {
       this.chainDecidedFor = me.attack;
       if (this.chance(P.comboChance)) {
         // 콤보 상한을 고려: 가능한 종류만, 섞어서 길게 잇는 것을 선호
-        const opts = ['light', 'heavy'].filter((k) => comboAllows(me, k, frame, true) && dist <= reachOf(me.weapon[k]) + 10);
+        // 강공 연결은 예비 동작이 길어 틈이 생긴다: 상대가 가장 빨리 낼 수 있는 공격보다 먼저 닿을 때만
+        // (상대가 강공만 쓰는 습관이면 상대 강공 속도 기준)
+        const oppFast = this.activePattern(frame) === 'heavySpam' ? opp.weapon.heavy.hits[0].from : opp.weapon.light.hits[0].from;
+        const heavyGap = me.weapon.heavy.hits[0].from - me.weapon.light.hits[0].from;
+        const heavySafe = heavyGap + BALANCE.combo.minGap < oppFast;
+        const opts = ['light', 'heavy'].filter((k) => comboAllows(me, k, frame, true) && dist <= reachOf(me.weapon[k]) + 10 && (k === 'light' || heavySafe));
         const other = opts.find((k) => k !== me.combo.lastType);
         const key = other && this.chance(0.6) ? other : opts[Math.floor(this.random() * opts.length)];
         if (key) this.tapAt(frame + 1, key);
@@ -295,18 +305,22 @@ export class AIController {
     const P = this.p;
     if (!this.chance(P.punishChance)) return;
     const remaining = seen.def.duration - seen.aframe - this.reactNow; // 실제 남은 후딜레이(추정)
+    // 상대 판정이 끝나기 전에 도착하면 헛치게 한 공격에 오히려 맞는다 → 판정이 끝난 뒤에 닿도록
+    const activeEnd = (seen.def.hits.at(-1)?.to ?? 0) - seen.aframe - this.reactNow + 2;
     const lightReach = reachOf(me.weapon.light) + 20;
     const heavyReach = reachOf(me.weapon.heavy) + 20;
     const lightSu = me.weapon.light.hits[0].from;
     const heavySu = me.weapon.heavy.hits[0].from;
     const fwd = me.facing > 0 ? 'right' : 'left';
-    if (dist <= heavyReach && remaining > heavySu + 1) { this.release('guard'); this.tapAt(frame, 'heavy'); return; }
+    if (dist <= heavyReach && remaining > heavySu + 1 && heavySu > activeEnd) { this.release('guard'); this.tapAt(frame, 'heavy'); return; }
     const dashDist = BALANCE.dash.speed * BALANCE.dash.duration;
-    if (dist - dashDist <= lightReach && remaining > BALANCE.dash.duration + lightSu + 1 &&
-        me.stamina >= dashCost(me) && me.dashCooldown <= 0 && this.canDashIn(frame)) {
+    // 대시가 끝나 상대 앞에 도착하는 시점이 판정 종료 뒤여야 한다
+    const delay = Math.max(0, activeEnd + 2 - BALANCE.dash.duration);
+    if (dist - dashDist <= lightReach && remaining > delay + BALANCE.dash.duration + lightSu + 1 &&
+        me.stamina >= dashCost(me) && me.dashCooldown <= 0 && this.canDashIn(frame + delay)) {
       this.release('guard');
-      this.dashIn(frame, fwd);
-      this.tapAt(frame + BALANCE.dash.duration - 2, 'light');
+      this.dashIn(frame + delay, fwd);
+      this.tapAt(frame + delay + BALANCE.dash.duration - 2, 'light');
     }
   }
 
@@ -322,8 +336,10 @@ export class AIController {
       until = Math.max(next.from, contact) - seen.aframe - this.reactNow;
     }
     const isUlt = seen.def?.kind === 'ultimate';
+    const pat = this.activePattern(frame);
     // 느린 공격(강공 등)이고 사거리 끝이면: 뒤로 빠져 헛치게 한 뒤 후딜을 노린다
-    if (!plunging && !isUlt && until >= 3 && dist > reachOf(seen.def) - 45 && this.roomBehind(me) > 70 && this.chance(P.adapt)) {
+    const vsHeavyMash = pat === 'heavySpam' && !plunging && seen.def?.kind === 'heavy';
+    if (!vsHeavyMash && !plunging && !isUlt && until >= 3 && dist > reachOf(seen.def) - 45 && this.roomBehind(me) > 70 && this.chance(P.adapt)) {
       const back = me.facing > 0 ? 'left' : 'right';
       this.release('guard');
       if (me.stamina >= dashCost(me) && me.dashCooldown <= 0 && until < 10) this.retreat(me, frame, 12, true);
@@ -334,7 +350,12 @@ export class AIController {
     // 상대가 강공 위주(견제형)면 느린 강공에 완벽패링을 더 노린다 (반응 가능한 속도라 공정)
     const slowHit = !plunging && seen.def?.kind === 'heavy' && until >= 2;
     const vsPoker = slowHit && this.model.style() === 'poker' ? P.adapt * 0.6 : 0;
-    const perfectP = isUlt ? Math.min(0.9, P.perfectChance * 1.6) : Math.min(0.85, P.perfectChance + vsPoker);
+    // 약공 연타 상대: 박자가 일정하므로 완벽패링을 더 노린다
+    const vsMasher = pat === 'lightSpam' ? P.adapt * 0.45 : 0;
+    // 강공 연타: 보고 반응할 수 있는 느린 공격이므로 거의 매번 완벽패링을 노린다
+    const perfectP = isUlt ? Math.min(0.9, P.perfectChance * 1.6)
+      : vsHeavyMash && until >= 2 ? Math.min(0.92, 0.45 + P.adapt * 0.55)
+      : Math.min(0.85, P.perfectChance + vsPoker + vsMasher);
 
     if (until >= 1 && r < perfectP) {
       // 완벽패링 시도: 가드를 떼었다가 예상 판정 직전에 다시 누른다 (오차 포함)
@@ -342,6 +363,13 @@ export class AIController {
       const err = Math.round((this.random() * 2 - 1) * P.perfectError);
       const pressAt = frame + Math.max(0, until - 3 + err);
       this.tapAt(pressAt, 'guard', {}, 20);
+      return;
+    }
+    // 습관을 알고 있으면 운에 맡기지 않는다: 완벽패링을 안 노릴 때는 무조건 막는다
+    if (vsHeavyMash || (pat === 'lightSpam' && seen.def?.kind === 'light')) {
+      // 판정이 확실히 끝날 때까지 (지연 추정 없이, 보이는 진행 프레임 기준으로 넉넉히)
+      const lastTo = seen.def.hits.at(-1)?.to ?? 0;
+      this.holdFor('guard', frame, Math.max(12, until + 14, lastTo - seen.aframe + 4));
       return;
     }
     if (isUlt || r < perfectP + P.guardChance) {
@@ -413,6 +441,9 @@ export class AIController {
       return;
     }
 
+    // 단순한 습관을 발견하면 바로 그 습관을 공략 (가만히 / 약공 연타 / 강공 연타 / 가드만)
+    if (this.exploit(me, opp, seen, frame, dist)) return;
+
     // 상대 패턴 예측에 따른 대응 (예측 반영 정도 = 난이도)
     if (this.model.count >= 6 && this.chance(P.adapt) && this.counterPlan(me, opp, seen, frame, dist)) return;
 
@@ -442,7 +473,8 @@ export class AIController {
     // 상대 사거리가 더 긴데 그 안쪽(내 사거리 밖)에 서 있으면: 파고들기 / 물러나 헛치기 유도 / 가드
     if (dist > lightReach + 15 && dist <= oppReach + 25 && oppReach > heavyReach) {
       const r0 = this.random();
-      if (r0 < 0.3 && me.stamina > dashCost(me) + 10 && me.dashCooldown <= 0 && this.canDashIn(frame)) {
+      const oppSwinging = seen.state === S.ATTACK && seen.def && seen.aframe <= (seen.def.hits.at(-1)?.to ?? 0) + 2;
+      if (r0 < 0.3 && !oppSwinging && me.stamina > dashCost(me) + 10 && me.dashCooldown <= 0 && this.canDashIn(frame)) {
         // 파고들기: 대시 직후 빠른 공격
         this.dashIn(frame, fwd);
         this.tapAt(frame + BALANCE.dash.duration - 3, this.chance(0.7) ? 'light' : 'heavy');
@@ -493,6 +525,63 @@ export class AIController {
       } else {
         this.holdFor(fwd, frame, 6);
       }
+    }
+  }
+
+  /** 지금 공략 중인 습관 (난이도별로 확인 후 반응까지 시간이 다름) */
+  activePattern(frame) {
+    const g = this.patterns.get(frame);
+    return g && g.held >= (this.p.exploitDelay ?? 0) ? g.pattern : null;
+  }
+
+  /**
+   * 습관 공략. 실제 사람이 하는 대처:
+   *   가만히   → 다가가 가장 아픈 공격(강공·궁극기)부터
+   *   약공 연타 → 전부 막고 박자에 맞춰 완벽패링, 콤보가 끝나 숨 고를 때 반격
+   *   강공 연타 → 섣불리 들어가지 않고 느린 강공을 보고 완벽패링 → 경직·후딜에 들어가는 공격으로 반격
+   *   가드만   → 가드 게이지를 깎는 강공으로 압박 → 무너지면 특수강공 (react 3)
+   * 공략했으면 true.
+   */
+  exploit(me, opp, seen, frame, dist) {
+    const pat = this.activePattern(frame);
+    if (!pat) return false; // 확인된 습관은 항상 공략 (난이도 차이는 알아채는 속도·실행 정확도)
+    this.lastExploit = pat;
+    const fwd = me.facing > 0 ? 'right' : 'left';
+    const myLight = reachOf(me.weapon.light), myHeavy = reachOf(me.weapon.heavy);
+    const can = (k) => comboAllows(me, k, frame, false);
+    const ultHere = me.ult >= BALANCE.ultimate.cost && (contactFrame(me.weapon.ultimate, dist) ?? 99) <= 4;
+    // 공격할 때만 가드를 푼다 (이미 잡아 둔 가드·완벽패링 타이밍을 지우지 않도록)
+    const hit = (key) => { this.release('guard'); this.tapAt(frame, key); return true; };
+    const guarding = this.hold.guard && this.hold.guard > frame;
+    switch (pat) {
+      case 'idle':
+        if (ultHere) { return hit('ult'); }
+        if (dist > myHeavy - 12) { if (!guarding) this.holdFor(fwd, frame, 6); return true; }
+        if (can('heavy')) return hit('heavy');
+        return false;
+      case 'turtle':
+        if (dist > myHeavy - 12) { if (!guarding) this.holdFor(fwd, frame, 6); return true; }
+        if (can('heavy')) return hit('heavy');
+        if (can('light')) return hit('light');
+        return false;
+      case 'lightSpam':
+        // 간격 싸움보다 확실한 대처: 약공은 전부 막고(respondToThreat), 일정한 박자에 완벽패링을 노리고,
+        // 콤보가 끝나 숨 고르는 순간 반격(react 3-c). 위치 선정은 평소대로 둔다.
+        // (habit-check: 간격 유지 공략보다 AI 피해 48→38%, 승률 92→100%)
+        return false;
+      case 'heavySpam': {
+        // 강공은 느려서 보고 완벽패링할 수 있다: 섣불리 들어가지 않고 기다렸다가
+        // (respondToThreat 가 완벽패링 확률을 크게 올림) 상대 후딜·패링 경직에 강공으로 크게 반격
+        const inRecovery = seen.state === S.ATTACK && seen.def && seen.aframe > (seen.def.hits.at(-1)?.to ?? 0);
+        // 남은 후딜 안에 들어가는 공격만 (늦으면 상대의 다음 강공과 부딪힌다)
+        const left = inRecovery ? seen.def.duration - seen.aframe - this.reactNow : 0;
+        const stunned = STUNNED_OPP.has(seen.state);
+        if ((inRecovery || stunned) && dist <= myHeavy && can('heavy') && (stunned || left > me.weapon.heavy.hits[0].from + 2)) return hit('heavy');
+        if (inRecovery && dist <= myLight + 8 && can('light') && left > me.weapon.light.hits[0].from + 1) return hit('light');
+        return true; // 제자리에서 다음 강공을 기다렸다가 완벽패링 (가드 유지)
+      }
+      default:
+        return false;
     }
   }
 
