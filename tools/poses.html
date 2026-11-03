@@ -1,0 +1,22 @@
+<!doctype html><html><head><meta charset="utf-8"><title>상태 포즈</title>
+<style>body{margin:0;background:#1b1f28}canvas{image-rendering:pixelated}</style></head><body>
+<canvas id="c"></canvas>
+<script type="module">
+// 무기별 비공격 상태 포즈 (가드 · 막음 · 피격 · 패링당함 · 가드 브레이크 · 넉백 · 착지)
+import { WEAPONS, WEAPON_ORDER } from '../src/config/weapons.js';
+import { createFighter, S } from '../src/core/fighter.js';
+import { drawFighter } from '../src/render/fighterArt.js';
+import { TEAM } from '../src/render/renderer.js';
+const states = [S.GUARD, S.BLOCKSTUN, S.HITSTUN, S.PARRIED, S.GUARD_BREAK, S.KNOCKBACK, S.LANDING];
+const CW = 64, CH = 60;
+const c = document.getElementById('c'); c.width = CW * states.length; c.height = CH * WEAPON_ORDER.length;
+c.style.width = c.width * 4 + 'px'; c.style.height = c.height * 4 + 'px';
+const ctx = c.getContext('2d');
+WEAPON_ORDER.forEach((id, r) => states.forEach((st, k) => {
+  ctx.fillStyle = (r + k) % 2 ? '#262b36' : '#2b303b'; ctx.fillRect(k * CW, r * CH, CW, CH);
+  const f = createFighter({ id: 0, x: 0, facing: 1, weapon: WEAPONS[id] });
+  f.state = st; f.timer = 8;
+  drawFighter(ctx, f, k * CW + 24, r * CH + CH - 4, { ...TEAM[0], weapon: WEAPONS[id].color }, 0, { smooth: false });
+}));
+document.title = 'ready';
+</script></body></html>

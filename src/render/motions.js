@@ -42,7 +42,7 @@ export const GUARD_POSE = {
   longsword: { a: 1.3, h: [24, 86], recoil: { dx: -6, da: 0.25 } },
   greatsword: { a: 1.68, h: [20, 82], recoil: { dx: -3, da: 0.1 } },
   dagger: { a: 2.45, h: [20, 100], h2: [12, 88], recoil: { dx: -7, da: 0.35 } },
-  axe: { a: 0.18, h: [30, 100], recoil: { dx: -4, da: -0.15 } },
+  axe: { a: 0.22, h: [22, 104], recoil: { dx: -4, da: -0.15 } },
   spear: { a: 1.2, h: [20, 90], recoil: { dx: -5, da: 0.2 } },
   knuckle: { a: 0, h: [20, 106], h2: [24, 98], recoil: { dx: -6, da: 0 } },
 };

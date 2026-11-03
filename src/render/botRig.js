@@ -13,6 +13,7 @@ import { makeSprite, sset, blit, PX } from './pixel.js';
 import { BOT_FRAMES, BOT_RIG } from './botSprites.js';
 import { drawWeapon, drawFist } from './weaponArt.js';
 import { computePose } from './fighterArt.js';
+import { drawLimbRig } from './limbRig.js';
 import { STANCE, GRIP, backHand } from './motions.js';
 
 /** 팀별 팔레트 (같은 그림, 색만 다름) */
@@ -164,6 +165,8 @@ export function drawBot(ctx, f, ax, ay, pal, frame, opts = {}) {
   const R = BOT_RIG;
   const foot = R.foot, hip = R.hip;
   const ko = f.state === S.KO;
+  // 쓰러진 상태 외에는 관절 리그 (팔·다리 IK, src/render/limbRig.js)
+  if (!ko && opts.rig !== 'cutout') return drawLimbRig(ctx, f, ax, ay, pal, P, toSprite(R.core, P, hip, `${key}|core`), pose, opts);
   const lean = Math.max(-0.5, Math.min(0.5, pose.lean));
   const tanL = Math.tan(lean);
   const drop = Math.max(0, Math.min(8, Math.round(pose.crouch / PX)));
