@@ -39,12 +39,13 @@ export const STANCE = {
  * recoil: 막았을 때 밀리는 방향(손 x 이동, 각도 변화) — 무거운 무기일수록 덜 밀린다
  */
 export const GUARD_POSE = {
-  longsword: { a: 1.3, h: [24, 86], recoil: { dx: -6, da: 0.25 } },
-  greatsword: { a: 1.68, h: [20, 82], recoil: { dx: -3, da: 0.1 } },
-  dagger: { a: 2.45, h: [20, 100], h2: [12, 88], recoil: { dx: -7, da: 0.35 } },
-  axe: { a: 0.22, h: [22, 104], recoil: { dx: -4, da: -0.15 } },
-  spear: { a: 1.2, h: [20, 90], recoil: { dx: -5, da: 0.2 } },
-  knuckle: { a: 0, h: [20, 106], h2: [24, 98], recoil: { dx: -6, da: 0 } },
+  // support: 뒷손이 무기 위 어디를 잡는지 (앞손에서 칼끝 쪽 + / 자루 끝 쪽 -, 아트 px). 없으면 평소 양손 그립
+  longsword: { a: 1.15, h: [22, 94], recoil: { dx: -6, da: 0.25 } },                    // 양손으로 칼을 비스듬히 세워 받음
+  greatsword: { a: 1.6, h: [16, 82], support: 12, recoil: { dx: -3, da: 0.08 } },      // 칼을 세우고 뒷손 손바닥으로 칼면을 받쳐 방패처럼
+  dagger: { a: 2.45, h: [20, 102], h2: [12, 98], recoil: { dx: -7, da: 0.35 } },       // 역수로 쥔 팔뚝을 얼굴 앞에, 빈손은 턱 옆
+  axe: { a: 1.15, h: [18, 86], support: 8, recoil: { dx: -4, da: -0.15 } },           // 자루를 얼굴 앞에 비스듬히 세우고 두 손을 벌려 자루로 받음
+  spear: { a: 1.3, h: [22, 104], support: -13, recoil: { dx: -5, da: 0.2 } },          // 자루를 대각선으로 세우고 두 손을 멀리 벌려 몸 앞을 가림
+  knuckle: { a: 0, h: [20, 106], h2: [24, 98], recoil: { dx: -6, da: 0 } },            // 두 주먹을 얼굴 앞에 붙인 하이 가드
 };
 
 /** 완벽패링: 막는 순간 무기를 바깥으로 쳐내는 동작 (프레임 0~DEFLECT) */

@@ -15,6 +15,7 @@
 // =============================================================================
 
 import { attack } from './attackDef.js';
+import { BALANCE } from '../config/balance.js';
 
 const builders = new Map();
 
@@ -27,6 +28,8 @@ export function buildUltimate(weaponId, spec) {
   const builder = builders.get(spec.type);
   if (!builder) throw new Error(`Unknown ultimate type "${spec.type}" (${weaponId})`);
   const def = builder(spec.params ?? {}, weaponId);
+  const scale = BALANCE.ultimate.damageScale ?? 1;
+  def.hits = def.hits.map((h) => ({ ...h, damage: Math.round(h.damage * scale) }));
   def.kind = 'ultimate';
   def.id = 'ultimate';
   def.motion = spec.motion ?? def.motion;

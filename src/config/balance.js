@@ -11,11 +11,12 @@
 export const FPS = 60;
 
 export const STAGE = {
-  width: 1280,
+  width: 2400,         // 경기장 전체 폭 (화면은 1281px 만큼 보이고 카메라가 따라간다)
   height: 720,
   groundY: 610,        // 화면상 지면 높이(렌더링용)
   leftWall: 70,        // 캐릭터 중심 x 최소값
-  rightWall: 1210,     // 캐릭터 중심 x 최대값
+  rightWall: 2330,     // 캐릭터 중심 x 최대값
+  maxSeparation: 1100, // 두 캐릭터 최대 거리: 둘 다 항상 한 화면 안에 (격투 게임 화면 끝 규칙)
   startDistance: 360,  // [TEMP] 라운드 시작 시 두 플레이어 거리
 };
 
@@ -99,6 +100,7 @@ export const BALANCE = {
   ultimate: {
     // 궁극기는 즉시 시전, 일반 공격으로 취소 불가, 일반 패링 불가, 완벽패링으로만 끊김.
     cost: 55,             // = fighter.maxUlt
+    damageScale: 1.3,     // [TEMP] 궁극기 피해 배율 (무기별 궁극기 수치에 곱함)
   },
 
   ultGain: {

@@ -79,6 +79,17 @@ function land(f) {
 /** 벽 / 캐릭터 간 밀어내기 */
 export function resolveBodies(a, b) {
   for (const f of [a, b]) clampWall(f);
+  // 화면 끝: 둘 사이가 한 화면을 넘지 않게. 멀어지려는 쪽을 막는다 (둘 다면 반씩)
+  const sep = Math.abs(b.x - a.x);
+  if (sep > STAGE.maxSeparation) {
+    const excess = sep - STAGE.maxSeparation;
+    const dir = Math.sign(b.x - a.x) || 1;
+    const outA = -dir * ((a.vx ?? 0) + (a.pushVx ?? 0));
+    const outB = dir * ((b.vx ?? 0) + (b.pushVx ?? 0));
+    const ka = outA > outB ? 1 : outB > outA ? 0 : 0.5;
+    a.x += dir * excess * ka;
+    b.x -= dir * excess * (1 - ka);
+  }
 
   const W = B.fighter.width;
   const H = B.fighter.height;

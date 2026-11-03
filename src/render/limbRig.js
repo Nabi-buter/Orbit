@@ -11,7 +11,7 @@
 
 import { BOT_RIG } from './botSprites.js';
 import { drawWeapon, drawFist } from './weaponArt.js';
-import { GRIP } from './motions.js';
+import { GRIP, GUARD_POSE } from './motions.js';
 import { S } from '../core/fighter.js';
 
 const R = BOT_RIG;
@@ -134,10 +134,18 @@ export function drawLimbRig(ctx, f, ax, ay, pal, P, core, pose, opts = {}) {
   // 양손 무기: 뒷손은 실제 앞손 위치에서 자루를 따라 GRIP 만큼 뒤
   const grip = weaponId !== 'knuckle' ? GRIP_ART[weaponId] : null;
   const twoHanded = grip != null && f.state !== S.HITSTUN && f.state !== S.KNOCKBACK && f.state !== S.PARRIED;
-  const backTarget = twoHanded
-    ? [armF.end[0] - dir[0] * grip, armF.end[1] - dir[1] * grip]
-    : handTarget(shB, pose.hand2 ?? [pose.hand[0] - 12, pose.hand[1] - 6]);
-  const armB = ik(shB, backTarget, ARM.upper, ARM.fore, elbowDown);
+  // 가드: 무기마다 뒷손이 잡는 곳이 다르다 (대검은 칼면을 받치고, 도끼·창은 자루를 넓게 잡음)
+  const guarding = f.state === S.GUARD || f.state === S.BLOCKSTUN;
+  const support = guarding ? GUARD_POSE[weaponId]?.support : undefined;
+  const backTarget = support != null
+    ? [armF.end[0] + dir[0] * support, armF.end[1] + dir[1] * support]
+    : twoHanded
+      ? [armF.end[0] - dir[0] * grip, armF.end[1] - dir[1] * grip]
+      : handTarget(shB, pose.hand2 ?? [pose.hand[0] - 12, pose.hand[1] - 6]);
+  // 뒷손을 앞으로 뻗을수록 상체가 돌아 뒷어깨가 앞으로 온다 (시트 그림은 약간 정면이라 어깨 사이가 넓다)
+  const twist = Math.max(0, Math.min(0.75, (backTarget[0] - shB[0] - 4) / 12));
+  const shB2 = [shB[0] + (shF[0] - shB[0]) * twist, shB[1] + (shF[1] - shB[1]) * twist];
+  const armB = ik(shB2, backTarget, ARM.upper, ARM.fore, elbowDown);
 
   // --- 색 (앞쪽 팔다리는 밝게, 뒤쪽은 어둡게 → 깊이감) ---------------------------
   const front = { line: P['#'], fill: P.l, hi: P.w, lo: P.m, joint: P.d };
@@ -156,7 +164,9 @@ export function drawLimbRig(ctx, f, ax, ay, pal, P, core, pose, opts = {}) {
   const arm = (c, sh, A) => drawLimb(put, [{ a: sh, b: A.joint, r: 1.15 }, { a: A.joint, b: A.end, r: 1.0 }, { a: A.end, b: A.end, r: 1.35 }], c, [A.joint]);
 
   // --- 그리기 순서: 뒷팔 · 뒷다리 · 몸통 · 앞다리 · 무기 · 앞팔 ------------------
-  arm(back, shB, armB);
+  // 가드에서 뒷손이 무기를 받치면 그 팔은 가슴 앞을 지나므로 몸 위에 그린다
+  const backArmFront = support != null;
+  if (!backArmFront) arm(back, shB2, armB);
   leg(back, hipB, legB);
   for (let y = 0; y <= CUT; y++) for (let x = 0; x < core.w; x++) {
     const c = core.px[y * core.w + x];
@@ -167,6 +177,7 @@ export function drawLimbRig(ctx, f, ax, ay, pal, P, core, pose, opts = {}) {
   leg(front, hipF, legF);
   const hand = toScreen(armF.end);
   if (showWeapon && weaponId !== 'knuckle') drawWeapon(ctx, weaponId, pal.weapon, hand[0], hand[1], wa, facing);
+  if (backArmFront) arm(back, shB2, armB);
   arm(front, shF, armF);
   if (showWeapon && weaponId === 'knuckle') {
     const hb = toScreen(armB.end);

@@ -36,7 +36,7 @@ function wrap(str, maxW, size = 11) {
 let bgCache = null;
 function background(ctx, dim = 0.5) {
   if (!bgCache) bgCache = buildBackground();
-  ctx.drawImage(bgCache, 0, 0);
+  ctx.drawImage(bgCache, -Math.round((bgCache.width - PW) / 2), 0); // 넓은 경기장 배경의 가운데
   ctx.globalAlpha = dim; rect(ctx, 0, 0, PW, PH, UI.ink); ctx.globalAlpha = 1;
 }
 

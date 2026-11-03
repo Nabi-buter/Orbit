@@ -149,6 +149,7 @@ export class AIController {
     this.history.push(this.snapshot(opp, me));
     if (this.history.length > 90) this.history.shift();
     const seen = this.perceive(frame);
+    this.lastDist = Math.abs(opp.x - me.x);
     this.model.observe(seen, me, frame); // 상대 패턴 학습 (보이는 정보만)
     this.patterns.observe(seen, frame);
 
@@ -389,7 +390,11 @@ export class AIController {
   }
 
   /** 등 뒤 벽까지 남은 거리 */
-  roomBehind(me) { return me.facing > 0 ? me.x - STAGE.leftWall : STAGE.rightWall - me.x; }
+  roomBehind(me) {
+    const wall = me.facing > 0 ? me.x - STAGE.leftWall : STAGE.rightWall - me.x;
+    // 화면 끝(두 캐릭터 최대 거리)도 벽처럼 막힌다
+    return Math.min(wall, STAGE.maxSeparation - (this.lastDist ?? 0));
+  }
 
   /**
    * 뒤로 빠지기. 벽에 몰렸으면 빠질 수 없으므로 상대 머리 위로 점프해 빠져나가거나 가드한다.
