@@ -7,7 +7,7 @@
 import { S } from '../core/fighter.js';
 import { drawWeapon, drawFist, weaponSprite } from './weaponArt.js';
 import { line, disc, px, rect, PX } from './pixel.js';
-import { evalMotion, backHand, STANCE } from './motions.js';
+import { evalMotion, backHand, STANCE, GUARD_POSE, DEFLECT_FRAMES } from './motions.js';
 import { drawBot } from './botRig.js';
 
 const SWING = {
@@ -61,13 +61,34 @@ export function computePose(f, frame) {
       p.stride = Math.sin(f.x * 0.09) * 14;
       break;
     case S.GUARD:
-    case S.BLOCKSTUN:
-      p.crouch = 8;
-      p.lean = -0.05;
-      p.wAngle = 1.45;
-      p.hand = [26, 76];
-      p.hand2 = [20, 70];
+    case S.BLOCKSTUN: {
+      // 무기별 가드 자세 (motions.js GUARD_POSE)
+      const g = GUARD_POSE[weaponId] ?? GUARD_POSE.longsword;
+      p.crouch = 7;
+      p.lean = -0.06;
+      p.wAngle = g.a;
+      p.hand = [...g.h];
+      p.hand2 = g.h2 ? [...g.h2] : backHand(weaponId, g);
+      // 막은 직후: 충격으로 밀렸다가 돌아옴
+      if (f.state === S.BLOCKSTUN) {
+        const k = Math.min(1, f.timer / 10);
+        p.hand[0] += g.recoil.dx * k; p.hand2[0] += g.recoil.dx * k;
+        p.wAngle += g.recoil.da * k;
+        p.lean -= 0.18 * k; p.crouch += 3 * k;
+      }
+      // 완벽패링: 무기를 바깥 위로 쳐냈다가 가드로 돌아옴
+      const since = f.flash?.type === 'perfect' ? frame - f.flash.frame : Infinity;
+      if (since >= 0 && since < DEFLECT_FRAMES) {
+        const t = since / DEFLECT_FRAMES;
+        const k = t < 0.3 ? t / 0.3 : 1 - (t - 0.3) / 0.7;
+        p.hand[0] += 10 * k; p.hand[1] += 6 * k;
+        p.wAngle += (weaponId === 'axe' ? 0.9 : 0.7) * k;
+        p.lean += 0.2 * k;
+        if (weaponId === 'knuckle') { p.hand2 = [p.hand2[0] + 14 * k, p.hand2[1] + 4 * k]; }
+        else if (!GUARD_POSE[weaponId]?.h2) p.hand2 = backHand(weaponId, { a: p.wAngle, h: p.hand });
+      }
       break;
+    }
     case S.DASH: {
       const back = f.dash && f.dash.dir !== f.facing;
       p.lean = back ? -0.25 : 0.32;

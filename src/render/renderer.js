@@ -8,6 +8,7 @@ import { S, worldBox } from '../core/fighter.js';
 import { drawFighter, weaponTip } from './fighterArt.js';
 import { Effects } from './effects.js';
 import { playEvent } from './sfx.js';
+import { GUARD_POSE } from './motions.js';
 import { PX, PW, PH, createArtCanvas, rect, line, px, disc, text, panel } from './pixel.js';
 
 const GY = STAGE.groundY;
@@ -101,6 +102,17 @@ export class Renderer {
     return [Math.floor(((clientX - r.left) / r.width) * PW), Math.floor(((clientY - r.top) / r.height) * PH)];
   }
 
+  /** 막는 무기와 공격이 부딪히는 지점(아트 좌표) + 무기의 화면 각도 */
+  guardPoint(D, frame) {
+    const g = GUARD_POSE[D.weapon.id] ?? GUARD_POSE.longsword;
+    const hand = [D.x + D.facing * g.h[0], D.y + g.h[1]];
+    // 무기 날 중간쯤 (너클은 주먹)
+    const along = D.weapon.id === 'knuckle' ? 4 : D.weapon.id === 'spear' ? 20 : D.weapon.id === 'dagger' ? 8 : 16;
+    const wx = hand[0] + D.facing * Math.cos(g.a) * along, wy = hand[1] + Math.sin(g.a) * along;
+    const wa = Math.atan2(-Math.sin(g.a), D.facing * Math.cos(g.a));
+    return [AX(wx), AY(wy), wa];
+  }
+
   // ---------------------------------------------------------------------------
   // 이벤트 → 효과
   // ---------------------------------------------------------------------------
@@ -127,21 +139,24 @@ export class Renderer {
           fx.hitImpact(x, y, dir, e.kind === 'ultimate' ? 3 : big ? 2 : 1, '#f08a3c');
           fx.sparks(x, y, '#ffd08a', big ? 7 : 4, big ? 2.4 : 1.7, { dir: dir > 0 ? 0 : Math.PI, spread: 1.2, life: 10 });
           fx.addShake(big ? 1 : 0);
-          if (e.kind === 'ultimate') { fx.text('궁극기 적중', x, y - 22, UI.gold, 3); fx.screenFlash('#f08a3c', 0.18); }
+          if (e.kind === 'ultimate') {
+            const A = match?.fighters[e.attacker];
+            fx.ultImpact(A?.weapon.id, x, y, dir, GROUND - 1, TEAM[e.attacker]?.ui ?? UI.gold);
+            fx.screenFlash(TEAM[e.attacker]?.main ?? '#f08a3c', 0.2);
+            fx.addShake(1);
+          }
           break;
         }
         case 'parry': {
-          // 일반 가드: 방패 호 + 뒤로 튕기는 불꽃 (글자 없음)
-          const face = D ? D.facing : -dir;
-          fx.guardImpact(x, y, face, UI.cyan, 1);
-          fx.sparks(x, y, '#bfe0ea', 5, 1.5, { dir: dir > 0 ? Math.PI : 0, spread: 1.4, life: 10, gravity: 0.15 });
+          // 일반 가드: 막은 무기 위에서 쇳소리 불꽃 (무기별 가드 자세는 fighterArt / motions.GUARD_POSE)
+          const [gx, gy, wa] = D ? this.guardPoint(D, match.frame) : [x, y, 0];
+          fx.guardClang(gx, gy, dir, wa, false, '#bfe0ea');
           break;
         }
         case 'perfect': {
-          const face = D ? D.facing : -dir;
-          fx.guardImpact(x, y, face, UI.gold, 2, true);
-          fx.sparks(x, y, UI.gold, 12, 2.4, { life: 18 });
-          fx.text('완벽패링', x, y - 26, UI.gold, 2, 45);
+          const [gx, gy, wa] = D ? this.guardPoint(D, match.frame) : [x, y, 0];
+          fx.guardClang(gx, gy, dir, wa, true, UI.gold);
+          fx.text('완벽패링', gx, gy - 24, UI.gold, 2, 45);
           fx.screenFlash('#f6e2a0', 0.16);
           fx.addShake(1);
           break;

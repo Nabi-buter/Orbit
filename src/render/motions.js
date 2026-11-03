@@ -28,6 +28,28 @@ export const STANCE = {
   knuckle: { a: 0, h: [20, 94], h2: [12, 90] },    // 주먹을 올린 가드
 };
 
+/**
+ * 가드 자세: 무기마다 막는 방법이 다르다.
+ *   장검  칼을 세워 비스듬히 앞으로 (칼등으로 받음)
+ *   대검  넓은 칼면을 몸 앞에 세워 방패처럼
+ *   단검  역수로 쥐고 팔뚝을 얼굴 앞에 대각선으로
+ *   도끼  양손으로 자루를 가로로 들어 올려 받음
+ *   창    자루를 대각선으로 세워 몸 앞을 가림
+ *   너클  두 주먹을 얼굴 앞에 붙인 하이 가드
+ * recoil: 막았을 때 밀리는 방향(손 x 이동, 각도 변화) — 무거운 무기일수록 덜 밀린다
+ */
+export const GUARD_POSE = {
+  longsword: { a: 1.3, h: [24, 86], recoil: { dx: -6, da: 0.25 } },
+  greatsword: { a: 1.68, h: [20, 82], recoil: { dx: -3, da: 0.1 } },
+  dagger: { a: 2.45, h: [20, 100], h2: [12, 88], recoil: { dx: -7, da: 0.35 } },
+  axe: { a: 0.18, h: [30, 100], recoil: { dx: -4, da: -0.15 } },
+  spear: { a: 1.2, h: [20, 90], recoil: { dx: -5, da: 0.2 } },
+  knuckle: { a: 0, h: [20, 106], h2: [24, 98], recoil: { dx: -6, da: 0 } },
+};
+
+/** 완벽패링: 막는 순간 무기를 바깥으로 쳐내는 동작 (프레임 0~DEFLECT) */
+export const DEFLECT_FRAMES = 12;
+
 /** 양손 무기: 뒷손이 자루를 잡는 거리 */
 export const GRIP = { greatsword: 9, axe: 13, spear: 26 };
 
