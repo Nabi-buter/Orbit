@@ -166,3 +166,12 @@ test('궁극기는 무기마다 다르다: 타입·이름·판정 수, 창이 �
     for (let i = 1; i < hs.length; i++) assert.ok(hs[i - 1].from + hs[i - 1].hitstun >= hs[i].from, `${id} ${i}`);
   }
 });
+
+test('무작위 무기는 모든 무기를 고른다 (무기 수가 바뀌어도)', async () => {
+  const { randomWeapon } = await import('../src/config/weapons.js');
+  const seen = new Set();
+  for (let i = 0; i < WEAPON_ORDER.length; i++) seen.add(randomWeapon(() => (i + 0.5) / WEAPON_ORDER.length));
+  assert.equal(seen.size, WEAPON_ORDER.length);
+  assert.ok(seen.has('knuckle'));
+  assert.equal(randomWeapon(() => 0.999999), WEAPON_ORDER.at(-1));
+});

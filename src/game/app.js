@@ -4,7 +4,7 @@
 // =============================================================================
 
 import { FPS, BALANCE } from '../config/balance.js';
-import { WEAPONS, WEAPON_ORDER } from '../config/weapons.js';
+import { WEAPONS, WEAPON_ORDER, randomWeapon } from '../config/weapons.js';
 import { Match } from '../core/match.js';
 import { EMPTY_INPUT } from '../core/fighter.js';
 import { AIController, DIFFICULTY } from '../ai/ai.js';
@@ -32,6 +32,7 @@ export class App {
     this.weapons = ['longsword', 'longsword'];
     this.difficulty = 'normal';
     this.cpuWeapon = 'random';
+    this.picks = [null, null]; // 무기 선택 화면에서 고른 것 ('random' 이면 대전마다 새로 뽑음)
     this.match = null;
     this.paused = false;
     this.acc = 0;
@@ -80,18 +81,18 @@ export class App {
     this.match = null;
     this.screen = new LoadoutScreen({
       player: 0,
-      weapon: this.weapons[0],
+      weapon: this.picks[0] ?? this.weapons[0],
       mode: o.mode ?? (this.mode === 'online' ? 'online' : this.mode === 'local' ? 'local' : 'pve'),
       difficulty: this.difficulty,
       cpuWeapon: this.cpuWeapon,
       onBack: () => this.toTitle(),
-      onStart: ({ weapon, mode, difficulty, cpuWeapon }) => {
+      onStart: ({ weapon, pick, mode, difficulty, cpuWeapon }) => {
         this.weapons[0] = weapon;
+        this.picks[0] = pick;
         this.mode = mode;
         this.difficulty = difficulty;
         this.cpuWeapon = cpuWeapon;
         if (mode === 'pve') {
-          this.weapons[1] = cpuWeapon === 'random' ? WEAPON_ORDER[Math.floor(Math.random() * 6)] : cpuWeapon;
           this.startMatch();
         } else if (mode === 'local') {
           this.toLoadoutP2();
@@ -105,13 +106,19 @@ export class App {
   toLoadoutP2() {
     this.scene = 'loadout';
     this.screen = new LoadoutScreen({
-      player: 1, weapon: this.weapons[1], mode: 'local', lockMode: true, title: 'P2 준비',
+      player: 1, weapon: this.picks[1] ?? this.weapons[1], mode: 'local', lockMode: true, title: 'P2 준비',
       onBack: () => this.toLoadout({ mode: 'local' }),
-      onStart: ({ weapon }) => { this.weapons[1] = weapon; this.startMatch(); },
+      onStart: ({ weapon, pick }) => { this.weapons[1] = weapon; this.picks[1] = pick; this.startMatch(); },
     });
   }
 
   startMatch() {
+    // 무작위로 고른 쪽은 대전(재시작·다시 대전 포함)마다 새로 뽑는다. 온라인은 방에서 정한 무기 그대로
+    if (this.mode !== 'online') {
+      if (this.picks[0] === 'random') this.weapons[0] = randomWeapon();
+      if (this.mode === 'pve') this.weapons[1] = this.cpuWeapon === 'random' ? randomWeapon() : this.cpuWeapon;
+      else if (this.picks[1] === 'random') this.weapons[1] = randomWeapon();
+    }
     this.scene = 'battle';
     this.paused = false;
     this.screen = null;

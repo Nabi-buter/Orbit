@@ -97,9 +97,9 @@ function assert(c, msg) { if (!c) throw new Error('E2E 실패: ' + msg); console
     await key('KeyQ'); await key('KeyQ');
     assert(await page.evaluate(() => window.__game.screen.mode) === 'pve', 'Q → AI 대전');
 
-    // 하단 무기 6종 마우스 선택 확인
+    // 하단 무기 7종 + 무작위 마우스 선택 확인
     const cards = await page.evaluate(() => window.__game.screen.cards.map((c) => [c.id, c.x + c.w / 2, c.y + c.h / 2]));
-    assert(cards.length === 7 && new Set(cards.map((c) => c[2])).size === 1, '무기 7종이 하단 1열');
+    assert(cards.length === 8 && cards.at(-1)[0] === 'random' && new Set(cards.map((c) => c[2])).size === 1, '무기 7종 + 무작위가 하단 1열');
     for (const [id, x, y] of cards) {
       await clickArt(x, y);
       assert(await page.evaluate(() => window.__game.screen.weapon) === id, `무기 클릭 선택: ${id}`);
@@ -117,6 +117,23 @@ function assert(c, msg) { if (!c) throw new Error('E2E 실패: ' + msg); console
       await key('ShiftLeft'); await wait(300); await key('KeyW'); await wait(400);
       if (id === 'longsword') await shot(page, '03-battle');
     }
+
+    // 플레이어 무작위 + AI 무작위: 대전마다 실제 무기를 뽑고, 다시 대전하면 새로 뽑는다 (너클 포함 모두 나옴)
+    await page.evaluate(() => { window.__game.toLoadout({ mode: 'pve' }); window.__game.screen.setWeapon('random'); window.__game.screen.cpuWeapon = 'random'; });
+    await wait(700);
+    await shot(page, '02b-loadout-random');
+    await key('Enter');
+    const seenP = new Set(), seenC = new Set();
+    for (let k = 0; k < 60; k++) {
+      const [p, c] = await page.evaluate(() => { const g = window.__game; g.startMatch(); return g.match.fighters.map((f) => f.weapon.id); });
+      seenP.add(p); seenC.add(c);
+    }
+    assert(seenP.size === 7 && seenC.size === 7, `무작위가 7종 모두 (플레이어 ${seenP.size}, AI ${seenC.size})`);
+    assert(seenC.has('knuckle'), 'AI 무작위에 너클');
+    await page.evaluate(() => window.__game.toLoadout({ mode: 'pve' }));
+    assert(await page.evaluate(() => window.__game.screen.weapon) === 'random', '무기 선택으로 돌아오면 무작위가 그대로 선택됨');
+    await page.evaluate(() => { window.__game.screen.setWeapon('longsword'); });
+    await key('Enter');
 
     // 일시정지 / 재시작
     await key('Escape');

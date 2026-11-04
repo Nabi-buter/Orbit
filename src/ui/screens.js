@@ -12,7 +12,10 @@ import { drawWeaponIcon } from '../render/weaponArt.js';
 import { CODE_CHARS, TIME_OPTIONS } from '../net/roomNet.js';
 import { BALANCE } from '../config/balance.js';
 import { getTouchControls, setTouchControls } from './touch.js';
-import { WEAPONS, WEAPON_ORDER } from '../config/weapons.js';
+import { WEAPONS, WEAPON_ORDER, randomWeapon } from '../config/weapons.js';
+
+/** 무기 선택 목록: 7종 + 무작위 */
+const PICKS = [...WEAPON_ORDER, 'random'];
 import { CONTROLS, ACTIONS, ACTION_LABELS, keyLabel, assignKey, resetControls, isDefaultControls, RESERVED_KEYS } from '../config/controls.js';
 import { DIFFICULTY } from '../ai/ai.js';
 import { createFighter, S } from '../core/fighter.js';
@@ -205,15 +208,15 @@ export class LoadoutScreen {
     this.mode = o.mode ?? 'pve';
     this.difficulty = o.difficulty ?? 'normal';
     this.cpuWeapon = o.cpuWeapon ?? 'random';
-    this.puppet = new Puppet(this.weapon, this.player, 1);
+    this.puppet = new Puppet(this.weapon === 'random' ? WEAPON_ORDER[0] : this.weapon, this.player, 1);
     this.hover = null;
     this.t = 0;
     this.layout();
   }
 
   layout() {
-    const slot = 56, x0 = Math.round((PW - slot * WEAPON_ORDER.length) / 2);
-    this.cards = WEAPON_ORDER.map((id, i) => ({ id, x: x0 + i * slot, y: 168, w: slot, h: 40 }));
+    const slot = 52, x0 = Math.round((PW - slot * PICKS.length) / 2);
+    this.cards = PICKS.map((id, i) => ({ id, x: x0 + i * slot, y: 168, w: slot, h: 40 }));
     let tx = PW - 24; // 오른쪽 끝에 E 키 자리
     this.modeTabs = this.o.lockMode ? [] : [...MODES].reverse().map((m) => {
       const w = textW(m.label, { size: 11 });
@@ -229,11 +232,12 @@ export class LoadoutScreen {
   }
 
   get buttons() { return [this.start, this.back]; }
-  setWeapon(id) { this.weapon = id; this.puppet.setWeapon(id); }
-  cycleWeapon(d) { const i = WEAPON_ORDER.indexOf(this.weapon); this.setWeapon(WEAPON_ORDER[(i + d + WEAPON_ORDER.length) % WEAPON_ORDER.length]); }
+  setWeapon(id) { this.weapon = id; if (id !== 'random') this.puppet.setWeapon(id); this.shuffleAt = 0; }
+  cycleWeapon(d) { const i = PICKS.indexOf(this.weapon); this.setWeapon(PICKS[(i + d + PICKS.length) % PICKS.length]); }
   cycleDiff(d) { const k = Object.keys(DIFFICULTY); this.difficulty = k[(k.indexOf(this.difficulty) + d + k.length) % k.length]; }
   cycleCpu(d) { const list = ['random', ...WEAPON_ORDER]; this.cpuWeapon = list[(list.indexOf(this.cpuWeapon) + d + list.length) % list.length]; }
-  confirm() { this.o.onStart({ weapon: this.weapon, mode: this.mode, difficulty: this.difficulty, cpuWeapon: this.cpuWeapon }); }
+  /** 무작위면 지금 하나를 뽑아 넘긴다 (pick 에는 고른 것 그대로 — 다시 대전할 때 새로 뽑도록) */
+  confirm() { this.o.onStart({ weapon: this.weapon === 'random' ? randomWeapon() : this.weapon, pick: this.weapon, mode: this.mode, difficulty: this.difficulty, cpuWeapon: this.cpuWeapon }); }
 
   keys() {
     return this.player === 1
@@ -278,7 +282,10 @@ export class LoadoutScreen {
   draw(ctx) {
     this.t++;
     background(ctx, 0.62);
-    const w = WEAPONS[this.weapon];
+    const random = this.weapon === 'random';
+    // 무작위: 가운데 캐릭터가 무기를 차례로 바꿔 든다
+    if (random && this.t >= (this.shuffleAt ?? 0)) { this.shuffleAt = this.t + 36; const cur = this.puppet.f.weapon.id; this.puppet.setWeapon(WEAPON_ORDER[(WEAPON_ORDER.indexOf(cur) + 1) % WEAPON_ORDER.length]); }
+    const w = random ? null : WEAPONS[this.weapon];
     const team = TEAM[this.player];
 
     // 상단: 제목 + 모드 탭 (텍스트, 선택은 밑줄)
@@ -303,10 +310,14 @@ export class LoadoutScreen {
     this.puppet.draw(ctx, cx, 161, 2);
 
     // 왼쪽: 무기 정보 (실제 수치)
-    const L = w.light;
-    text(ctx, w.name, 14, 36, UI.paper, { size: 16, shadow: UI.ink });
-    wrap(w.desc, 110).slice(0, 3).forEach((l, i) => text(ctx, l, 14, 63 + i * 12, UI.dim, { size: 11, forceRaster: true }));
-    const rows = [
+    if (random) {
+      text(ctx, '무작위', 14, 36, UI.paper, { size: 16, shadow: UI.ink });
+      wrap(`대전을 시작할 때 ${WEAPON_ORDER.length}종 중 하나를 고른다. 다시 대전하면 또 새로 뽑는다.`, 110).slice(0, 4).forEach((l, i) => text(ctx, l, 14, 63 + i * 12, UI.dim, { size: 11, forceRaster: true }));
+    }
+    const L = w?.light;
+    if (w) text(ctx, w.name, 14, 36, UI.paper, { size: 16, shadow: UI.ink });
+    if (w) wrap(w.desc, 110).slice(0, 3).forEach((l, i) => text(ctx, l, 14, 63 + i * 12, UI.dim, { size: 11, forceRaster: true }));
+    const rows = random ? [] : [
       ['속도', speedWord(L.hits[0].from)],
       ['사거리', reachWord(w)],
       ['콤보', `약 ${w.combo.lightMax} · 강 ${w.combo.heavyMax}`],
@@ -334,9 +345,10 @@ export class LoadoutScreen {
       const hov = this.hover === c;
       const cxx = c.x + c.w / 2;
       if (!on && !hov) ctx.globalAlpha = 0.5;
-      drawWeaponIcon(ctx, c.id, WEAPONS[c.id].color, cxx, 186 - (on ? 2 : 0));
+      if (c.id === 'random') text(ctx, '?', cxx, 178 - (on ? 2 : 0), UI.gold, { scale: 2, align: 'center', shadow: UI.ink });
+      else drawWeaponIcon(ctx, c.id, WEAPONS[c.id].color, cxx, 186 - (on ? 2 : 0));
       ctx.globalAlpha = 1;
-      text(ctx, WEAPONS[c.id].name, cxx, 199, on ? UI.paper : '#5d636f', { size: 11, align: 'center' });
+      text(ctx, c.id === 'random' ? '무작위' : WEAPONS[c.id].name, cxx, 199, on ? UI.paper : '#5d636f', { size: 11, align: 'center' });
       if (on) rect(ctx, cxx - 10, 212, 20, 2, UI.gold);
     }
 

@@ -463,6 +463,11 @@ export function applyKnobs(id, kn) {
 
 export const DEFAULT_WEAPON = 'longsword';
 
+/** 무작위 무기 (모든 무기가 같은 확률 — 무기 수가 바뀌어도 그대로) */
+export function randomWeapon(rand = Math.random) {
+  return WEAPON_ORDER[Math.floor(rand() * WEAPON_ORDER.length)];
+}
+
 export function getWeapon(id) {
   const w = WEAPONS[id];
   if (!w) throw new Error(`Unknown weapon: ${id}`);
