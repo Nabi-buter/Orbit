@@ -1,0 +1,32 @@
+<!doctype html><html><head><meta charset="utf-8"><style>body{margin:0;background:#1b1f28}canvas{image-rendering:pixelated}</style></head><body>
+<canvas id="c"></canvas>
+<script type="module">
+// 콤보 이어짐 점검: 공격 버튼을 연타한 실제 시뮬레이션을 3프레임마다 그린다 (공격 사이가 기본 자세로 튀지 않는지)
+//   ?w=무기&k=light|heavy&n=프레임수
+import { Match } from '../src/core/match.js';
+import { EMPTY_INPUT } from '../src/core/fighter.js';
+import { drawFighter } from '../src/render/fighterArt.js';
+import { TEAM } from '../src/render/renderer.js';
+const q = new URLSearchParams(location.search);
+const id = q.get('w'), kind = q.get('k') ?? 'light', N = Number(q.get('n') ?? 120), step = 3;
+const m = new Match({ weapons: [id, 'longsword'] });
+const a = m.fighters[0];
+m.fighters[1].x = a.x + 700;
+const CW = 64, CH = 60, per = 20, cnt = Math.ceil(N / step);
+const c = document.getElementById('c'); c.width = CW * per; c.height = CH * Math.ceil(cnt / per);
+c.style.width = c.width * 2 + 'px'; c.style.height = c.height * 2 + 'px';
+const ctx = c.getContext('2d');
+for (let f = 0, k = 0; f < N; f++) {
+  m.step([{ ...EMPTY_INPUT, [kind]: f % 8 < 2 }, EMPTY_INPUT]);
+  if (f % step) continue;
+  const x0 = (k % per) * CW, y0 = Math.floor(k / per) * CH;
+  ctx.fillStyle = a.attack && a.attack.def.hits.some((h) => a.attack.frame >= h.from && a.attack.frame <= h.to) ? '#4a3d20' : k % 2 ? '#262b36' : '#2b303b';
+  ctx.fillRect(x0, y0, CW, CH - 1);
+  const x = a.x; a.x = 0;
+  drawFighter(ctx, a, x0 + 20, y0 + CH - 5, { ...TEAM[0], weapon: a.weapon.color }, m.frame, { smooth: false });
+  a.x = x;
+  ctx.fillStyle = '#6b7180'; ctx.font = '7px sans-serif'; ctx.fillText(`${f} ${a.attack?.def.name ?? a.state}`, x0 + 2, y0 + 8);
+  k++;
+}
+document.title = 'ready';
+</script></body></html>

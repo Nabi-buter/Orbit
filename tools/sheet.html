@@ -1,0 +1,36 @@
+<!doctype html><html><head><meta charset="utf-8"><style>body{margin:0;background:#1b1f28}canvas{image-rendering:pixelated}</style></head><body>
+<canvas id="c"></canvas>
+<script type="module">
+// 무기 하나의 모든 공격(약공 단계 · 강공 단계 · 궁극기 · 걷기 · 가드)을 줄마다 프레임 순서로 (모션 점검용)
+//   ?w=무기&s=프레임간격
+import { WEAPONS } from '../src/config/weapons.js';
+import { createFighter, S } from '../src/core/fighter.js';
+import { drawFighter } from '../src/render/fighterArt.js';
+import { TEAM } from '../src/render/renderer.js';
+const q = new URLSearchParams(location.search);
+const w = WEAPONS[q.get('w')], step = Number(q.get('s') ?? 3);
+const rows = [...w.lights.map((d) => ['L ' + d.name, d]), ...w.heavies.map((d) => ['H ' + d.name, d]), ['U ' + w.ultimate.name, w.ultimate], ['walk', null], ['guard', 'g']];
+const CW = 64, CH = 60;
+const n = Math.max(...rows.map(([, d]) => (d && d !== 'g' ? Math.ceil(d.duration / step) : 8)));
+const c = document.getElementById('c'); c.width = CW * n + 70; c.height = CH * rows.length;
+c.style.width = c.width * 2 + 'px'; c.style.height = c.height * 2 + 'px';
+const ctx = c.getContext('2d');
+ctx.fillStyle = '#20242e'; ctx.fillRect(0, 0, c.width, c.height);
+rows.forEach(([label, def], r) => {
+  const y0 = r * CH;
+  ctx.fillStyle = '#8a909e'; ctx.font = '8px sans-serif'; ctx.fillText(label, 2, y0 + 30);
+  const f = createFighter({ id: 0, x: 0, facing: 1, weapon: w });
+  const cnt = def && def !== 'g' ? Math.ceil(def.duration / step) : 8;
+  for (let k = 0; k < cnt; k++) {
+    const frame = k * step, x0 = 70 + k * CW;
+    const active = def && def !== 'g' && def.hits.some((h) => frame >= h.from && frame <= h.to);
+    ctx.fillStyle = active ? '#4a3d20' : (k % 2 ? '#262b36' : '#2b303b'); ctx.fillRect(x0, y0, CW, CH - 1);
+    if (!def) { f.state = S.WALK; f.attack = null; f.x = k * 9; f.vx = 4; }
+    else if (def === 'g') { f.state = k < 4 ? S.GUARD : S.BLOCKSTUN; f.timer = k < 4 ? 0 : 12 - (k - 4) * 3; f.attack = null; }
+    else { f.state = def.kind === 'ultimate' ? S.ULTIMATE : S.ATTACK; f.attack = { def, frame }; }
+    drawFighter(ctx, f, x0 + 20, y0 + CH - 5, { ...TEAM[0], weapon: w.color }, frame, { smooth: false });
+    ctx.fillStyle = '#6b7180'; ctx.fillText(frame, x0 + 2, y0 + 8);
+  }
+});
+document.title = 'ready';
+</script></body></html>

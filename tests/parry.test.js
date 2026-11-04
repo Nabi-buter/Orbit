@@ -8,7 +8,7 @@ const P = BALANCE.guard.parry;
 
 /** 실제로 닿는 프레임 (판정이 무기 모양이라 판정 첫 프레임보다 늦을 수 있다) */
 function contactAt() {
-  const m = setup({ distance: 60, weapons: ['greatsword', 'longsword'] });
+  const m = setup({ distance: 60, weapons: ['longsword', 'longsword'] }); // 공격자 무기 속도와 무관하게 연속 시도 간격(chainFrames) 안에 들도록 빠른 강공
   m.step([I({ heavy: true }), I()]);
   for (let k = 1; k < 120; k++) if (m.step([I(), I()]).some((e) => e.type === 'hit')) return k;
   throw new Error('강공이 닿지 않음');
@@ -17,7 +17,7 @@ function contactAt() {
 /** 공격이 닿기 n 프레임 전에 가드를 눌렀을 때 결과 */
 function parryAt(lead, { presses = [], hold = true } = {}) {
   const hitAt = contactAt();
-  const m = setup({ distance: 60, weapons: ['greatsword', 'longsword'] });
+  const m = setup({ distance: 60, weapons: ['longsword', 'longsword'] }); // 공격자 무기 속도와 무관하게 연속 시도 간격(chainFrames) 안에 들도록 빠른 강공
   const [a, b] = m.fighters;
   // 이전 시도들 (연속 시도 단계 올리기): 각각 짧게 눌렀다 뗌
   for (const gap of presses) { m.step([I(), I({ guard: true })]); run(m, gap); }
@@ -73,7 +73,7 @@ test('완벽패링 성공: 공격자 자세(가드) 게이지 감소, 단계 초
 });
 
 test('자세 게이지가 바닥인 공격자를 완벽패링하면 가드 브레이크', () => {
-  const m = setup({ distance: 60, weapons: ['greatsword', 'longsword'] });
+  const m = setup({ distance: 60, weapons: ['longsword', 'longsword'] }); // 공격자 무기 속도와 무관하게 연속 시도 간격(chainFrames) 안에 들도록 빠른 강공
   const [a] = m.fighters;
   m.step([I({ heavy: true }), I()]);
   a.guard = 5; a.lastGuardUse = m.frame;

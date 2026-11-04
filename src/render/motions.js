@@ -240,8 +240,12 @@ function extend(p, q, k, handMax = 6) {
   return r;
 }
 
-/** 공격 진행 프레임에 맞는 포즈 (모션 데이터가 없으면 null) */
-export function evalMotion(weaponId, def, frame) {
+/**
+ * 공격 진행 프레임에 맞는 포즈 (모션 데이터가 없으면 null)
+ * start: 이 공격을 시작한 자세 (콤보로 이어질 때 앞 공격이 끝난 자세 — 기본 자세로 되돌아갔다 다시 휘두르지 않게).
+ *        준비 동작에만 쓰이므로 판정 프레임은 그대로다.
+ */
+export function evalMotion(weaponId, def, frame, start = null) {
   const m = MOTIONS[weaponId]?.[def.name];
   if (!m) return null;
   const W = WEIGHT[weaponId] ?? 0.5;
@@ -259,7 +263,7 @@ export function evalMotion(weaponId, def, frame) {
     const t = frame / s0;
     const first = beat(0).from;
     const coil = extend(beat(0).to, first, coilK); // to → from 방향으로 더 = 뒤로 젖힘
-    if (t < 0.7) return mix(idle, first, smooth(t / 0.7));
+    if (t < 0.7) return mix(start ?? idle, first, smooth(t / 0.7));
     return mix(first, coil, easeOutCubic((t - 0.7) / 0.3));
   }
   let prevEnd = s0, prevPose = extend(beat(0).to, beat(0).from, coilK);

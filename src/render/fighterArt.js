@@ -7,7 +7,7 @@
 import { S } from '../core/fighter.js';
 import { drawWeapon, drawFist, weaponSprite } from './weaponArt.js';
 import { line, disc, px, rect, PX } from './pixel.js';
-import { evalMotion, backHand, STANCE, GUARD_POSE, DEFLECT_FRAMES } from './motions.js';
+import { evalMotion, backHand, STANCE, GUARD_POSE, DEFLECT_FRAMES, WEIGHT } from './motions.js';
 import { drawBot } from './botRig.js';
 
 const SWING = {
@@ -56,10 +56,20 @@ export function computePose(f, frame) {
   const st = STANCE[weaponId];
   if (st) { p.wAngle = st.a; p.hand = [...st.h]; p.hand2 = backHand(weaponId, st); }
 
+  // 가만히 서 있어도 숨에 맞춰 무기가 아주 조금 오르내린다 (무거울수록 덜)
+  const W = WEIGHT[weaponId] ?? 0.5;
+  if (st && f.state === S.IDLE) { p.wAngle += Math.sin(frame * 0.08) * 0.03 * (1 - W * 0.6); p.hand[1] += breathe * 0.4; }
+
   switch (f.state) {
-    case S.WALK:
+    case S.WALK: {
       p.stride = Math.sin(f.x * 0.09) * 14;
+      // 걸음에 맞춰 손이 흔들리고 무기 끝이 살짝 까딱인다 (리그의 걸음 주기와 같은 위상)
+      const ph = f.x * 0.075;
+      p.hand = [p.hand[0] + Math.sin(ph) * 1.2, p.hand[1] - Math.abs(Math.cos(ph)) * 1.6];
+      p.wAngle += Math.sin(ph) * (0.07 - W * 0.04);
+      if (weaponId !== 'knuckle' && !st?.h2) p.hand2 = backHand(weaponId, { a: p.wAngle, h: p.hand });
       break;
+    }
     case S.GUARD:
     case S.BLOCKSTUN: {
       // 무기별 가드 자세 (motions.js GUARD_POSE)
@@ -152,15 +162,31 @@ export function computePose(f, frame) {
     default:
       break;
   }
+  // 공격이 아닌 상태에서 시작한 공격은 기본 자세에서 출발
+  if (f.state !== S.ATTACK && f.state !== S.SPECIAL && f.state !== S.ULTIMATE) { const m = chain.get(f); if (m) { m.last = null; m.atk = null; } }
   if (weaponId === 'knuckle' && !p.extraFist) p.extraFist = p.hand2;
   return p;
+}
+
+/**
+ * 콤보 이어 그리기: 공격이 바뀌는 순간 직전 공격의 마지막 자세를 기억해 다음 공격의 준비 동작을 거기서 시작한다
+ * (베기 → 되베기가 기본 자세로 돌아갔다 다시 휘두르지 않고, 내려간 칼이 그대로 올라오며 이어짐). 그리기 전용.
+ */
+const chain = new WeakMap();
+function chainStart(f) {
+  let m = chain.get(f);
+  if (!m) { m = { atk: null, start: null, last: null }; chain.set(f, m); }
+  if (m.atk !== f.attack) { m.start = m.last; m.atk = f.attack; }
+  return m;
 }
 
 function attackPose(p, f, weaponId) {
   const a = f.attack;
   if (!a) return;
   // 무기별 키프레임 모션 (src/render/motions.js)
-  const mp = evalMotion(weaponId, a.def, a.frame);
+  const m = chainStart(f);
+  const mp = evalMotion(weaponId, a.def, a.frame, m.start);
+  m.last = mp;
   if (mp) {
     p.wAngle = mp.a;
     p.hand = mp.h;

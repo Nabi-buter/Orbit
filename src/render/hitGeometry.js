@@ -13,6 +13,7 @@ import { evalMotion } from './motions.js';
 import { frontHandLocal } from './limbRig.js';
 import { weaponSprite } from './weaponArt.js';
 import { PX } from './pixel.js';
+import { clampToGround } from './groundClamp.js';
 
 /**
  * 무기별 "닿는 부분" (아트 px, 손에서 무기 끝 방향으로 from→to, 반지름 r)
@@ -39,7 +40,7 @@ export function framePieces(id, def, frame) {
   const pose = evalMotion(id, def, frame);
   if (!pose) return null;
   const hand = frontHandLocal({ hand: pose.h, lean: pose.lean, crouch: pose.crouch, stride: pose.stride });
-  const a = pose.a;
+  const a = clampToGround(id, hand, pose.a); // 그림과 같이 땅에서 멈춤
   const d = [Math.cos(a), -Math.sin(a)];       // 무기 방향 (아트, y 아래 +)
   const n = [Math.sin(a), Math.cos(a)];        // 무기 그림의 "아래" (도끼 날 쪽)
   const L = weaponLength(id);

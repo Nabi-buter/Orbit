@@ -14,6 +14,7 @@ import { drawWeapon, drawFist } from './weaponArt.js';
 import { makeSprite, sset, blit } from './pixel.js';
 import { GRIP, GUARD_POSE } from './motions.js';
 import { S } from '../core/fighter.js';
+import { clampToGround } from './groundClamp.js';
 
 const R = BOT_RIG;
 const FOOT = R.foot;          // 시트 좌표의 발밑 기준점
@@ -170,7 +171,8 @@ export function drawLimbRig(ctx, f, ax, ay, pal, P, core, pose, opts = {}) {
   const handTarget = handTargetOf;
   const elbowDown = (a, b) => (a[1] > b[1] ? a : b);
   const armF = ik(shF, handTarget(shF, pose.hand), ARM.upper, ARM.fore, elbowDown);
-  const wa = pose.wAngle;
+  // 땅에 서 있으면 무기가 바닥을 뚫지 않게 (내려찍기 끝에서 바닥에 닿은 채 멈춤)
+  const wa = airborne ? pose.wAngle : clampToGround(weaponId, armF.end, pose.wAngle);
   const dir = [Math.cos(wa), -Math.sin(wa)];
   // 양손 무기: 뒷손은 실제 앞손 위치에서 자루를 따라 GRIP 만큼 뒤
   const grip = weaponId !== 'knuckle' ? GRIP_ART[weaponId] : null;
