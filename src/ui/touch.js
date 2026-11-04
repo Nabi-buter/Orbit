@@ -43,6 +43,9 @@ const CSS = `
 .tbtn.dash { right: 14.5%; bottom: 34%; width: 8%; aspect-ratio: 1; }
 .tbtn.ult { right: 3%; bottom: 49%; width: 7.5%; aspect-ratio: 1; }
 .tbtn.pause { left: 50%; top: 12%; transform: translateX(-50%); width: 5%; aspect-ratio: 1; border-radius: 8px; font-size: min(2.6vh, 1.6vw); }
+.tbtn.toggle { left: calc(50% + 3.5%); top: 12%; width: 5%; aspect-ratio: 1; border-radius: 8px; font-size: min(2.2vh, 1.3vw); }
+/* 버튼 끔: 일시정지·켜기 버튼만 남김 (키보드를 연결해 할 때) */
+#touch.off .tpad, #touch.off .tbtn[data-k] { display: none; }
 #rotate { position: fixed; inset: 0; display: none; place-items: center; z-index: 10; background: #0c0912; color: #eceef2;
   font: 600 18px system-ui, sans-serif; text-align: center; line-height: 1.6; }
 #rotate.on { display: grid; }
@@ -68,7 +71,8 @@ export function setupTouch(stage, app) {
     <div class="tbtn guard" data-k="guard">가드</div>
     <div class="tbtn dash" data-k="dash">대시</div>
     <div class="tbtn ult" data-k="ult">궁</div>
-    <div class="tbtn pause" data-tap="Escape">II</div>`;
+    <div class="tbtn pause" data-tap="Escape">II</div>
+    <div class="tbtn toggle" data-toggle="1" aria-label="화면 버튼 끄기/켜기"></div>`;
   stage.append(root);
 
   const rotate = document.createElement('div');
@@ -88,8 +92,27 @@ export function setupTouch(stage, app) {
   const releaseAll = () => { sources.clear(); sync(); root.querySelectorAll('.on').forEach((e) => e.classList.remove('on')); };
 
   // --- 버튼 -----------------------------------------------------------------
+  // --- 화면 버튼 끄기/켜기 (키보드를 연결한 경우), 기기에 기억 -------------------------
+  const PREF = 'orbit.touchControls';
+  let controlsOn = true;
+  try { controlsOn = localStorage.getItem(PREF) !== 'off'; } catch { /* 저장소 없음: 기본 켜짐 */ }
+  const toggleBtn = root.querySelector('.toggle');
+  const applyToggle = () => {
+    root.classList.toggle('off', !controlsOn);
+    toggleBtn.innerHTML = controlsOn ? '⌨<small>버튼 끄기</small>' : '🎮<small>버튼 켜기</small>';
+  };
+  applyToggle();
+  toggleBtn.addEventListener('pointerdown', (e) => {
+    e.preventDefault();
+    controlsOn = !controlsOn;
+    try { localStorage.setItem(PREF, controlsOn ? 'on' : 'off'); } catch { /* 이번 접속에만 적용 */ }
+    if (!controlsOn) releaseAll();
+    applyToggle();
+  });
+
   for (const el of root.querySelectorAll('.tbtn')) {
     const key = el.dataset.k, tap = el.dataset.tap;
+    if (el.dataset.toggle) continue;
     el.addEventListener('pointerdown', (e) => {
       e.preventDefault();
       el.setPointerCapture?.(e.pointerId);
