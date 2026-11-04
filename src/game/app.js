@@ -3,7 +3,7 @@
 // 타이틀 → 플레이(로드아웃: 캐릭터 + 하단 무기 1열, 모드 선택) → 대전 → 결과
 // =============================================================================
 
-import { FPS } from '../config/balance.js';
+import { FPS, BALANCE } from '../config/balance.js';
 import { WEAPONS, WEAPON_ORDER } from '../config/weapons.js';
 import { Match } from '../core/match.js';
 import { EMPTY_INPUT } from '../core/fighter.js';
@@ -115,7 +115,7 @@ export class App {
     this.scene = 'battle';
     this.paused = false;
     this.screen = null;
-    this.match = new Match({ weapons: this.weapons });
+    this.match = new Match({ weapons: this.weapons, ...(this.mode === 'online' && this.netTime != null ? { roundSeconds: this.netTime } : {}) });
     this.ai = this.mode === 'pve' ? new AIController(this.difficulty) : null;
     this.renderer.reset();
     this.hitstop = 0;
@@ -192,6 +192,7 @@ export class App {
       onJoin: (code) => this.net?.send({ t: 'join', code }),
       onSelect: (weapon) => { this.weapons[0] = weapon; this.net?.send({ t: 'select', weapon }); },
       onReady: (ready) => this.net?.send({ t: 'ready', ready }),
+      onTime: (time) => this.net?.send({ t: 'time', time }),
       onLeave: () => { this.net?.send({ t: 'leave' }); this.setNet({ phase: 'connect', error: null }); },
     });
     this.screen = screen;
@@ -238,7 +239,7 @@ export class App {
         Object.assign(this.netState, { phase: 'room', code: m.code, slot: m.slot, error: null });
         net.send({ t: 'select', weapon: this.weapons[0] }); // 로드아웃에서 고른 무기
       })
-      .on('lobby', (m) => this.setNet({ ...this.netState, phase: 'room', code: m.code, connected: m.connected, weapons: m.weapons, ready: m.ready, playing: m.playing }))
+      .on('lobby', (m) => this.setNet({ ...this.netState, phase: 'room', code: m.code, connected: m.connected, weapons: m.weapons, ready: m.ready, playing: m.playing, time: m.time }))
       .on('error', (m) => this.setNet({ ...this.netState, error: m.msg }))
       .on('roomClosed', (m) => this.setNet({ phase: 'connect', error: m.msg }))
       .on('ping', (m) => { if (this.netState) { this.netState.rtt = m.rtt; this.netState.peerRtt = m.peerRtt; } })
@@ -270,6 +271,7 @@ export class App {
     this.weapons = [...msg.weapons];
     this.slot = msg.slot;
     this.netDelay = msg.delay;
+    this.netTime = msg.time ?? BALANCE.round.timeSeconds;
     this.lockstep = new Lockstep({ slot: msg.slot, delay: msg.delay, matchId: msg.matchId, send: (m) => this.net?.send(m) });
     this.onlineMenuOpen = false;
     this.startMatch();

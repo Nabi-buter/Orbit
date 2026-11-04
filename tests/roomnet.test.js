@@ -66,7 +66,8 @@ function makePlayer(world, peer, weapon) {
     .on('roomClosed', (m) => { p.closed = m.msg; })
     .on('peerLeft', () => { p.left = (p.left ?? 0) + 1; })
     .on('start', (m) => {
-      p.match = new Match({ weapons: m.weapons });
+      p.start = m;
+      p.match = new Match({ weapons: m.weapons, roundSeconds: m.time });
       p.ls = new Lockstep({ slot: m.slot, delay: m.delay, matchId: m.matchId, send: (x) => net.send(x) });
     })
     .on('input', (m) => p.ls && m.m === p.ls.matchId && p.ls.onRemoteInput(m.f, m.i))
@@ -161,4 +162,35 @@ test('잠깐 연결이 흔들려도 방이 깨지지 않고, 방장이 정말 �
   await a.net.close();
   await world.advance(500);
   assert.ok(b.closed?.includes('방장이 방을 나갔'), b.closed);
+});
+
+test('시간 제한: 방장만 바꿀 수 있고(무제한 포함) 손님에게 공유되며 시작 신호에 실린다', async () => {
+  const world = makeWorld({ drop: 0 });
+  const a = makePlayer(world, 'peer-a', 'axe');
+  const b = makePlayer(world, 'peer-b', 'spear');
+  a.net.send({ t: 'create' });
+  await world.advance(50);
+  b.net.send({ t: 'join', code: a.joined.code });
+  await world.advance(2000);
+  assert.equal(b.lobby?.time, 99, '기본 99초');
+  // 손님이 바꾸려 해도 무시
+  b.net.send({ t: 'time', time: 0 });
+  b.net.control({ op: 'time', time: 0 });
+  await world.advance(1500);
+  assert.equal(a.lobby.time, 99); assert.equal(b.lobby.time, 99);
+  // 방장이 무제한으로 → 준비가 풀리고 손님에게도 보임
+  a.net.send({ t: 'ready', ready: true });
+  await world.advance(200);
+  a.net.send({ t: 'time', time: 0 });
+  await world.advance(1500);
+  assert.equal(b.lobby.time, 0, '손님에게 무제한 공유');
+  assert.deepEqual(a.lobby.ready, [false, false], '시간을 바꾸면 준비 해제');
+  a.net.send({ t: 'time', time: 37 }); // 목록에 없는 값은 무시
+  await world.advance(200);
+  assert.equal(a.lobby.time, 0);
+  a.net.send({ t: 'ready', ready: true });
+  b.net.send({ t: 'ready', ready: true });
+  await world.advance(1000);
+  assert.equal(a.start?.time, 0); assert.equal(b.start?.time, 0);
+  assert.ok(a.match.unlimited && b.match.unlimited);
 });

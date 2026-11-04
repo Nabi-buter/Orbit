@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import { BALANCE } from '../src/config/balance.js';
 import { S } from '../src/core/fighter.js';
 import { setup, run, tap, until, I } from './helpers.js';
+import { Match } from '../src/core/match.js';
 
 const B = BALANCE;
 
@@ -406,4 +407,15 @@ test('KO 및 시간 종료 판정 (목숨 2개)', () => {
   assert.equal(m.over, true);
   assert.equal(m.winner, 1);
   assert.equal(m.endReason, 'time');
+});
+
+test('시간 제한 0 = 무제한: 시간이 지나도 끝나지 않고, 라운드가 바뀌어도 무제한', () => {
+  const m = new Match({ roundSeconds: 0 });
+  assert.ok(m.unlimited);
+  for (let i = 0; i < 99 * 60 + 200; i++) m.step();
+  assert.equal(m.over, false);
+  m.nextRound();
+  assert.equal(m.timeLeft, Infinity);
+  const t = new Match({ roundSeconds: 60 });
+  assert.equal(t.timeLeft, 3600);
 });

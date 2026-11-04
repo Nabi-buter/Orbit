@@ -7,6 +7,9 @@
 // =============================================================================
 
 import { WEAPON_ORDER } from '../src/config/weapons.js';
+import { BALANCE } from '../src/config/balance.js';
+
+const TIME_OPTIONS = BALANCE.round.timeOptions;
 
 const FRAME_MS = 1000 / 60;
 export const NET = {
@@ -34,6 +37,7 @@ function lobbyState(room) {
     weapons: room.weapons,
     ready: room.ready,
     playing: room.playing,
+    time: room.time,
   };
 }
 
@@ -92,7 +96,7 @@ function handle(conn, msg) {
 
     case 'create': {
       if (room) leave(conn);
-      const r = { code: makeCode(), players: [conn, null], weapons: ['longsword', 'longsword'], ready: [false, false], playing: false, matchId: 0 };
+      const r = { code: makeCode(), players: [conn, null], weapons: ['longsword', 'longsword'], ready: [false, false], playing: false, matchId: 0, time: BALANCE.round.timeSeconds };
       rooms.set(r.code, r);
       conn.room = r; conn.slot = 0;
       conn.send({ t: 'joined', code: r.code, slot: 0 });
@@ -126,6 +130,14 @@ function handle(conn, msg) {
       broadcast(room, lobbyState(room));
       return;
 
+    case 'time':
+      // 방장(1P)만, 경기 중이 아닐 때. 바꾸면 양쪽 준비 해제
+      if (!room || room.playing || conn.slot !== 0 || !TIME_OPTIONS.includes(msg.time) || room.time === msg.time) return;
+      room.time = msg.time;
+      room.ready = [false, false];
+      broadcast(room, lobbyState(room));
+      return;
+
     case 'ready':
       if (!room || room.playing) return;
       room.ready[conn.slot] = !!msg.ready;
@@ -134,7 +146,7 @@ function handle(conn, msg) {
         room.ready = [false, false];
         room.matchId++;
         const delay = inputDelayFor(room.players.map((p) => p.rtt));
-        room.players.forEach((p, slot) => p.send({ t: 'start', matchId: room.matchId, weapons: room.weapons, delay, slot }));
+        room.players.forEach((p, slot) => p.send({ t: 'start', matchId: room.matchId, weapons: room.weapons, delay, time: room.time, slot }));
       }
       broadcast(room, lobbyState(room));
       return;

@@ -146,11 +146,22 @@ function assert(c, msg) { if (!c) throw new Error('E2E(Pages) 실패: ' + msg); 
     assert(ra.scene === 'online' && rb.scene === 'online', `양쪽 로비 (${ra.scene}/${rb.scene})`);
     assert(ra.phase === 'room' && rb.phase === 'room' && !ra.error && !rb.error, `같은 방 유지, 오류 없음 A=${JSON.stringify(ra)} B=${JSON.stringify(rb)}`);
     assert(ra.connected?.[1] && rb.connected?.[0], '상대 접속 상태 유지');
+    // 방장이 시간 제한을 무제한으로 (Q 로 한 칸 뒤 = 99초 → 60초, E 두 번 → ... 마지막 = 무제한)
+    await key(B, 'KeyE'); // 손님은 못 바꿈
+    await key(A, 'KeyQ'); await key(A, 'KeyQ');
+    await B.waitForFunction(() => window.__game.netState?.time === 0, null, { timeout: 4000 });
+    assert(true, '방장 시간 변경(무제한) → 손님에게 공유');
+    out && await B.screenshot({ path: path.join(out, 'pages-online-time-B.png') });
+    out && await A.screenshot({ path: path.join(out, 'pages-online-time-A.png') });
     // 재대결
     await key(A, 'KeyJ'); await key(B, 'KeyJ');
     await A.waitForFunction(() => window.__game.scene === 'battle', null, { timeout: 8000 });
     await B.waitForFunction(() => window.__game.scene === 'battle', null, { timeout: 8000 });
     assert(true, '재대결 시작');
+    const un = await Promise.all([A, B].map((p) => p.evaluate(() => window.__game.match.unlimited)));
+    assert(un[0] && un[1], '양쪽 무제한 경기');
+    await A.waitForTimeout(2500);
+    out && await A.screenshot({ path: path.join(out, 'pages-online-unlimited.png') });
     assert(errors.length === 0, `콘솔 오류 없음 ${errors.length ? JSON.stringify(errors) : ''}`);
     console.log('E2E(Pages 온라인) 통과');
   } catch (e) {

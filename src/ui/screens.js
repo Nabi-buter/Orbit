@@ -9,7 +9,8 @@ import { PW, PH, rect, px, text, textW, createArtCanvas } from '../render/pixel.
 import { UI, TEAM, buildBackground } from '../render/renderer.js';
 import { drawFighter } from '../render/fighterArt.js';
 import { drawWeaponIcon } from '../render/weaponArt.js';
-import { CODE_CHARS } from '../net/roomNet.js';
+import { CODE_CHARS, TIME_OPTIONS } from '../net/roomNet.js';
+import { BALANCE } from '../config/balance.js';
 import { getTouchControls, setTouchControls } from './touch.js';
 import { WEAPONS, WEAPON_ORDER } from '../config/weapons.js';
 import { CONTROLS, ACTIONS, ACTION_LABELS, keyLabel, assignKey, resetControls, isDefaultControls, RESERVED_KEYS } from '../config/controls.js';
@@ -550,6 +551,9 @@ export class MenuOverlay {
 // -----------------------------------------------------------------------------
 // 온라인 로비
 // -----------------------------------------------------------------------------
+/** 시간 제한 표시 (0 = 무제한) */
+export function timeLabel(s) { return !s ? '무제한' : s % 60 === 0 && s >= 120 ? `${s / 60}분` : `${s}초`; }
+
 export class OnlineScreen {
   /** cb: {onCreate, onJoin(code), onSelect(w), onReady(bool), onLeave, onBack} */
   constructor(cb) {
@@ -583,9 +587,21 @@ export class OnlineScreen {
         { label: st.ready?.[me] ? '준비 취소' : '준비', disabled: !st.connected?.[op], onClick: () => this.cb.onReady(!st.ready[me]) },
         { label: '방 나가기', onClick: this.cb.onLeave },
       ], 34, 190);
+      // 시간 제한: 방장만 바꿈 (◀ ▶ 버튼 또는 Q / E)
+      if (me === 0) {
+        this.keys.push({ label: '<', x: 34, y: 103, w: 18, h: 16, act: () => this.cycleTime(-1) });
+        this.keys.push({ label: '>', x: 124, y: 103, w: 18, h: 16, act: () => this.cycleTime(1) });
+      }
     } else {
       this.menu = new TextMenu([{ label: '뒤로', onClick: this.cb.onBack }], 34, Math.max(190, below));
     }
+  }
+  cycleTime(d) {
+    const st = this.state;
+    if (st.phase !== 'room' || st.slot !== 0 || !this.cb.onTime) return;
+    const opts = TIME_OPTIONS;
+    const i = Math.max(0, opts.indexOf(st.time ?? BALANCE.round.timeSeconds));
+    this.cb.onTime(opts[(i + d + opts.length) % opts.length]);
   }
   type(c) { if (this.code.length < 4) this.code += c; }
   join() { if (this.code.length === 4) this.cb.onJoin(this.code); }
@@ -605,6 +621,8 @@ export class OnlineScreen {
       const i = WEAPON_ORDER.indexOf(st.weapons?.[me] ?? 'longsword');
       if (['KeyA', 'ArrowLeft'].includes(e.code)) { this.cb.onSelect(WEAPON_ORDER[(i + 5) % 6]); return true; }
       if (['KeyD', 'ArrowRight'].includes(e.code)) { this.cb.onSelect(WEAPON_ORDER[(i + 1) % 6]); return true; }
+      if (e.code === 'KeyQ') { this.cycleTime(-1); return true; }
+      if (e.code === 'KeyE') { this.cycleTime(1); return true; }
       if (CONFIRM.includes(e.code)) { if (st.connected?.[1 - me]) this.cb.onReady(!st.ready[me]); return true; }
       if (e.code === 'Escape') { this.cb.onLeave(); return true; }
       return this.menu.onKey(e);
@@ -657,6 +675,21 @@ export class OnlineScreen {
       text(ctx, st.code ?? '', 80, 49, UI.gold, { scale: 2 });
       const pingTxt = st.rtt != null ? ` · 핑 ${st.rtt}ms` : '';
       text(ctx, (st.connected?.[op] ? '상대 접속됨' : '상대를 기다리는 중…') + pingTxt, 34, 70, UI.dim, { size: 11 });
+      // 시간 제한
+      const host = me === 0;
+      text(ctx, '시간 제한', 34, 90, UI.dim, { size: 11 });
+      text(ctx, timeLabel(st.time ?? BALANCE.round.timeSeconds), 88, 105, UI.gold, { size: 13, align: 'center', shadow: UI.ink });
+      if (host) {
+        for (const b of this.keys) {
+          const hov = this.hoverKey === b;
+          rect(ctx, b.x, b.y, b.w, b.h, hov ? '#323745' : '#232733');
+          rect(ctx, b.x, b.y, b.w, 1, hov ? '#5b616e' : '#363b48');
+          rect(ctx, b.x, b.y + b.h - 1, b.w, 1, '#0d0f13');
+          text(ctx, b.label, b.x + b.w / 2, b.y + 5, UI.paper, { align: 'center' });
+        }
+        text(ctx, 'Q E 로 변경', 34, 124, '#5d636f', { size: 11 });
+        text(ctx, '바꾸면 양쪽 준비가 풀립니다', 34, 136, '#5d636f', { size: 11 });
+      } else text(ctx, '방장이 정합니다', 34, 124, '#5d636f', { size: 11 });
       const slot = (p, x) => {
         const wid = st.weapons?.[p];
         const on = st.connected?.[p];

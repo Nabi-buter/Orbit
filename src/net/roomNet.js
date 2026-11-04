@@ -7,6 +7,7 @@
 //   방 만들기: 4자리 코드 → 이름 붙은 방 "duel-<코드>" 에 들어가 호스트(1P)가 됨
 //   코드로 참가: 같은 방에 들어가 hello → 호스트가 자리(2P)를 배정
 //   로비 상태(무기·준비)는 호스트가 정하고 1초마다 다시 알림 (메시지가 빠져도 맞춰짐)
+//   시간 제한: 방장만 바꿀 수 있고(무제한 포함) 로비 상태와 start 에 실려 양쪽이 같은 값으로 경기를 만든다
 //   시작: 호스트가 양쪽 준비를 확인하면 start (상대 첫 입력이 올 때까지 반복)
 //   입력: 3프레임마다 묶어 보내고, 매번 최근 24프레임을 함께 실어 빠진 메시지를 다음 메시지가 메운다
 //   나감: bye 또는 방 참가자 목록에서 사라지면 peerLeft
@@ -14,6 +15,11 @@
 // =============================================================================
 
 import { WEAPON_ORDER } from '../config/weapons.js';
+import { BALANCE } from '../config/balance.js';
+
+/** 방장이 고를 수 있는 시간 제한(초, 0 = 무제한) */
+export const TIME_OPTIONS = BALANCE.round.timeOptions;
+export const validTime = (s) => TIME_OPTIONS.includes(s);
 
 const FRAME_MS = 1000 / 60;
 /** 참가자 목록에서 빠진 상대를 나간 것으로 보기까지 (짧은 재연결은 무시) */
@@ -112,6 +118,7 @@ export class RoomNet {
       case 'join': this.joinCode(msg.code); break;
       case 'leave': this.leaveRoom(); break;
       case 'select': this.control({ op: 'select', weapon: msg.weapon }); break;
+      case 'time': if (this.host) this.hostControl(0, { op: 'time', time: msg.time }); break;
       case 'ready': this.control({ op: 'ready', ready: !!msg.ready }); break;
       case 'end': this.control({ op: 'end', m: msg.m }); break;
       case 'input':
@@ -172,7 +179,7 @@ export class RoomNet {
       await this.enter(makeCode(this.rand));
       this.host = true;
       this.slot = 0;
-      this.state = { weapons: ['longsword', 'longsword'], ready: [false, false], playing: false, matchId: 0 };
+      this.state = { weapons: ['longsword', 'longsword'], ready: [false, false], playing: false, matchId: 0, time: BALANCE.round.timeSeconds };
       this.lastLobbyAt = 0;
       this.emitLocal('joined', { code: this.code, slot: 0 });
       this.broadcastLobby();
@@ -238,7 +245,7 @@ export class RoomNet {
   // --- 로비 (호스트가 정함) ------------------------------------------------------
   lobbyMsg() {
     const s = this.state;
-    return { code: this.code, connected: [true, !!this.otherPeer], weapons: s.weapons, ready: s.ready, playing: s.playing, matchId: s.matchId };
+    return { code: this.code, connected: [true, !!this.otherPeer], weapons: s.weapons, ready: s.ready, playing: s.playing, matchId: s.matchId, time: s.time };
   }
 
   broadcastLobby() {
@@ -252,7 +259,7 @@ export class RoomNet {
   applyLobby(d) {
     if (this.slot !== 1) return;
     this.matchIdle = !d.playing;
-    this.emitLocal('lobby', { code: d.code, connected: d.connected, weapons: d.weapons, ready: d.ready, playing: d.playing });
+    this.emitLocal('lobby', { code: d.code, connected: d.connected, weapons: d.weapons, ready: d.ready, playing: d.playing, time: validTime(d.time) ? d.time : BALANCE.round.timeSeconds });
   }
 
   control(op) {
@@ -272,6 +279,11 @@ export class RoomNet {
       if (s.playing || !WEAPON_ORDER.includes(op.weapon)) return;
       s.weapons[slot] = op.weapon;
       s.ready[slot] = false;
+    } else if (op.op === 'time') {
+      // 시간 제한은 방장만 (손님 ctl 로 오는 것은 무시). 바꾸면 양쪽 준비를 풀어 상대가 확인하게 한다
+      if (slot !== 0 || s.playing || !validTime(op.time) || s.time === op.time) return;
+      s.time = op.time;
+      s.ready = [false, false];
     } else if (op.op === 'ready') {
       if (s.playing) return;
       s.ready[slot] = !!op.ready;
@@ -297,7 +309,7 @@ export class RoomNet {
     s.ready = [false, false];
     s.matchId++;
     const delay = roomDelayFor([this.rtt, this.peerRtt ?? this.rtt], this.cfg.flushMs); // 상대 측정값이 아직 없으면 내 값으로
-    this.lastStart = { matchId: s.matchId, weapons: [...s.weapons], delay };
+    this.lastStart = { matchId: s.matchId, weapons: [...s.weapons], delay, time: s.time };
     this.startAcked = false;
     this.room.emit('start', this.lastStart).catch(() => {});
     this.beginMatch(s.matchId);
@@ -309,7 +321,7 @@ export class RoomNet {
     this.matchIdle = false;
     if (this.want) this.want.ready = false;
     this.beginMatch(d.matchId);
-    this.emitLocal('start', { matchId: d.matchId, weapons: d.weapons, delay: d.delay, slot: 1 });
+    this.emitLocal('start', { matchId: d.matchId, weapons: d.weapons, delay: d.delay, time: validTime(d.time) ? d.time : BALANCE.round.timeSeconds, slot: 1 });
   }
 
   beginMatch(id) {

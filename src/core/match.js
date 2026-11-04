@@ -22,7 +22,8 @@ export class Match {
     this.fighters = this.spawn.map((sp) => createFighter(sp));
     this.frame = 0;
     this.roundSeconds = roundSeconds;
-    this.timeLeft = roundSeconds * FPS;
+    this.unlimited = !(roundSeconds > 0); // 0 = 시간 제한 없음 (목숨이 다 떨어질 때까지)
+    this.timeLeft = this.unlimited ? Infinity : roundSeconds * FPS;
     // 목숨: 한쪽이 쓰러지면 처음 위치에서 다시 시작. 쓰러진 쪽만 체력이 차고, 버틴 쪽은 깎인 체력 그대로.
     this.lives = [BALANCE.round.lives, BALANCE.round.lives];
     this.round = 1;
@@ -88,6 +89,7 @@ export class Match {
       }
       return;
     }
+    if (this.unlimited) return;
     if (--this.timeLeft <= 0) {
       this.timeLeft = 0;
       this.endReason = 'time';
@@ -110,7 +112,7 @@ export class Match {
     this.koTimer = 0;
     this.winner = null;
     this.endReason = null;
-    this.timeLeft = this.roundSeconds * FPS;
+    this.timeLeft = this.unlimited ? Infinity : this.roundSeconds * FPS;
     this.roundIntro = BALANCE.round.introFrames;
     this.events.push({ type: 'round', round: this.round, lives: [...this.lives] });
   }
