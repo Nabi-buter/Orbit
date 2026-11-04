@@ -1,5 +1,5 @@
 // =============================================================================
-// 무기 데이터 (6종)
+// 무기 데이터 (7종)
 // -----------------------------------------------------------------------------
 // 공격 정의 형식은 src/core/attackDef.js 참고. 모든 프레임 단위 = 1/60초.
 // 이 파일의 무기별 수치는 전부 [TEMP] 임시값이다.
@@ -77,6 +77,7 @@ export const KNOBS = {
   // 새 시드 검증 승률 48~53%
   // 규칙: 모든 무기 강공 콤보 ≥ 2, 강공 콤보 < 약공 콤보
   longsword: { combo: { lightMax: 3, heavyMax: 2, maxTotal: 4 }, reach: 1.01, damage: 1.05, speed: 1.28, hp: 1.05, guardTaken: 1, windup: 1.25 },
+  rapier: { combo: { lightMax: 3, heavyMax: 2, maxTotal: 4 }, reach: 1, damage: 0.82, speed: 1.4, hp: 0.98, guardTaken: 1.05 }, // 추가 시 64% → 데미지·속도 조정 50%
   greatsword: { combo: { lightMax: 3, heavyMax: 2, maxTotal: 3 }, reach: 1, damage: 0.94, speed: 1.3, hp: 1.08, guardTaken: 1, windup: 1.3 },
   dagger: { combo: { lightMax: 3, heavyMax: 2, maxTotal: 5 }, reach: 1.04, damage: 0.9, speed: 1.53, hp: 1, guardTaken: 1 },
   axe: { combo: { lightMax: 3, heavyMax: 2, maxTotal: 3 }, reach: 1.05, damage: 1.17, speed: 1.44, hp: 1.18, guardTaken: 1, windup: 1.3 },
@@ -120,6 +121,43 @@ const DEFS = {
     plunge: plunge({ damage: 70, guardDamage: 20, landingLag: 22 }),
     special: specialAttack('special-thrust'),
     ultimate: { type: 'crossSlash', motion: 'ult-longsword' },
+  },
+
+  // ---------------------------------------------------------------------------
+  // 레이피어: 가늘고 긴 찌르기. 한 점으로 멀리 닿지만 판정이 얇고, 막는 상대의 자세는 잘 못 무너뜨린다
+  // ---------------------------------------------------------------------------
+  rapier: {
+    name: '레이피어',
+    desc: '가늘고 길다. 거리를 재다 한 점을 꿰뚫는다.',
+    color: '#8ff0d8',
+    mods: { walkScale: 1.08, backWalkScale: 1.12, dashCostScale: 0.9 },   // 펜싱 발놀림: 물러서기 빠름
+    lightSteps: [
+      { name: '재찌르기', motion: 'thrust', startup: 1 },
+      { name: '런지', motion: 'thrust', dmg: 1.35, push: 10, recovery: 7 },
+    ],
+    heavySteps: [
+      { name: '베어 올리기', motion: 'rising', dmg: 1.05, startup: 2, recovery: 4 },
+    ],
+    light: attack({
+      id: 'light', kind: 'light', motion: 'thrust', cancelFrom: 11,
+      hits: [singleHit({
+        startup: 5, active: 2, recovery: 15,
+        box: { x: 20, y: 50, w: 100, h: 30 },
+        damage: 34, guardDamage: 7, hitstun: 7, blockstun: 7, push: 8,
+      })],
+    }),
+    heavy: attack({
+      id: 'heavy', kind: 'heavy', motion: 'thrust', cancelFrom: 27,
+      moves: [{ from: 4, to: 12, vx: 3.5 }],   // 플레시: 달려들며 찌름
+      hits: [singleHit({
+        startup: 14, active: 4, recovery: 26,
+        box: { x: 20, y: 45, w: 130, h: 35 },
+        damage: 82, guardDamage: 15, hitstun: 12, blockstun: 11, push: 18, ultGainScale: 1.5,
+      })],
+    }),
+    plunge: plunge({ damage: 58, guardDamage: 14, landingLag: 18, w: 56 }),
+    special: specialAttack('special-thrust'),
+    ultimate: { type: 'flashThrusts', motion: 'ult-rapier' },
   },
 
   // ---------------------------------------------------------------------------
@@ -311,7 +349,7 @@ const DEFS = {
   },
 };
 
-export const WEAPON_ORDER = ['longsword', 'greatsword', 'dagger', 'axe', 'spear', 'knuckle'];
+export const WEAPON_ORDER = ['longsword', 'rapier', 'greatsword', 'dagger', 'axe', 'spear', 'knuckle'];
 
 /**
  * 콤보 단계 목록을 정확히 n 개로 만든다.
@@ -338,7 +376,7 @@ function scaleDef(def, { reach = 1, damage = 1 }) {
 }
 
 const FIRST_NAMES = {
-  longsword: ['베기', '내려베기'], greatsword: ['좌상단 베기', '대검 내려찍기'], dagger: ['찌르기', '이연 찌르기'],
+  longsword: ['베기', '내려베기'], rapier: ['찌르기', '플레시'], greatsword: ['좌상단 베기', '대검 내려찍기'], dagger: ['찌르기', '이연 찌르기'],
   axe: ['내려찍기', '도끼 찍기'], spear: ['찌르기', '휘두르기'], knuckle: ['잽', '돌진 연타'],
 };
 

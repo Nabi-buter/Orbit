@@ -212,7 +212,7 @@ export class LoadoutScreen {
   }
 
   layout() {
-    const slot = 58, x0 = Math.round((PW - slot * 6) / 2);
+    const slot = 56, x0 = Math.round((PW - slot * WEAPON_ORDER.length) / 2);
     this.cards = WEAPON_ORDER.map((id, i) => ({ id, x: x0 + i * slot, y: 168, w: slot, h: 40 }));
     let tx = PW - 24; // 오른쪽 끝에 E 키 자리
     this.modeTabs = this.o.lockMode ? [] : [...MODES].reverse().map((m) => {
@@ -230,7 +230,7 @@ export class LoadoutScreen {
 
   get buttons() { return [this.start, this.back]; }
   setWeapon(id) { this.weapon = id; this.puppet.setWeapon(id); }
-  cycleWeapon(d) { const i = WEAPON_ORDER.indexOf(this.weapon); this.setWeapon(WEAPON_ORDER[(i + d + 6) % 6]); }
+  cycleWeapon(d) { const i = WEAPON_ORDER.indexOf(this.weapon); this.setWeapon(WEAPON_ORDER[(i + d + WEAPON_ORDER.length) % WEAPON_ORDER.length]); }
   cycleDiff(d) { const k = Object.keys(DIFFICULTY); this.difficulty = k[(k.indexOf(this.difficulty) + d + k.length) % k.length]; }
   cycleCpu(d) { const list = ['random', ...WEAPON_ORDER]; this.cpuWeapon = list[(list.indexOf(this.cpuWeapon) + d + list.length) % list.length]; }
   confirm() { this.o.onStart({ weapon: this.weapon, mode: this.mode, difficulty: this.difficulty, cpuWeapon: this.cpuWeapon }); }
@@ -619,8 +619,8 @@ export class OnlineScreen {
     if (st.phase === 'room') {
       const me = st.slot;
       const i = WEAPON_ORDER.indexOf(st.weapons?.[me] ?? 'longsword');
-      if (['KeyA', 'ArrowLeft'].includes(e.code)) { this.cb.onSelect(WEAPON_ORDER[(i + 5) % 6]); return true; }
-      if (['KeyD', 'ArrowRight'].includes(e.code)) { this.cb.onSelect(WEAPON_ORDER[(i + 1) % 6]); return true; }
+      if (['KeyA', 'ArrowLeft'].includes(e.code)) { this.cb.onSelect(WEAPON_ORDER[(i + WEAPON_ORDER.length - 1) % WEAPON_ORDER.length]); return true; }
+      if (['KeyD', 'ArrowRight'].includes(e.code)) { this.cb.onSelect(WEAPON_ORDER[(i + 1) % WEAPON_ORDER.length]); return true; }
       if (e.code === 'KeyQ') { this.cycleTime(-1); return true; }
       if (e.code === 'KeyE') { this.cycleTime(1); return true; }
       if (CONFIRM.includes(e.code)) { if (st.connected?.[1 - me]) this.cb.onReady(!st.ready[me]); return true; }

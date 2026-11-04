@@ -10,8 +10,8 @@ import { setup, run, tap, until, I } from './helpers.js';
 
 const B = BALANCE;
 
-test('무기 6종이 존재한다', () => {
-  assert.deepEqual(WEAPON_ORDER, ['longsword', 'greatsword', 'dagger', 'axe', 'spear', 'knuckle']);
+test('무기 7종이 존재한다', () => {
+  assert.deepEqual(WEAPON_ORDER, ['longsword', 'rapier', 'greatsword', 'dagger', 'axe', 'spear', 'knuckle']);
   for (const id of WEAPON_ORDER) assert.ok(WEAPONS[id]);
 });
 

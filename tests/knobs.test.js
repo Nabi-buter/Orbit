@@ -5,7 +5,7 @@ import { KNOBS, WEAPONS, WEAPON_ORDER, buildWeapon } from '../src/config/weapons
 import { reachOf } from '../src/core/attackDef.js';
 import { setup, run, I } from './helpers.js';
 
-test('밸런스 변수 표가 6종 모두에 있고 범위 안이다', () => {
+test('밸런스 변수 표가 7종 모두에 있고 범위 안이다', () => {
   for (const id of WEAPON_ORDER) {
     const k = KNOBS[id];
     for (const key of ['reach', 'damage', 'speed', 'hp', 'guardTaken']) assert.ok(k[key] > 0.7 && k[key] < 1.7, `${id}.${key}=${k[key]}`);

@@ -20,6 +20,7 @@ import { PX } from './pixel.js';
  */
 const PARTS = {
   longsword: [{ from: 2, to: 'tip', r: 1.6 }],
+  rapier: [{ from: 4, to: 'tip', r: 1.2 }],          // 가늘다: 판정도 얇은 선
   greatsword: [{ from: 2, to: 'tip', r: 2.6 }],
   dagger: [{ from: 1, to: 'tip', r: 1.6 }],
   axe: [{ from: 0, to: -6, r: 1.1 }, { head: true, back: 6, len: 11, r: 3 }],

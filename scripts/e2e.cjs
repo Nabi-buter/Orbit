@@ -1,6 +1,6 @@
 // =============================================================================
 // 브라우저 종단 테스트 (Playwright 필요): node scripts/e2e.cjs [스크린샷 폴더]
-// 도트 캔버스 UI를 키보드/마우스로 조작해 모든 흐름, 6종 무기, PvE/로컬/온라인을 확인한다.
+// 도트 캔버스 UI를 키보드/마우스로 조작해 모든 흐름, 7종 무기, PvE/로컬/온라인을 확인한다.
 // =============================================================================
 const { chromium } = require('playwright');
 const { spawn } = require('node:child_process');
@@ -99,14 +99,14 @@ function assert(c, msg) { if (!c) throw new Error('E2E 실패: ' + msg); console
 
     // 하단 무기 6종 마우스 선택 확인
     const cards = await page.evaluate(() => window.__game.screen.cards.map((c) => [c.id, c.x + c.w / 2, c.y + c.h / 2]));
-    assert(cards.length === 6 && new Set(cards.map((c) => c[2])).size === 1, '무기 6종이 하단 1열');
+    assert(cards.length === 7 && new Set(cards.map((c) => c[2])).size === 1, '무기 7종이 하단 1열');
     for (const [id, x, y] of cards) {
       await clickArt(x, y);
       assert(await page.evaluate(() => window.__game.screen.weapon) === id, `무기 클릭 선택: ${id}`);
     }
 
     // PvE: 무기별 대전 시작
-    for (const id of ['longsword', 'greatsword', 'dagger', 'axe', 'spear', 'knuckle']) {
+    for (const id of ['longsword', 'rapier', 'greatsword', 'dagger', 'axe', 'spear', 'knuckle']) {
       await page.evaluate((w) => { window.__game.toLoadout({ mode: 'pve' }); window.__game.screen.setWeapon(w); }, id);
       await key('Enter');
       const w = await page.evaluate(() => window.__game.match.fighters[0].weapon.id);

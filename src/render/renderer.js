@@ -142,7 +142,7 @@ export class Renderer {
     const g = GUARD_POSE[D.weapon.id] ?? GUARD_POSE.longsword;
     const hand = [D.x + D.facing * g.h[0], D.y + g.h[1]];
     // 무기 날 중간쯤 (너클은 주먹)
-    const along = D.weapon.id === 'knuckle' ? 4 : D.weapon.id === 'spear' ? 20 : D.weapon.id === 'dagger' ? 8 : 16;
+    const along = D.weapon.id === 'knuckle' ? 4 : D.weapon.id === 'spear' ? 20 : D.weapon.id === 'dagger' ? 8 : D.weapon.id === 'rapier' ? 10 : 16;
     const wx = hand[0] + D.facing * Math.cos(g.a) * along, wy = hand[1] + Math.sin(g.a) * along;
     const wa = Math.atan2(-Math.sin(g.a), D.facing * Math.cos(g.a));
     return [AX(wx), AY(wy), wa];

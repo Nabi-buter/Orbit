@@ -1,0 +1,14 @@
+<!doctype html><html><head><meta charset="utf-8"><style>body{margin:0;background:#1b1f28}canvas{image-rendering:pixelated;width:1320px;height:480px}</style></head><body>
+<canvas id="c" width="220" height="80"></canvas>
+<script type="module">
+// 레이피어 모델 확인: 왼쪽 8배 확대 원본 · 오른쪽 장검과 길이 비교 + 회전
+import { WEAPONS } from '../src/config/weapons.js';
+import { drawWeapon, weaponSprite } from '../src/render/weaponArt.js';
+const ctx = document.getElementById('c').getContext('2d');
+ctx.fillStyle = '#2b303b'; ctx.fillRect(0, 0, 220, 80);
+const s = weaponSprite('rapier', '#fff');
+for (let y = 0; y < s.h; y++) for (let x = 0; x < s.w; x++) { const c = s.px[y * s.w + x]; if (c) { ctx.fillStyle = c; ctx.fillRect(4 + x * 2, 4 + y * 2, 2, 2); } }
+drawWeapon(ctx, 'longsword', '#fff', 10 + weaponSprite('longsword','#fff').pivot[0], 46, 0, 1);
+drawWeapon(ctx, 'rapier', '#fff', 10 + s.pivot[0], 60, 0, 1);
+[0.5, 1.2, 2.2, -0.6].forEach((a, i) => drawWeapon(ctx, 'rapier', '#fff', 110 + i * 26, 50, a, 1));
+</script></body></html>

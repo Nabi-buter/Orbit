@@ -76,6 +76,37 @@ function longsword() {
   return s;
 }
 
+/**
+ * 레이피어: 가늘고 긴 찌르기용 칼날, 감싸는 손잡이(스웹트 힐트) —
+ * 칼끝 쪽으로 말린 코등이, 손을 감싸 폼멜까지 이어지는 손가락 보호대(너클 보우), 칼날 밑동의 고리,
+ * 철사를 감은 손잡이, 배 모양 폼멜. 칼날은 밑동에서만 조금 두껍고 곧 한 줄로 가늘어진다.
+ */
+function rapier() {
+  const H = 11, mid = 4;
+  const s = makeSprite(37, H, [4, mid]);
+  // 배 모양 폼멜
+  sset(s, 0, mid, P.brassLo); sset(s, 1, mid - 1, P.brassHi); sset(s, 1, mid, P.brass); sset(s, 1, mid + 1, P.brassLo); sset(s, 2, mid, P.brass);
+  // 철사 감은 손잡이 (놋쇠 줄 사이로 어두운 홈)
+  for (let x = 3; x <= 6; x++) { sset(s, x, mid - 1, x % 2 ? P.brassHi : P.ironLo); sset(s, x, mid, x % 2 ? P.ironLo : P.brass); }
+  // 코등이(퀼론): 세로 막대, 위 끝은 칼끝 쪽으로, 아래 끝은 손 쪽으로 말림
+  for (let y = mid - 4; y <= mid + 2; y++) sset(s, 7, y, y === mid - 4 ? P.brassHi : P.brass);
+  sset(s, 8, mid - 5, P.brass); sset(s, 9, mid - 5, P.brassLo);
+  // 손가락 보호대: 코등이 아래에서 손을 감싸 돌아 폼멜로
+  sset(s, 7, mid + 3, P.brassLo); sset(s, 6, mid + 4, P.brass); for (let x = 3; x <= 5; x++) sset(s, x, mid + 5, x === 4 ? P.brassHi : P.brass);
+  sset(s, 2, mid + 4, P.brass); sset(s, 1, mid + 3, P.brassLo); sset(s, 1, mid + 2, P.brassLo);
+  // 칼날 밑동의 고리 (파스 다네) — 칼날을 둥글게 감쌈
+  sset(s, 8, mid - 2, P.brass); sset(s, 9, mid - 2, P.brassHi); sset(s, 10, mid - 1, P.brass);
+  sset(s, 8, mid + 2, P.brassLo); sset(s, 9, mid + 2, P.brass); sset(s, 10, mid + 1, P.brassLo);
+  // 리카소(날 없는 밑동): 조금 두꺼움
+  for (let x = 8; x <= 11; x++) { sset(s, x, mid, P.light); sset(s, x, mid + 1, P.mid); }
+  // 칼날: 두 줄(위 빛 · 아래 그늘)로 가다 칼끝 1/3 은 한 줄로
+  for (let x = 12; x <= 35; x++) {
+    if (x <= 26) { sset(s, x, mid, x % 5 === 0 ? P.white : P.light); sset(s, x, mid + 1, P.dark); }
+    else sset(s, x, mid, x >= 34 ? P.white : P.light);
+  }
+  return s;
+}
+
 /** 대검(츠바이핸더): 긴 손잡이, 넓은 코등이, 날 세우지 않은 리카소와 받침 돌기, 넓고 긴 칼날 */
 function greatsword() {
   const H = 13, mid = 6;
@@ -195,7 +226,7 @@ const cache = new Map();
 export function weaponSprite(id, accent) {
   const key = id + accent;
   if (cache.has(key)) return cache.get(key);
-  const make = { longsword, greatsword, dagger, axe, spear, knuckle }[id] ?? longsword;
+  const make = { longsword, rapier, greatsword, dagger, axe, spear, knuckle }[id] ?? longsword;
   const s = outlined(make(), PAL.outline);
   cache.set(key, s);
   return s;

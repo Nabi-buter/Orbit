@@ -1,5 +1,5 @@
 // =============================================================================
-// 상성 평가: 후보 변수 세트를 적용해 15개 상성을 병렬로 측정한다.
+// 상성 평가: 후보 변수 세트를 적용해 모든 상성을 병렬로 측정한다.
 //   node scripts/matchup.js <조합·난이도쌍당 판수> <시드> '<JSON {무기: 변경}>'
 // 출력: 무기별 승률, 승률 편차, 가장 쏠린 상성, 상성 편차 제곱합
 // =============================================================================
@@ -36,7 +36,7 @@ if (isMainThread) {
     };
     for (let k = 0; k < pool; k++) launch();
   });
-  const rate = Object.fromEntries(WEAPON_ORDER.map((w) => [w, WEAPON_ORDER.filter((o) => o !== w).reduce((s, o) => s + res[`${w}|${o}`], 0) / 5]));
+  const rate = Object.fromEntries(WEAPON_ORDER.map((w) => [w, WEAPON_ORDER.filter((o) => o !== w).reduce((s, o) => s + res[`${w}|${o}`], 0) / (WEAPON_ORDER.length - 1)]));
   const v = Object.values(rate);
   const spread = Math.max(...v) - Math.min(...v);
   let worst = ['', 0], sq = 0;

@@ -21,6 +21,7 @@
 /** 기본(대기) 자세: 무기마다 다르게 든다 */
 export const STANCE = {
   longsword: { a: 0.9, h: [18, 84] },              // 중단 자세
+  rapier: { a: 0.22, h: [24, 88], h2: [-14, 116] }, // 펜싱 자세: 팔을 뻗어 칼끝으로 겨누고, 빈손은 뒤로 들어 균형
   greatsword: { a: 1.95, h: [8, 92] },             // 어깨에 둘러멘 자세
   dagger: { a: -0.35, h: [22, 78] },               // 낮게 앞으로
   axe: { a: 2.25, h: [6, 94] },                    // 어깨에 올린 자세
@@ -41,6 +42,7 @@ export const STANCE = {
 export const GUARD_POSE = {
   // support: 뒷손이 무기 위 어디를 잡는지 (앞손에서 칼끝 쪽 + / 자루 끝 쪽 -, 아트 px). 없으면 평소 양손 그립
   longsword: { a: 1.15, h: [22, 94], recoil: { dx: -6, da: 0.25 } },                    // 양손으로 칼을 비스듬히 세워 받음
+  rapier: { a: 1.2, h: [24, 92], h2: [-12, 112], recoil: { dx: -8, da: 0.4 } },          // 손목을 돌려 칼을 세우고 칼 밑동(손잡이 쪽)으로 받아 흘림 — 가벼워 크게 밀림
   greatsword: { a: 1.6, h: [16, 82], support: 12, recoil: { dx: -3, da: 0.08 } },      // 칼을 세우고 뒷손 손바닥으로 칼면을 받쳐 방패처럼
   dagger: { a: 2.45, h: [20, 102], h2: [12, 98], recoil: { dx: -7, da: 0.35 } },       // 역수로 쥔 팔뚝을 얼굴 앞에, 빈손은 턱 옆
   axe: { a: 1.15, h: [18, 86], support: 8, recoil: { dx: -4, da: -0.15 } },           // 자루를 얼굴 앞에 비스듬히 세우고 두 손을 벌려 자루로 받음
@@ -55,6 +57,8 @@ export const DEFLECT_FRAMES = 12;
 export const GRIP = { greatsword: 9, axe: 13, spear: 26 };
 
 const P = (a, hx, hy, extra = {}) => ({ a, h: [hx, hy], ...extra });
+/** 레이피어: 빈손을 뒤로 든 채 (h2 생략 시 기본 위치) */
+const R = (a, hx, hy, extra = {}, h2 = [-14, 116]) => ({ a, h: [hx, hy], h2, ...extra });
 
 export const MOTIONS = {
   longsword: {
@@ -63,6 +67,16 @@ export const MOTIONS = {
     '찔러 마무리': { beats: [{ from: P(0.3, -14, 90, { lean: -0.15 }), to: P(0, 48, 86, { lean: 0.32, stride: 22 }) }] },
     '내려베기': { beats: [{ from: P(2.65, -2, 110, { lean: -0.18, crouch: -3 }), to: P(-1.05, 32, 64, { lean: 0.32, stride: 16, crouch: 8 }) }] },
     '올려베기': { beats: [{ from: P(-1.55, 10, 60, { lean: 0.15, crouch: 10 }), to: P(2.25, 18, 110, { lean: -0.05, stride: 8, crouch: -2 }) }] },
+  },
+  rapier: {
+    // 한손 펜싱: 앞발을 내디디며 팔을 곧게 뻗어 찌른다. 빈손(h2)은 뒤로 들어 균형을 잡음
+    '찌르기': { beats: [{ from: R(0.16, 10, 90), to: R(0.02, 40, 88, { lean: 0.26, stride: 20 }, [-18, 112]) }] },
+    '재찌르기': { beats: [{ from: R(0.3, 16, 98, { lean: 0.08, stride: 8 }), to: R(0.14, 42, 98, { lean: 0.26, stride: 20 }, [-18, 112]) }] },
+    '런지': { beats: [{ from: R(0.06, 2, 86, { crouch: 4, lean: -0.05 }), to: R(-0.03, 54, 80, { lean: 0.46, stride: 32, crouch: 12 }, [-22, 92]) }] },
+    // 플레시: 뒷발로 박차고 달려들며 한 줄로 찌름
+    '플레시': { beats: [{ from: R(0.1, -6, 88, { lean: -0.12 }), to: R(-0.04, 56, 84, { lean: 0.52, stride: 30 }, [-20, 96]) }] },
+    // 손목을 돌려 아래에서 위로 베어 올림 (가벼운 날이라 빠르게 휙)
+    '베어 올리기': { beats: [{ from: R(-1.2, 14, 66, { lean: 0.12, crouch: 8 }), to: R(1.55, 24, 108, { lean: 0.04, stride: 10 }) }] },
   },
   greatsword: {
     '좌상단 베기': { beats: [{ from: P(2.6, -8, 106, { lean: -0.15 }), to: P(-0.95, 34, 64, { lean: 0.3, stride: 18, crouch: 6 }) }] },
@@ -132,6 +146,13 @@ Object.assign(MOTIONS.longsword, {
     { from: P(-1.25, 30, 58, { lean: 0.28, crouch: 8, stride: 16 }), to: P(2.0, 30, 116, { lean: 0.12, stride: 20, crouch: -4 }) },
   ] },
 });
+Object.assign(MOTIONS.rapier, {
+  // 섬광 연격: 높이를 바꿔 가며 눈에 안 보일 만큼 빠르게 다섯 번 찌르고, 마지막에 깊게 런지
+  '섬광 연격': { beats: [
+    ...[96, 84, 102, 78, 92].map((y, i) => ({ from: R(0.1, 14, y + 2, { lean: 0.15, stride: 12 }), to: R(i % 2 ? -0.06 : 0.08, 48, y, { lean: 0.3, stride: 20 }, [-18, 112]) })),
+    { from: R(0.06, 0, 86, { crouch: 6, lean: -0.05 }), to: R(-0.02, 60, 82, { lean: 0.55, stride: 34, crouch: 12 }, [-24, 90]) },
+  ] },
+});
 Object.assign(MOTIONS.greatsword, {
   // 손잡이로 짧게 쳐 붙잡고 → 머리 위 끝까지 들어 올렸다가 바닥까지 내려찍기
   '대지 가르기': { beats: [
@@ -182,7 +203,7 @@ Object.assign(MOTIONS.knuckle, {
 // 판정 프레임(weapons.js)은 그대로이고, 보이는 궤적만 바뀐다.
 
 /** 무기 무게감 0(가벼움) ~ 1(무거움) */
-export const WEIGHT = { knuckle: 0.1, dagger: 0.2, spear: 0.45, longsword: 0.5, axe: 0.8, greatsword: 1 };
+export const WEIGHT = { knuckle: 0.1, dagger: 0.2, rapier: 0.25, spear: 0.45, longsword: 0.5, axe: 0.8, greatsword: 1 };
 
 const lerp = (a, b, t) => a + (b - a) * t;
 const clamp01 = (t) => Math.max(0, Math.min(1, t));

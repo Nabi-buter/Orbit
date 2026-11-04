@@ -101,6 +101,17 @@ export class Effects {
         this.hitImpact(x, y, dir, 2, color);
         this.sparks(x, y, W, 16, 2.8, { life: 18 });
         break;
+      case 'rapier': { // 섬광 연격: 한 점 주위에 바늘 같은 찌르기 자국이 연달아 → 마지막에 꿰뚫는 가는 선
+        const back = dir > 0 ? Math.PI : 0;
+        for (let i = 0; i < 6; i++) {
+          const oy = [-10, 4, -16, 10, -4, 0][i], ox = (i % 3) * 3 * dir;
+          this.impacts.push({ type: 'star', x: x + ox, y: y + oy, rays: [{ a: back, len: 9 }, { a: back + 0.5, len: 4 }, { a: back - 0.5, len: 4 }, { a: back + Math.PI, len: 5 }], size: 1, color: i % 2 ? W : color, delay: i * 3, life: 8, max: 8 });
+        }
+        this.slashLine(x + 24 * dir, y - 2, dir > 0 ? 0 : Math.PI, 64, W, { life: 12, width: 1, delay: 16, grow: 2 });
+        this.slashLine(x + 24 * dir, y - 2, dir > 0 ? 0 : Math.PI, 48, color, { life: 14, width: 1, delay: 17, grow: 2 });
+        this.sparks(x, y, W, 10, 3.4, { dir: dir > 0 ? 0 : Math.PI, spread: 0.35, life: 14 });
+        break;
+      }
       case 'greatsword': // 내려찍는 거대한 일격 + 바닥 충격파
         this.slashLine(x, y - 18, Math.PI / 2 - 0.15 * dir, 46, color, { life: 16, width: 5, grow: 2 });
         this.ellipse(x, gy, 46, 6, color, { life: 22, delay: 3, thick: 2 });
