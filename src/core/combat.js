@@ -33,12 +33,50 @@ function activeHits(f) {
   return out;
 }
 
+/**
+ * 두께 r 인 선분이 사각형에 닿는가 (사각형을 r 만큼 넓혀 선분을 자르는 방식).
+ * 사칙연산과 비교만 쓴다 → 어느 브라우저에서도 같은 결과 (온라인 동기화).
+ */
+export function segmentHitsRect(ax, ay, bx, by, r, R) {
+  const x0 = R.x - r, x1 = R.x + R.w + r, y0 = R.y - r, y1 = R.y + R.h + r;
+  const dx = bx - ax, dy = by - ay;
+  let t0 = 0, t1 = 1;
+  const clip = (p, q) => {
+    if (p === 0) return q >= 0;
+    const t = q / p;
+    if (p < 0) { if (t > t1) return false; if (t > t0) t0 = t; }
+    else { if (t < t0) return false; if (t < t1) t1 = t; }
+    return true;
+  };
+  return clip(-dx, ax - x0) && clip(dx, x1 - ax) && clip(-dy, ay - y0) && clip(dy, y1 - ay);
+}
+
+/** 무기 선분 판정: 이번 프레임의 선분 중 하나라도 닿으면 그 선분을 감싸는 사각형(효과 위치용) */
+function weaponContact(attacker, hit, frame, hb) {
+  const list = hit.segs[frame - hit.from];
+  if (!list) return null;
+  for (const [x1, y1, x2, y2, r] of list) {
+    const ax = attacker.x + attacker.facing * x1, bx = attacker.x + attacker.facing * x2;
+    const ay = attacker.y + y1, by = attacker.y + y2;
+    if (segmentHitsRect(ax, ay, bx, by, r, hb)) {
+      return { x: Math.min(ax, bx) - r, y: Math.min(ay, by) - r, w: Math.abs(bx - ax) + 2 * r, h: Math.abs(by - ay) + 2 * r };
+    }
+  }
+  return null;
+}
+
 export function collectHits(attacker, defender) {
   if (defender.state === S.KO || attacker.state === S.KO) return [];
   const hb = hurtbox(defender);
   const events = [];
   for (const h of activeHits(attacker)) {
     if (attacker.attack.hitLog.has(h.index)) continue;
+    // 약공·강공: 그려지는 무기 모양 그대로 (src/render/hitGeometry.js) / 그 밖: 사각형
+    if (h.hit.segs) {
+      const box = weaponContact(attacker, h.hit, attacker.attack.frame, hb);
+      if (box) events.push({ attacker, defender, ...h, box });
+      continue;
+    }
     const box = worldBox(attacker, h.hit.box);
     if (overlap(box, hb)) events.push({ attacker, defender, ...h, box });
   }

@@ -59,36 +59,36 @@ const P = (a, hx, hy, extra = {}) => ({ a, h: [hx, hy], ...extra });
 export const MOTIONS = {
   longsword: {
     '베기': { beats: [{ from: P(2.0, 2, 100, { lean: -0.1 }), to: P(-0.75, 32, 72, { lean: 0.22, stride: 14 }) }] },
-    '되베기': { beats: [{ from: P(-0.9, 28, 68, { lean: 0.15, stride: 8 }), to: P(1.7, 20, 106, { lean: 0.05, stride: 12 }) }] },
-    '찔러 마무리': { beats: [{ from: P(0.05, -2, 86, { lean: -0.12 }), to: P(0, 48, 86, { lean: 0.32, stride: 22 }) }] },
+    '되베기': { beats: [{ from: P(-1.5, 12, 70, { lean: 0.1, stride: 4 }), to: P(1.7, 20, 106, { lean: 0.05, stride: 12 }) }] },
+    '찔러 마무리': { beats: [{ from: P(0.3, -14, 90, { lean: -0.15 }), to: P(0, 48, 86, { lean: 0.32, stride: 22 }) }] },
     '내려베기': { beats: [{ from: P(2.65, -2, 110, { lean: -0.18, crouch: -3 }), to: P(-1.05, 32, 64, { lean: 0.32, stride: 16, crouch: 8 }) }] },
-    '올려베기': { beats: [{ from: P(-1.35, 26, 58, { lean: 0.22, crouch: 10 }), to: P(2.25, 18, 110, { lean: -0.05, stride: 8, crouch: -2 }) }] },
+    '올려베기': { beats: [{ from: P(-1.55, 10, 60, { lean: 0.15, crouch: 10 }), to: P(2.25, 18, 110, { lean: -0.05, stride: 8, crouch: -2 }) }] },
   },
   greatsword: {
     '좌상단 베기': { beats: [{ from: P(2.6, -8, 106, { lean: -0.15 }), to: P(-0.95, 34, 64, { lean: 0.3, stride: 18, crouch: 6 }) }] },
     '횡베기': { beats: [{ from: P(1.1, -14, 92, { lean: -0.22 }), to: P(-0.15, 40, 82, { lean: 0.34, stride: 18 }) }] },
-    '우상단 베기': { beats: [{ from: P(-1.25, 24, 60, { lean: 0.3, crouch: 8, stride: 12 }), to: P(2.0, 12, 110, { lean: -0.08, stride: 6 }) }] },
+    '우상단 베기': { beats: [{ from: P(-1.6, 8, 62, { lean: 0.15, crouch: 8, stride: 4 }), to: P(2.0, 12, 110, { lean: -0.08, stride: 6 }) }] },
     '대검 내려찍기': { beats: [{ from: P(3.0, -6, 114, { lean: -0.28, crouch: -4 }), to: P(-1.3, 34, 56, { lean: 0.42, stride: 20, crouch: 16 }) }] },
-    '대검 올려베기': { beats: [{ from: P(-1.35, 30, 54, { lean: 0.4, crouch: 16, stride: 18 }), to: P(2.3, 10, 116, { lean: -0.12, stride: 8, crouch: -4 }) }] },
+    '대검 올려베기': { beats: [{ from: P(-1.65, 6, 58, { lean: 0.2, crouch: 14, stride: 6 }), to: P(2.3, 10, 116, { lean: -0.12, stride: 8, crouch: -4 }) }] },
   },
   dagger: {
-    '찌르기': { beats: [{ from: P(-0.1, 6, 80), to: P(-0.05, 44, 84, { lean: 0.25, stride: 16 }) }] },
+    '찌르기': { beats: [{ from: P(-0.1, 4, 80), to: P(-0.05, 30, 84, { lean: 0.2, stride: 10 }) }] },
     '가르기': { beats: [{ from: P(1.4, 16, 98, { lean: 0.05 }), to: P(-1.05, 34, 70, { lean: 0.22, stride: 12 }) }] },
-    '깊게 찌르기': { beats: [{ from: P(0, -4, 78, { crouch: 6, lean: -0.05 }), to: P(0.08, 52, 88, { lean: 0.38, stride: 24 }) }] },
+    '깊게 찌르기': { beats: [{ from: P(0, -4, 78, { crouch: 6, lean: -0.05 }), to: P(0.08, 36, 88, { lean: 0.3, stride: 14 }) }] },
     '이연 찌르기': {
       beats: [
-        { from: P(0, 4, 80), to: P(0, 44, 84, { lean: 0.25, stride: 16 }) },
-        { from: P(0.2, 12, 88, { lean: 0.1, stride: 10 }), to: P(-0.15, 50, 80, { lean: 0.36, stride: 22 }) },
+        { from: P(0, 4, 80), to: P(0, 30, 84, { lean: 0.2, stride: 10 }) },
+        { from: P(0.2, 10, 88, { lean: 0.1, stride: 8 }), to: P(-0.15, 36, 80, { lean: 0.3, stride: 14 }) },
       ],
     },
     '돌려 베기': { beats: [{ from: P(2.5, -10, 96, { lean: -0.2 }), to: P(-0.65, 40, 76, { lean: 0.32, stride: 18 }) }] },
   },
   axe: {
     '내려찍기': { beats: [{ from: P(2.35, 0, 108, { lean: -0.12 }), to: P(-0.95, 30, 66, { lean: 0.26, stride: 12, crouch: 6 }) }] },
-    '올려치기': { beats: [{ from: P(-1.0, 28, 62, { lean: 0.22, crouch: 8, stride: 10 }), to: P(1.9, 16, 108, { lean: 0.02, stride: 10 }) }] },
-    '옆치기': { beats: [{ from: P(0.95, -18, 88, { lean: -0.25 }), to: P(0.05, 38, 84, { lean: 0.3, stride: 16 }) }] },
+    '올려치기': { beats: [{ from: P(-1.6, 10, 64, { lean: 0.12, crouch: 8, stride: 4 }), to: P(1.9, 16, 108, { lean: 0.02, stride: 10 }) }] },
+    '옆치기': { beats: [{ from: P(1.45, -20, 96, { lean: -0.25 }), to: P(0.05, 38, 84, { lean: 0.3, stride: 16 }) }] },
     '도끼 찍기': { beats: [{ from: P(3.05, -6, 116, { lean: -0.28, crouch: -3 }), to: P(-1.25, 30, 56, { lean: 0.42, stride: 16, crouch: 14 }) }] },
-    '휘둘러 찍기': { beats: [{ from: P(0.4, -20, 74, { lean: -0.2, crouch: 4 }), to: P(-0.55, 42, 70, { lean: 0.36, stride: 18 }) }] },
+    '휘둘러 찍기': { beats: [{ from: P(1.3, -18, 84, { lean: -0.2, crouch: 4 }), to: P(-0.55, 42, 70, { lean: 0.36, stride: 18 }) }] },
   },
   spear: {
     '찌르기': { beats: [{ from: P(0.05, -4, 84, { lean: -0.08 }), to: P(0, 44, 84, { lean: 0.26, stride: 18 }) }] },
@@ -203,7 +203,7 @@ function mix(p, q, t) {
 }
 
 /** p 에서 q 방향의 반대쪽으로 k 만큼 더 (코일), 또는 같은 방향으로 더 (오버슈트) */
-function extend(p, q, k) {
+function extend(p, q, k, handMax = 6) {
   const r = mix(p, q, 1 + k);
   r.h2 = q.h2; // 뒷손은 과장하지 않음
   // 큰 궤적(머리 위 → 아래)은 비율만큼 더하면 과해지므로 각도·손 이동량에 상한
@@ -211,8 +211,11 @@ function extend(p, q, k) {
   if (Math.abs(da) > maxA) r.a = q.a + Math.sign(da) * maxA;
   for (const i of [0, 1]) {
     const dh = r.h[i] - q.h[i];
-    if (Math.abs(dh) > 6) r.h[i] = q.h[i] + Math.sign(dh) * 6;
+    if (Math.abs(dh) > handMax) r.h[i] = q.h[i] + Math.sign(dh) * handMax;
   }
+  // 따라가기에서 손이 판정 끝보다 더 앞으로 나가지 않게 (무기가 판정보다 멀리 보이면 '닿았는데 안 맞음')
+  if (handMax < 6) r.h[0] = Math.min(r.h[0], q.h[0]);
+  r.stride = Math.min(r.stride ?? 0, q.stride ?? 0);
   return r;
 }
 
@@ -251,7 +254,7 @@ export function evalMotion(weaponId, def, frame) {
     const from = i === 0 ? prevPose : b.from;
     if (frame <= contact) return mix(from, b.to, swingEase((frame - start) / Math.max(1, contact - start)));
     // 3) 따라가기 (다단 히트는 다음 타 직전까지만)
-    const over = extend(b.from, b.to, overK);
+    const over = extend(b.from, b.to, overK, 2);
     const fEnd = Math.min(end, nextFrom);
     if (frame <= fEnd) return mix(b.to, over, easeOutCubic((frame - contact) / Math.max(1, fEnd - contact)));
     prevEnd = fEnd;

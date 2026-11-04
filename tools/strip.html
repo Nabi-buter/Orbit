@@ -23,6 +23,16 @@ for (let k = 0; k < n; k++) {
   if (loco) { f.state = which === 'walk' ? S.WALK : S.IDLE; f.attack = null; f.x = frame * 4.2; f.vx = which === 'walk' ? 4.2 : 0; }
   else { f.state = S.ATTACK; f.attack = { def, frame }; }
   drawFighter(ctx, f, k * CW + 24, CH - 4, { ...TEAM[0], weapon: w.color }, loco ? frame : 0, { smooth: false });
+  // 판정 프레임: 무기 모양 판정 선분 (빨강, 반투명) — 그림과 겹쳐야 정상
+  const hit = !loco && def.hits.find((h) => frame >= h.from && frame <= h.to);
+  if (hit?.segs) {
+    ctx.save(); ctx.globalAlpha = 0.5; ctx.strokeStyle = '#ff3b3b';
+    for (const [x1, y1, x2, y2, r] of hit.segs[frame - hit.from]) {
+      ctx.lineWidth = Math.max(1, (2 * r) / 3);
+      ctx.beginPath(); ctx.moveTo(k * CW + 24 + x1 / 3, CH - 4 - y1 / 3); ctx.lineTo(k * CW + 24 + x2 / 3, CH - 4 - y2 / 3); ctx.stroke();
+    }
+    ctx.restore();
+  }
   ctx.fillStyle = '#8a909e'; ctx.font = '7px monospace'; ctx.fillText(frame, k * CW + 2, 8);
 }
 document.title = 'ready';

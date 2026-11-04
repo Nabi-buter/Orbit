@@ -6,14 +6,22 @@ import { setup, run, I } from './helpers.js';
 
 const P = BALANCE.guard.parry;
 
-/** 공격 판정 n 프레임 전에 가드를 눌렀을 때 결과 */
+/** 실제로 닿는 프레임 (판정이 무기 모양이라 판정 첫 프레임보다 늦을 수 있다) */
+function contactAt() {
+  const m = setup({ distance: 60, weapons: ['greatsword', 'longsword'] });
+  m.step([I({ heavy: true }), I()]);
+  for (let k = 1; k < 120; k++) if (m.step([I(), I()]).some((e) => e.type === 'hit')) return k;
+  throw new Error('강공이 닿지 않음');
+}
+
+/** 공격이 닿기 n 프레임 전에 가드를 눌렀을 때 결과 */
 function parryAt(lead, { presses = [], hold = true } = {}) {
+  const hitAt = contactAt();
   const m = setup({ distance: 60, weapons: ['greatsword', 'longsword'] });
   const [a, b] = m.fighters;
   // 이전 시도들 (연속 시도 단계 올리기): 각각 짧게 눌렀다 뗌
   for (const gap of presses) { m.step([I(), I({ guard: true })]); run(m, gap); }
   m.step([I({ heavy: true }), I()]);
-  const hitAt = a.weapon.heavy.hits[0].from;
   let ev = [];
   for (let k = 1; k <= hitAt + 2; k++) {
     const g = k >= hitAt - lead && (hold || k === hitAt - lead);
@@ -69,7 +77,7 @@ test('자세 게이지가 바닥인 공격자를 완벽패링하면 가드 브�
   const [a] = m.fighters;
   m.step([I({ heavy: true }), I()]);
   a.guard = 5; a.lastGuardUse = m.frame;
-  const hitAt = a.weapon.heavy.hits[0].from;
+  const hitAt = contactAt();
   for (let k = 1; k <= hitAt + 1; k++) m.step([I(), I({ guard: k >= hitAt - 4 })]);
   assert.equal(a.state, S.GUARD_BREAK);
 });

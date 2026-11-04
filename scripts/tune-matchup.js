@@ -47,7 +47,8 @@ function score(over) {
 }
 
 const val = (over, id, k) => over[id]?.[k] ?? KNOBS[id][k] ?? 1;
-const STEP = { damage: 0.04, reach: 0.03, speed: 0.04, hp: 0.04 };
+// reach 는 제외: 약공·강공 판정이 무기 그림 모양이라 사거리는 무기 그림·모션이 정한다
+const STEP = { damage: 0.03, speed: 0.04, hp: 0.04 };
 let best = score(cur);
 console.log('시작', best.s.toFixed(2), JSON.stringify(best.r));
 for (let it = 0; it < ITERS; it++) {

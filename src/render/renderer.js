@@ -364,6 +364,19 @@ export class Renderer {
     if (a) {
       const hits = f.state === S.PLUNGE ? [f.weapon.plunge.hit] : a.def.hits.filter((h) => a.frame >= h.from && a.frame <= h.to);
       for (const h of hits) {
+        if (h.segs && f.state !== S.PLUNGE) {
+          // 무기 모양 판정: 이번 프레임 선분 (두께 포함)
+          ctx.globalAlpha = 0.55; ctx.strokeStyle = UI.red;
+          for (const [x1, y1, x2, y2, r] of h.segs[a.frame - h.from] ?? []) {
+            ctx.lineWidth = Math.max(1, (2 * r) / PX);
+            ctx.beginPath();
+            ctx.moveTo(AX(f.x + f.facing * x1), AY(f.y + y1));
+            ctx.lineTo(AX(f.x + f.facing * x2), AY(f.y + y2));
+            ctx.stroke();
+          }
+          ctx.lineWidth = 1; ctx.globalAlpha = 0.8;
+          continue;
+        }
         const b = worldBox(f, h.box);
         ctx.globalAlpha = 0.35; rect(ctx, AX(b.x), AY(b.y + b.h), b.w / PX, b.h / PX, UI.red); ctx.globalAlpha = 0.8;
       }

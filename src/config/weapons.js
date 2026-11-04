@@ -28,6 +28,7 @@
 
 import { BALANCE } from './balance.js';
 import { attack, singleHit, variant, tempo } from '../core/attackDef.js';
+import { attachWeaponSegments } from '../render/hitGeometry.js';
 import { buildUltimate } from '../core/ultimates.js';
 
 /** 특수강공: 무기마다 모션은 다르지만 피해량·판정은 모두 동일 (규칙) */
@@ -395,6 +396,8 @@ export function buildWeapon(id, kn = KNOBS[id]) {
   const lights = buildSteps(w.light, flat, FIRST_NAMES[id][0], kn.combo.lightMax).map(tune);
   const heavies = buildSteps(w.heavy, w.heavySteps ?? [], FIRST_NAMES[id][1], kn.combo.heavyMax).map(tune);
   enforceGaps([...lights, ...heavies]);
+  // 판정 = 그려지는 무기 모양 (프레임마다 무기 선분). 경직·타이밍이 정해진 뒤에 계산
+  for (const d of [...lights, ...heavies]) attachWeaponSegments(id, d);
   const plungeDef = {
     ...w.plunge,
     landingLag: Math.round(w.plunge.landingLag * k),

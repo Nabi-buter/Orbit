@@ -18,7 +18,8 @@ test('리치·데미지·공격속도 배율이 공격 데이터에 반영된다
   const base = { ...KNOBS.longsword, reach: 1, damage: 1, speed: 1 };
   const a = buildWeapon('longsword', base);
   const b = buildWeapon('longsword', { ...base, reach: 1.1, damage: 1.2, speed: 1.3 });
-  assert.ok(reachOf(b.light) > reachOf(a.light));
+  // 리치 배율은 이제 약공·강공에 쓰지 않는다 — 판정이 그려지는 무기 모양이라 무기 그림·모션이 사거리를 정함
+  assert.equal(reachOf(b.light), reachOf(a.light));
   assert.equal(b.light.hits[0].damage, Math.round(a.light.hits[0].damage * 1.2));
   assert.ok(b.light.duration > a.light.duration && b.light.hits[0].from >= a.light.hits[0].from);
 });

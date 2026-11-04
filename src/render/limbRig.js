@@ -98,6 +98,28 @@ function drawLimb(put, segs, col, joints = []) {
 }
 
 /**
+ * 앞손 위치 (로컬 아트 px: 발밑 기준, x 앞 +, y 아래 +) — 그리기와 공격 판정이 같은 계산을 쓴다.
+ * 땅에 서서 공격할 때 기준 (걷기 흔들림 없음).
+ */
+export function frontHandLocal(pose) {
+  const lean = Math.max(-0.5, Math.min(0.5, pose.lean ?? 0));
+  const drop = Math.max(-2, Math.min(9, (pose.crouch ?? 0) / 3));
+  const stride = Math.max(-12, Math.min(34, pose.stride ?? 0)) / 3;
+  const pelvis = [PELVIS[0] - FOOT[0] + stride * 0.35, PELVIS[1] - FOOT[1] + drop];
+  const cosL = Math.cos(lean), sinL = Math.sin(lean);
+  const vx = R.frontShoulder[0] - PELVIS[0], vy = R.frontShoulder[1] - PELVIS[1];
+  const shF = [pelvis[0] + vx * cosL - vy * sinL, pelvis[1] + vx * sinL + vy * cosL];
+  return ik(shF, handTargetOf(shF, pose.hand), ARM.upper, ARM.fore, (a, b) => (a[1] > b[1] ? a : b)).end;
+}
+
+/** 모션의 손 위치(월드, 어깨 높이 96 기준) → 어깨 기준 아트 px 목표 */
+function handTargetOf(sh, h) {
+  const up = h[1] - 96;
+  const dy = up > 0 ? -up / 2.2 - Math.max(0, up - 6) * 0.12 : -up / PX_PER + HAND_DROP;
+  return [sh[0] + h[0] / 3.0, sh[1] + dy];
+}
+
+/**
  * 관절 리그로 캐릭터를 그린다.
  * @param core  몸통 스프라이트 (시트 그림, 팔 제외)
  * @param P     팔레트 {#, d, m, b, l, w}
@@ -145,11 +167,7 @@ export function drawLimbRig(ctx, f, ax, ay, pal, P, core, pose, opts = {}) {
   // --- 팔: 어깨 → 모션이 정한 손 위치 -----------------------------------------
   const shF = body(...R.frontShoulder), shB = body(...R.backShoulder);
   // 어깨보다 높은 손은 더 크게 올린다 (머리 위로 치켜든 준비 자세), 낮은 손은 시트처럼 조금 내려서
-  const handTarget = (sh, h) => {
-    const up = h[1] - 96;
-    const dy = up > 0 ? -up / 2.2 - Math.max(0, up - 6) * 0.12 : -up / PX_PER + HAND_DROP;
-    return [sh[0] + h[0] / 3.0, sh[1] + dy];
-  };
+  const handTarget = handTargetOf;
   const elbowDown = (a, b) => (a[1] > b[1] ? a : b);
   const armF = ik(shF, handTarget(shF, pose.hand), ARM.upper, ARM.fore, elbowDown);
   const wa = pose.wAngle;
