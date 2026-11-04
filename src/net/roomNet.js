@@ -36,9 +36,9 @@ export function makeCode(rand = Math.random) {
 }
 
 /** 왕복 지연과 묶음 전송 지연을 보고 입력 지연(프레임) 결정 */
-export function roomDelayFor(rtts) {
+export function roomDelayFor(rtts, flushMs = ROOM_NET.flushMs) {
   const worst = Math.max(...rtts.map((r) => r ?? 150));
-  const d = Math.ceil((worst / 2 + ROOM_NET.flushMs) / FRAME_MS) + 1;
+  const d = Math.ceil((worst / 2 + flushMs) / FRAME_MS) + 1;
   return Math.max(ROOM_NET.minDelay, Math.min(ROOM_NET.maxDelay, d));
 }
 
@@ -57,6 +57,8 @@ export class RoomNet {
       setTimeout: opts.setTimeout ?? ((f, ms) => setTimeout(f, ms)),
     };
     this.rand = opts.rand ?? Math.random;
+    // 전송 방식별 설정: 직접 연결(WebRTC)은 매 프레임 보낼 수 있다
+    this.cfg = { ...ROOM_NET, ...(opts.net ?? {}) };
     this.room = null;        // 이름 붙은 방
     this.unsubs = [];
     this.intervals = [];
@@ -76,6 +78,8 @@ export class RoomNet {
     this.pending = false;
     this.startAcked = true;
     this.lastStart = null;
+    this.want = null;
+    this.matchIdle = false;
   }
 
   on(type, fn) { this.handlers.set(type, fn); return this; }
@@ -109,7 +113,7 @@ export class RoomNet {
       case 'input':
         if (msg.m !== this.matchId) return;
         this.sentInputs.set(msg.f, msg.i);
-        if (this.sentInputs.size > ROOM_NET.window * 4) this.sentInputs.delete(Math.min(...this.sentInputs.keys()));
+        if (this.sentInputs.size > this.cfg.window * 4) this.sentInputs.delete(Math.min(...this.sentInputs.keys()));
         this.pending = true;
         break;
       case 'hash':
@@ -143,8 +147,8 @@ export class RoomNet {
     });
     on('bye', (d, m) => { if (m.peer === this.otherPeer) this.onPeerGone(); });
     this.unsubs.push(r.onPeers((ch) => { if (this.otherPeer && ch.left.some((p) => p.peer === this.otherPeer)) this.onPeerGone(); }));
-    this.intervals.push(this.timers.setInterval(() => this.tick(), ROOM_NET.flushMs));
-    this.intervals.push(this.timers.setInterval(() => this.otherPeer && r.emit('pg', { ts: this.now(), rtt: this.rtt }).catch(() => {}), ROOM_NET.pingEveryMs));
+    this.intervals.push(this.timers.setInterval(() => this.tick(), this.cfg.flushMs));
+    this.intervals.push(this.timers.setInterval(() => this.otherPeer && r.emit('pg', { ts: this.now(), rtt: this.rtt }).catch(() => {}), this.cfg.pingEveryMs));
     return r;
   }
 
@@ -158,7 +162,7 @@ export class RoomNet {
       this.emitLocal('joined', { code: this.code, slot: 0 });
       this.broadcastLobby();
     } catch (e) {
-      this.emitLocal('error', { msg: '방을 만들 수 없습니다. 잠시 뒤 다시 시도하세요.' });
+      this.emitLocal('error', { msg: e?.userMessage ?? '방을 만들 수 없습니다. 잠시 뒤 다시 시도하세요.' });
     }
   }
 
@@ -167,8 +171,8 @@ export class RoomNet {
     if (!/^[A-Z0-9]{4}$/.test(code)) { this.emitLocal('error', { msg: '코드는 4자리입니다.' }); return; }
     try {
       await this.enter(code);
-    } catch {
-      this.emitLocal('error', { msg: '방에 들어갈 수 없습니다.' });
+    } catch (e) {
+      this.emitLocal('error', { msg: e?.userMessage ?? '방에 들어갈 수 없습니다.' });
       return;
     }
     this.host = false;
@@ -177,7 +181,7 @@ export class RoomNet {
     let tries = 0;
     const hello = () => {
       if (this.slot >= 0 || !this.room) return;
-      if (tries++ * 700 >= ROOM_NET.joinTimeoutMs) {
+      if (tries++ * 700 >= this.cfg.joinTimeoutMs) {
         this.emitLocal('error', { msg: '방을 찾을 수 없습니다.' });
         this.leaveRoom(true);
         return;
@@ -196,6 +200,7 @@ export class RoomNet {
     // 이미 다른 사람이 2P 면 가득 참
     this.room.emit('assign', { to: peer, slot: peer === this.otherPeer ? 1 : -1 }).catch(() => {});
     this.broadcastLobby();
+    this.pingNow();
   }
 
   onAssign(d, from) {
@@ -205,8 +210,13 @@ export class RoomNet {
     if (d.slot !== 1) { this.emitLocal('error', { msg: '방이 가득 찼습니다.' }); this.leaveRoom(true); return; }
     this.slot = 1;
     this.otherPeer = from; // 자리를 배정한 쪽이 호스트
+    this.matchIdle = true;
     this.emitLocal('joined', { code: this.code, slot: 1 });
+    this.pingNow();
   }
+
+  /** 상대가 정해지면 바로 핑 (입력 지연을 정할 때 실제 왕복 지연을 쓰도록) */
+  pingNow() { if (this.otherPeer) this.room?.emit('pg', { ts: this.now(), rtt: this.rtt }).catch(() => {}); }
 
   myPeer() { return this.room?.peers().find((p) => p.sameTab)?.peer ?? null; }
 
@@ -226,13 +236,18 @@ export class RoomNet {
 
   applyLobby(d) {
     if (this.slot !== 1) return;
+    this.matchIdle = !d.playing;
     this.emitLocal('lobby', { code: d.code, connected: d.connected, weapons: d.weapons, ready: d.ready, playing: d.playing });
   }
 
   control(op) {
     if (!this.room) return;
-    if (this.host) this.hostControl(0, op);
-    else this.room.emit('ctl', op).catch(() => {});
+    if (this.host) { this.hostControl(0, op); return; }
+    // 손님: 원하는 상태(무기·준비)를 기억해 두고 주기적으로 다시 알린다 (메시지가 빠져도 맞춰짐)
+    if (op.op === 'select') this.want = { ...(this.want ?? {}), weapon: op.weapon, ready: false };
+    if (op.op === 'ready') this.want = { ...(this.want ?? {}), ready: !!op.ready };
+    this.room.emit('ctl', op).catch(() => {});
+    this.lastWantAt = this.now();
   }
 
   hostControl(slot, op) {
@@ -246,6 +261,14 @@ export class RoomNet {
       if (s.playing) return;
       s.ready[slot] = !!op.ready;
       if (s.ready[0] && s.ready[1] && this.otherPeer) this.hostStart();
+    } else if (op.op === 'sync') {
+      // 손님이 반복해서 보내는 현재 상태: 같으면 아무것도 바꾸지 않는다
+      if (s.playing) return;
+      let changed = false;
+      if (WEAPON_ORDER.includes(op.weapon) && s.weapons[slot] !== op.weapon) { s.weapons[slot] = op.weapon; s.ready[slot] = false; changed = true; }
+      if (typeof op.ready === 'boolean' && s.ready[slot] !== op.ready) { s.ready[slot] = op.ready; changed = true; }
+      if (!changed) return;
+      if (s.ready[0] && s.ready[1] && this.otherPeer) this.hostStart();
     } else if (op.op === 'end') {
       if (op.m !== s.matchId) return;
       s.playing = false;
@@ -258,7 +281,7 @@ export class RoomNet {
     s.playing = true;
     s.ready = [false, false];
     s.matchId++;
-    const delay = roomDelayFor([this.rtt, this.peerRtt]);
+    const delay = roomDelayFor([this.rtt, this.peerRtt ?? this.rtt], this.cfg.flushMs); // 상대 측정값이 아직 없으면 내 값으로
     this.lastStart = { matchId: s.matchId, weapons: [...s.weapons], delay };
     this.startAcked = false;
     this.room.emit('start', this.lastStart).catch(() => {});
@@ -268,6 +291,8 @@ export class RoomNet {
 
   onStart(d) {
     if (this.slot !== 1 || d.matchId === this.matchId) return; // 같은 시작 신호 반복은 무시
+    this.matchIdle = false;
+    if (this.want) this.want.ready = false;
     this.beginMatch(d.matchId);
     this.emitLocal('start', { matchId: d.matchId, weapons: d.weapons, delay: d.delay, slot: 1 });
   }
@@ -283,10 +308,14 @@ export class RoomNet {
     if (!this.room) return;
     // 호스트: 시작 신호를 상대 첫 입력이 올 때까지 반복, 로비 상태 주기적 재전송
     if (this.host && this.lastStart && !this.startAcked) this.room.emit('start', this.lastStart).catch(() => {});
-    if (this.host && this.now() - (this.lastLobbyAt ?? 0) >= ROOM_NET.lobbyEveryMs) this.broadcastLobby();
+    if (this.host && this.now() - (this.lastLobbyAt ?? 0) >= this.cfg.lobbyEveryMs) this.broadcastLobby();
+    if (!this.host && this.slot === 1 && this.want && this.matchIdle && this.now() - (this.lastWantAt ?? 0) >= 500) {
+      this.room.emit('ctl', { op: 'sync', ...this.want }).catch(() => {});
+      this.lastWantAt = this.now();
+    }
     if (!this.sentInputs.size) return;
     // 새 입력이 없어도 보낸다: 상대가 빠진 프레임을 기다리는 중일 수 있다
-    const frames = [...this.sentInputs.keys()].sort((a, b) => a - b).slice(-ROOM_NET.window);
+    const frames = [...this.sentInputs.keys()].sort((a, b) => a - b).slice(-this.cfg.window);
     const f0 = frames[0];
     const bits = [];
     for (let f = f0; f <= frames.at(-1); f++) bits.push(this.sentInputs.get(f) ?? 0);

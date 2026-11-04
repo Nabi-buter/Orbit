@@ -14,6 +14,7 @@ import { Renderer, hitstopFor, UI, TEAM } from '../render/renderer.js';
 import { sfx, playEvent } from '../render/sfx.js';
 import { NetClient } from '../net/client.js';
 import { RoomNet, openRoom } from '../net/roomNet.js';
+import { PeerLobby, loadPeerJS } from '../net/peerLobby.js';
 import { Lockstep } from '../net/lockstep.js';
 import { TitleScreen, LoadoutScreen, HelpScreen, MenuOverlay, OnlineScreen } from '../ui/screens.js';
 
@@ -195,18 +196,17 @@ export class App {
       // 공유 링크(게임 파일만 있는 페이지): 서버 대신 페이지의 실시간 방 기능으로 중계
       let net;
       if (window.ORBIT_STATIC) {
+        // claude.ai 공유 링크: 페이지 실시간 방 기능 / 그 밖의 웹 주소(GitHub Pages 등): 브라우저끼리 직접 연결(WebRTC)
         const room = await openRoom();
-        if (!room) {
-          const inClaude = !!window.claude?.use;
-          this.setNet({
-            phase: 'connecting',
-            error: inClaude
-              ? '이 화면에서는 온라인 대전을 쓸 수 없습니다. claude.ai 에 로그인한 상태로 공유 링크를 열어 주세요 (참여자 이상 권한 필요).'
-              : '이 주소에서는 온라인 대전을 할 수 없습니다. 온라인 대전은 claude.ai 공유 링크나 직접 띄운 게임 서버(npm start)에서 할 수 있습니다.',
-          });
+        if (room) net = new RoomNet(room);
+        else if (window.claude?.use) {
+          // claude.ai 안인데 방 기능을 못 씀 (로그인·권한 문제)
+          this.setNet({ phase: 'connecting', error: '이 화면에서는 온라인 대전을 쓸 수 없습니다. claude.ai 에 로그인한 상태로 공유 링크를 열어 주세요 (참여자 이상 권한 필요).' });
           return;
+        } else {
+          const Peer = await loadPeerJS();
+          net = new RoomNet(new PeerLobby(Peer), { net: { flushMs: 17, window: 12 } });
         }
-        net = new RoomNet(room);
       } else {
         net = new NetClient(NetClient.defaultUrl());
       }

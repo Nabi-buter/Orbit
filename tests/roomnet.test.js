@@ -93,7 +93,8 @@ async function runDuel(opts) {
   await world.advance(50);
   assert.ok(a.joined?.code, '방 생성');
   b.net.send({ t: 'join', code: a.joined.code.toLowerCase() });
-  await world.advance(1500);
+  // 유실이 있으면 재전송으로 맞춰지기까지 조금 걸린다 (최대 6초)
+  for (let t = 0; t < 6000 && !(b.joined && b.lobby?.weapons?.[1] === 'spear'); t += 100) await world.advance(100);
   assert.equal(b.joined?.slot, 1, '코드로 참가');
   assert.deepEqual(b.lobby?.weapons, ['axe', 'spear'], '로비 무기 공유');
   a.net.send({ t: 'ready', ready: true });
@@ -116,10 +117,13 @@ test('방 기능 온라인: 생성 → 코드 참가 → 준비 → 시작, 양�
 });
 
 test('방 기능 온라인: 메시지 20% 유실에도 멈추지 않고 동기화가 유지된다', async () => {
-  const { a, b } = await runDuel({ drop: 0.2, seed: 11 });
-  assert.ok(a.match && b.match, '유실에도 시작 신호 도착');
-  assert.ok(a.frames > 900 && b.frames > 900, `진행 ${a.frames}/${b.frames}`);
-  assert.equal(a.ls.desyncAt, null); assert.equal(b.ls.desyncAt, null);
+  // 여러 유실 패턴 (선택·준비·시작 메시지가 빠지는 경우 포함)
+  for (const seed of [11, 23, 37, 51, 77]) {
+    const { a, b } = await runDuel({ drop: 0.2, seed });
+    assert.ok(a.match && b.match, `seed ${seed}: 유실에도 시작 신호 도착`);
+    assert.ok(a.frames > 900 && b.frames > 900, `seed ${seed}: 진행 ${a.frames}/${b.frames}`);
+    assert.equal(a.ls.desyncAt, null); assert.equal(b.ls.desyncAt, null);
+  }
   // 같은 프레임에서의 상태가 같다: 짧은 쪽에 맞춰 다시 계산하지 않고 해시 교환 결과로 확인
 });
 

@@ -62,8 +62,10 @@ Esc/P 일시정지 · F2 판정 박스 · M 소리 켜기/끄기. 키 배치는 
 ## 웹 배포 (GitHub Pages)
 
 `claude/tender-wright-x9w8dw` 브랜치에 푸시하면 `.github/workflows/pages.yml` 이 테스트를 돌리고 통과하면
-**https://nabi-buter.github.io/Orbit/** 에 배포한다(정적 파일만: AI 대전 · 로컬 2인).
-온라인 대전은 서버가 필요해 Pages 주소에서는 안내만 나온다 — claude.ai 공유 링크나 `npm start` 서버에서 가능.
+**https://nabi-buter.github.io/Orbit/** 에 배포한다. AI 대전 · 로컬 2인 · **온라인 대전** 모두 된다.
+Pages 주소의 온라인 대전은 브라우저끼리 직접 연결(WebRTC, `src/net/peerLobby.js`)한다:
+PeerJS 공개 중개 서버(0.peerjs.com)가 방 코드로 두 브라우저를 소개만 하고, 경기 데이터는 직접 오간다
+(직접 연결이 막힌 망에서는 PeerJS 기본 TURN 서버로 중계). 확인: `node scripts/e2e-pages.cjs`.
 
 ## 온라인 대전
 
@@ -102,7 +104,8 @@ Esc/P 일시정지 · F2 판정 박스 · M 소리 켜기/끄기. 키 배치는 
 | `src/ai/ai.js` | PvE AI (지연 인지·난이도 수치) |
 | `src/net/lockstep.js` | 온라인 락스텝 넷코드 (입력 지연, 해시 검사) |
 | `src/net/client.js` | 온라인 서버 접속 클라이언트 |
-| `src/net/roomNet.js` | 공유 링크용 온라인 중계 (페이지 실시간 방 기능, 서버와 같은 프로토콜) |
+| `src/net/roomNet.js` | 서버 없는 온라인 중계 로직 (방장이 로비 관리, 서버와 같은 프로토콜) — claude.ai 방 기능 / WebRTC 공용 |
+| `src/net/peerLobby.js` | 일반 웹 주소(GitHub Pages)용 WebRTC 연결 (PeerJS 를 방 모양으로 감쌈) |
 | `server/` | 게임 서버: 정적 파일 + WebSocket 방/입력 중계 (의존성 없음) |
 | `src/input/` | 키보드 → 프레임 입력 |
 | `src/game/app.js` | 화면 전환, 게임 루프, 히트스톱, 시작 연출 |
