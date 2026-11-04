@@ -448,7 +448,14 @@ export class OnlineScreen {
     if (st.phase === 'connect') {
       this.menu = new TextMenu([
         { label: '방 만들기', sub: '코드를 상대에게 알려 주세요', onClick: this.cb.onCreate },
-        { label: '코드로 참가', onClick: () => this.code.length === 4 && this.cb.onJoin(this.code) },
+        { label: '코드로 참가', onClick: () => {
+          // 키보드가 없는 터치 화면: 입력창으로 코드 받기
+          if (this.code.length !== 4 && typeof prompt === 'function' && (navigator.maxTouchPoints ?? 0) > 0) {
+            const v = (prompt('방 코드 4자리를 입력하세요') || '').toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 4);
+            if (v) this.code = v;
+          }
+          if (this.code.length === 4) this.cb.onJoin(this.code);
+        } },
         { label: '뒤로', onClick: this.cb.onBack },
       ], 34, 74);
     } else if (st.phase === 'room') {

@@ -37,7 +37,8 @@ export class App {
     this.last = performance.now();
 
     window.addEventListener('keydown', (e) => this.onKey(e));
-    canvas.addEventListener('mousedown', (e) => {
+    // pointerdown: 마우스와 터치 탭 모두 (메뉴는 탭으로 조작)
+    canvas.addEventListener('pointerdown', (e) => {
       canvas.focus();
       const [x, y] = this.renderer.toArt(e.clientX, e.clientY);
       this.screen?.onClick?.(x, y);

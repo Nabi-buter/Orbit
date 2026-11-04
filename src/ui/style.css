@@ -1,5 +1,8 @@
 /* 화면 전체를 도트 캔버스가 채운다 (가로형, 레터박스) */
-html, body { margin: 0; height: 100%; background: #0c0912; overflow: hidden; color-scheme: dark; }
+html, body { margin: 0; height: 100%; background: #0c0912; overflow: hidden; color-scheme: dark;
+  overscroll-behavior: none; -webkit-user-select: none; user-select: none; -webkit-tap-highlight-color: transparent; }
 #stage { position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%);
   width: min(100vw, calc(100vh * 427 / 240)); aspect-ratio: 427 / 240; }
-#game { width: 100%; height: 100%; display: block; outline: none; image-rendering: pixelated; cursor: pointer; }
+/* 모바일: 주소창을 뺀 실제 보이는 높이 기준 */
+@supports (height: 100dvh) { #stage { width: min(100vw, calc(100dvh * 427 / 240)); } }
+#game { width: 100%; height: 100%; display: block; outline: none; image-rendering: pixelated; cursor: pointer; touch-action: none; }
