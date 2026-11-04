@@ -1,0 +1,51 @@
+# 게임을 GitHub Pages 로 배포한다: 이 브랜치에 푸시하면 테스트 → 통과 시 배포.
+# 주소: https://<owner>.github.io/<repo>/
+name: Deploy to GitHub Pages
+
+on:
+  push:
+    branches: [claude/tender-wright-x9w8dw]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Test
+        run: npm test
+      - name: Build site (static files only)
+        run: |
+          mkdir -p _site
+          cp -r index.html src _site/
+          # Pages 에는 게임 서버가 없다 → 정적 모드 (온라인 대전은 안내 문구)
+          sed -i 's|<script type="module" src="src/main.js"></script>|<script>window.ORBIT_STATIC = true;</script>\n  <script type="module" src="src/main.js"></script>|' _site/index.html
+          touch _site/.nojekyll
+      - uses: actions/configure-pages@v5
+        with:
+          enablement: true
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: _site
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4
