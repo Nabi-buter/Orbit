@@ -16,7 +16,7 @@ import { NetClient } from '../net/client.js';
 import { RoomNet, openRoom } from '../net/roomNet.js';
 import { PeerLobby, loadPeerJS } from '../net/peerLobby.js';
 import { Lockstep } from '../net/lockstep.js';
-import { TitleScreen, LoadoutScreen, HelpScreen, MenuOverlay, OnlineScreen } from '../ui/screens.js';
+import { TitleScreen, LoadoutScreen, HelpScreen, MenuOverlay, OnlineScreen, SettingsScreen } from '../ui/screens.js';
 
 const STEP = 1000 / FPS;
 const INTRO_FRAMES = 96;
@@ -60,7 +60,13 @@ export class App {
       onPlay: () => this.toLoadout(),
       onOnline: () => this.toLoadout({ mode: 'online' }),
       onHelp: () => this.toHelp(),
+      onSettings: () => this.toSettings(),
     });
+  }
+
+  toSettings() {
+    this.scene = 'settings';
+    this.screen = new SettingsScreen({ onBack: () => this.toTitle() });
   }
 
   toHelp() {
@@ -287,6 +293,8 @@ export class App {
   // --- 입력 ------------------------------------------------------------------
   onKey(e) {
     if (e.repeat) return;
+    // 설정에서 새 키를 기다리는 중이면 어떤 키든 그 화면이 받는다
+    if (this.screen?.capturing) { this.screen.onKey(e); e.preventDefault(); return; }
     if (e.code === 'KeyM' && !(this.screen instanceof OnlineScreen)) { sfx.muted = !sfx.muted; return; }
     if (this.scene === 'battle') {
       if (e.code === 'Escape' || e.code === 'KeyP') {

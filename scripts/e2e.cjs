@@ -47,6 +47,39 @@ function assert(c, msg) { if (!c) throw new Error('E2E 실패: ' + msg); console
     await key('Escape');
     assert(await scene() === 'title', '조작법 → 타이틀');
 
+    // 설정: 키 바인딩 · 서로 바꾸기 · 취소 · 저장 · 기본값
+    await page.evaluate(() => window.__game.toSettings());
+    assert(await scene() === 'settings', '설정 화면');
+    const cell = (p, a) => page.evaluate(([p, a]) => { const it = window.__game.screen.items.find((i) => i.kind === 'key' && i.p === p && i.a === a); return [it.x + it.w / 2, it.y + it.h / 2]; }, [p, a]);
+    const binding = (p, a) => page.evaluate(async ([p, a]) => (await import('/src/config/controls.js')).CONTROLS[p][a].join(), [p, a]);
+    await clickArt(...(await cell(0, 'light')));
+    assert(await page.evaluate(() => window.__game.screen.capturing), '칸 클릭 → 새 키 대기');
+    await shot(page, '01b-settings-capture');
+    await key('KeyL');
+    assert(await binding(0, 'light') === 'KeyL', 'P1 약공격 = L');
+    await clickArt(...(await cell(0, 'light')));
+    await key('KeyK'); // 강공격 키 → 서로 바뀜
+    assert(await binding(0, 'light') === 'KeyK' && await binding(0, 'heavy') === 'KeyL', '이미 쓰는 키는 서로 바뀜 (약공 K, 강공 L)');
+    await clickArt(...(await cell(1, 'guard')));
+    await key('Escape');
+    assert(await binding(1, 'guard') === 'ArrowDown' && await scene() === 'settings', 'ESC 로 입력 취소');
+    await shot(page, '01c-settings');
+    await page.reload(); await wait(300);
+    assert(await binding(0, 'light') === 'KeyK', '새로고침해도 저장됨');
+    // 바꾼 키로 실제 공격
+    await page.evaluate(() => { const g = window.__game; g.mode = 'pve'; g.toLoadout({ mode: 'pve' }); });
+    await key('Enter'); await wait(1700);
+    await page.evaluate(() => { window.__game.ai = null; });
+    await page.keyboard.press('KeyK'); await wait(60);
+    assert(await page.evaluate(() => window.__game.match.fighters[0].attack?.def.kind) === 'light', '바꾼 키(K)로 약공격');
+    await key('Escape'); await key('ArrowDown'); await key('ArrowDown'); await key('ArrowDown'); await key('Enter'); // 메인 화면
+    await page.evaluate(() => window.__game.toSettings());
+    const reset = await page.evaluate(() => { const it = window.__game.screen.items.find((i) => i.kind === 'reset'); return [it.x + it.w / 2, it.y + it.h / 2]; });
+    await clickArt(...reset);
+    assert(await binding(0, 'light') === 'KeyJ' && await binding(0, 'heavy') === 'KeyK', '기본값으로 되돌리기');
+    await key('Escape');
+    assert(await scene() === 'title', '설정 → 타이틀');
+
     // 플레이 → 로드아웃
     await key('Enter');
     assert(await scene() === 'loadout', '플레이 → 로드아웃 (가운데 캐릭터 + 하단 무기)');

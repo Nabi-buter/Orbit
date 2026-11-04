@@ -6,3 +6,9 @@ html, body { margin: 0; height: 100%; background: #0c0912; overflow: hidden; col
 /* 모바일: 주소창을 뺀 실제 보이는 높이 기준 */
 @supports (height: 100dvh) { #stage { width: min(100vw, calc(100dvh * 427 / 240)); } }
 #game { width: 100%; height: 100%; display: block; outline: none; image-rendering: pixelated; cursor: pointer; touch-action: none; }
+
+/* 세로 화면: 게임 화면을 위쪽에 가로 꽉 차게 (아래는 터치 버튼 자리) */
+@media (orientation: portrait) {
+  #stage { top: calc(12px + env(safe-area-inset-top)); transform: translateX(-50%); width: 100vw; }
+  @supports (height: 100dvh) { #stage { width: 100vw; } }
+}

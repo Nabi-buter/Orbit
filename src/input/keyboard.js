@@ -42,5 +42,7 @@ export class Keyboard {
   endFrame() { this.pressedOnce.clear(); this.latched.clear(); }
 }
 
-const GAME_KEYS = new Set(CONTROLS.flatMap((m) => Object.values(m).flat()).concat(['Space', 'Escape']));
-function isGameKey(code) { return GAME_KEYS.has(code); }
+/** 게임 키는 브라우저 기본 동작(스크롤 등)을 막는다 — 설정에서 바뀔 수 있어 매번 확인 */
+function isGameKey(code) {
+  return code === 'Space' || code === 'Escape' || CONTROLS.some((m) => Object.values(m).some((list) => list.includes(code)));
+}

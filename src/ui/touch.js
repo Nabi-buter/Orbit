@@ -12,15 +12,25 @@
 import { CONTROLS } from '../config/controls.js';
 import { BALANCE } from '../config/balance.js';
 
+/** 화면 버튼 표시 설정 (기기에 저장) — 설정 화면과 대전 중 버튼이 같은 값을 쓴다 */
+const PREF = 'orbit.touchControls';
+export function getTouchControls() {
+  try { return localStorage.getItem(PREF) !== 'off'; } catch { return true; }
+}
+export function setTouchControls(on) {
+  try { if (on) localStorage.removeItem(PREF); else localStorage.setItem(PREF, 'off'); } catch { /* 이번 접속에만 */ }
+  window.dispatchEvent(new CustomEvent('orbit-touch-pref', { detail: on }));
+}
+
 export function isTouchDevice() {
   return (typeof matchMedia !== 'undefined' && matchMedia('(pointer: coarse)').matches) || (navigator.maxTouchPoints ?? 0) > 0;
 }
 
-const K = CONTROLS[0];
-const CODE = { left: K.left[0], right: K.right[0], up: K.up[0], guard: K.guard[0], light: K.light[0], heavy: K.heavy[0], dash: K.dash[0], ult: K.ult[0] };
+/** 버튼 → 지금 P1 배치의 대표 키 (설정에서 바꾸면 바로 따라감) */
+const CODE = new Proxy({}, { get: (_, action) => CONTROLS[0][action]?.[0] });
 
 const CSS = `
-#touch { position: absolute; inset: 0; pointer-events: none; display: none; font-family: system-ui, sans-serif; }
+#touch { position: fixed; inset: 0; pointer-events: none; display: none; font-family: system-ui, sans-serif; z-index: 5; }
 #touch.on { display: block; }
 #touch * { -webkit-user-select: none; user-select: none; -webkit-touch-callout: none; touch-action: none; }
 .tpad { position: absolute; left: 2.5%; bottom: 5%; width: 27%; aspect-ratio: 1.45; pointer-events: auto; }
@@ -46,10 +56,27 @@ const CSS = `
 .tbtn.toggle { left: calc(50% + 3.5%); top: 12%; width: 5%; aspect-ratio: 1; border-radius: 8px; font-size: min(2.2vh, 1.3vw); }
 /* 버튼 끔: 일시정지·켜기 버튼만 남김 (키보드를 연결해 할 때) */
 #touch.off .tpad, #touch.off .tbtn[data-k] { display: none; }
-#rotate { position: fixed; inset: 0; display: none; place-items: center; z-index: 10; background: #0c0912; color: #eceef2;
-  font: 600 18px system-ui, sans-serif; text-align: center; line-height: 1.6; }
-#rotate.on { display: grid; }
-#rotate b { display: block; font-size: 40px; color: #f2c14e; }
+/* 세로 화면: 게임 화면은 위, 버튼은 그 아래 빈 곳에 크게 */
+@media (orientation: portrait) {
+  .tpad { left: 4vw; bottom: max(7vh, env(safe-area-inset-bottom)); width: 46vw; aspect-ratio: 1.15; }
+  .tpad .z { font-size: 6vw; border-radius: 12px; }
+  .tbtn { font-size: 4.6vw; }
+  .tbtn.light { right: 21vw; bottom: max(7vh, env(safe-area-inset-bottom)); width: 22vw; font-size: 6vw; }
+  .tbtn.heavy { right: 3vw; bottom: calc(7vh + 18vw); width: 19vw; }
+  .tbtn.guard { right: 44vw; bottom: max(5vh, env(safe-area-inset-bottom)); width: 0; display: none; }
+  .tbtn.dash { right: 22vw; bottom: calc(7vh + 27vw); width: 16vw; }
+  .tbtn.ult { right: 4vw; bottom: calc(7vh + 39vw); width: 15vw; }
+  .tbtn.pause { left: auto; right: 22vw; top: calc(56.3vw + 16px + env(safe-area-inset-top)); transform: none; width: 12vw; font-size: 4vw; }
+  .tbtn.toggle { left: auto; right: 5vw; top: calc(56.3vw + 16px + env(safe-area-inset-top)); width: 15vw; font-size: 3.4vw; }
+}
+.tpad .zd { display: none; left: 30%; width: 40%; }
+/* 세로: 가드는 방향 패드 아래칸 (가로에서는 오른쪽 가드 버튼) */
+@media (orientation: portrait) { .tpad .zd { display: grid; } }
+@media (orientation: portrait) {
+  .tpad .zu { top: 0; height: 28%; }
+  .tpad .zl, .tpad .zr { bottom: auto; top: 31%; height: 36%; }
+  .tpad .zd { bottom: auto; top: 70%; height: 30%; }
+}
 `;
 
 /**
@@ -65,7 +92,7 @@ export function setupTouch(stage, app) {
   const root = document.createElement('div');
   root.id = 'touch';
   root.innerHTML = `
-    <div class="tpad"><div class="z zu">▲</div><div class="z zl">◀</div><div class="z zr">▶</div></div>
+    <div class="tpad"><div class="z zu">▲</div><div class="z zl">◀</div><div class="z zr">▶</div><div class="z zd">가드</div></div>
     <div class="tbtn light" data-k="light">약<small>공격</small></div>
     <div class="tbtn heavy" data-k="heavy">강<small>공격</small></div>
     <div class="tbtn guard" data-k="guard">가드</div>
@@ -73,12 +100,8 @@ export function setupTouch(stage, app) {
     <div class="tbtn ult" data-k="ult">궁</div>
     <div class="tbtn pause" data-tap="Escape">II</div>
     <div class="tbtn toggle" data-toggle="1" aria-label="화면 버튼 끄기/켜기"></div>`;
-  stage.append(root);
-
-  const rotate = document.createElement('div');
-  rotate.id = 'rotate';
-  rotate.innerHTML = '<div><b>⟳</b>화면을 가로로 돌려 주세요</div>';
-  document.body.append(rotate);
+  // 화면 전체 위에 깐다 (세로 화면에서는 게임 화면 아래 빈 곳에 버튼이 놓인다)
+  document.body.append(root);
 
   // --- 키 이벤트 보내기 (지금 누른 키 집합이 바뀔 때만) ----------------------------
   const held = new Set();
@@ -93,9 +116,7 @@ export function setupTouch(stage, app) {
 
   // --- 버튼 -----------------------------------------------------------------
   // --- 화면 버튼 끄기/켜기 (키보드를 연결한 경우), 기기에 기억 -------------------------
-  const PREF = 'orbit.touchControls';
-  let controlsOn = true;
-  try { controlsOn = localStorage.getItem(PREF) !== 'off'; } catch { /* 저장소 없음: 기본 켜짐 */ }
+  let controlsOn = getTouchControls();
   const toggleBtn = root.querySelector('.toggle');
   const applyToggle = () => {
     root.classList.toggle('off', !controlsOn);
@@ -104,8 +125,10 @@ export function setupTouch(stage, app) {
   applyToggle();
   toggleBtn.addEventListener('pointerdown', (e) => {
     e.preventDefault();
-    controlsOn = !controlsOn;
-    try { localStorage.setItem(PREF, controlsOn ? 'on' : 'off'); } catch { /* 이번 접속에만 적용 */ }
+    setTouchControls(!controlsOn); // → 아래 이벤트로 적용
+  });
+  window.addEventListener('orbit-touch-pref', (e) => {
+    controlsOn = !!e.detail;
     if (!controlsOn) releaseAll();
     applyToggle();
   });
@@ -128,12 +151,21 @@ export function setupTouch(stage, app) {
 
   // --- 방향 패드: 손가락 위치로 방향 결정 (미끄러뜨리기 가능) ---------------------
   const pad = root.querySelector('.tpad');
-  const zones = { left: pad.querySelector('.zl'), right: pad.querySelector('.zr'), up: pad.querySelector('.zu') };
+  const zones = { left: pad.querySelector('.zl'), right: pad.querySelector('.zr'), up: pad.querySelector('.zu'), guard: pad.querySelector('.zd') };
+  const portrait = () => innerHeight > innerWidth;
   const fingers = new Map();
   const padKeys = (e) => {
     const r = pad.getBoundingClientRect();
     const x = (e.clientX - r.left) / r.width, y = (e.clientY - r.top) / r.height;
     const keys = [];
+    if (portrait()) {
+      // 세로: 위 = 점프, 가운데 = 좌우, 아래 = 가드 (위·아래 줄에서도 끝쪽이면 좌우 같이)
+      if (y < 0.3) keys.push('up');
+      else if (y > 0.69) keys.push('guard');
+      const edge = y < 0.3 || y > 0.69 ? 0.25 : 0.45;
+      if (x < edge) keys.push('left'); else if (x > 1 - edge) keys.push('right');
+      return keys;
+    }
     if (x < 0.42) keys.push('left'); else if (x > 0.58) keys.push('right');
     if (y < 0.45) keys.push('up');
     return keys;
@@ -161,7 +193,6 @@ export function setupTouch(stage, app) {
     if (battle !== shown) { shown = battle; root.classList.toggle('on', battle); if (!battle) releaseAll(); }
     const me = app.match?.fighters[app.mode === 'online' ? (app.slot ?? 0) : 0];
     ultBtn.classList.toggle('ready', !!me && me.ult >= BALANCE.ultimate.cost);
-    rotate.classList.toggle('on', innerHeight > innerWidth);
     requestAnimationFrame(tick);
   };
   requestAnimationFrame(tick);

@@ -10,8 +10,9 @@ import { UI, TEAM, buildBackground } from '../render/renderer.js';
 import { drawFighter } from '../render/fighterArt.js';
 import { drawWeaponIcon } from '../render/weaponArt.js';
 import { CODE_CHARS } from '../net/roomNet.js';
+import { getTouchControls, setTouchControls } from './touch.js';
 import { WEAPONS, WEAPON_ORDER } from '../config/weapons.js';
-import { CONTROLS, KEY_LABELS } from '../config/controls.js';
+import { CONTROLS, ACTIONS, ACTION_LABELS, keyLabel, assignKey, resetControls, isDefaultControls, RESERVED_KEYS } from '../config/controls.js';
 import { DIFFICULTY } from '../ai/ai.js';
 import { createFighter, S } from '../core/fighter.js';
 import { reachOf } from '../core/attackDef.js';
@@ -145,12 +146,13 @@ class Puppet {
 // 타이틀
 // -----------------------------------------------------------------------------
 export class TitleScreen {
-  constructor({ onPlay, onOnline, onHelp }) {
+  constructor({ onPlay, onOnline, onHelp, onSettings }) {
     this.menu = new TextMenu([
       { label: '플레이', onClick: onPlay },
       { label: '온라인 대전', onClick: onOnline },
       { label: '조작법', onClick: onHelp },
-    ], 40, 126);
+      { label: '설정', onClick: onSettings },
+    ], 40, 120);
     this.left = new Puppet('longsword', 0, 1);
     this.right = new Puppet('spear', 1, -1, 120);
     this.t = 0;
@@ -362,7 +364,7 @@ export class HelpScreen {
       const y = 56 + i * 14;
       text(ctx, label, 20, y, UI.paper, { size: 11 });
       [0, 1].forEach((p) => {
-        const keys = acts.map((a) => (KEY_LABELS[CONTROLS[p][a][0]] ?? CONTROLS[p][a][0])).join(' ');
+        const keys = acts.map((a) => keyLabel(CONTROLS[p][a][0])).join(' ');
         text(ctx, keys.replace('←', '<').replace('→', '>').replace('↑', 'UP').replace('↓', 'DN'), p === 0 ? 104 : 160, y + 2, UI.dim);
       });
     });
@@ -390,6 +392,120 @@ export class HelpScreen {
   onKey(e) { if (BACK.includes(e.code) || CONFIRM.includes(e.code)) { this.onBack(); return true; } return false; }
   onClick(x, y) { if (hit(this.back, x, y)) { this.onBack(); return true; } return false; }
   onMove() {}
+}
+
+// -----------------------------------------------------------------------------
+// 설정: 키 배치(P1 · P2), 화면 버튼, 기본값으로 되돌리기
+// -----------------------------------------------------------------------------
+export class SettingsScreen {
+  constructor({ onBack }) {
+    this.onBack = onBack;
+    this.capture = null;   // 키를 기다리는 칸 {p, a}
+    this.note = null;      // 바꾼 결과 안내 {text, color, until}
+    this.t = 0;
+    this.items = [];
+    ACTIONS.forEach((a, row) => [0, 1].forEach((p) => this.items.push({ kind: 'key', p, a, row, x: p ? 228 : 150, y: 46 + row * 15, w: 70, h: 13 })));
+    this.items.push({ kind: 'touch', x: 312, y: 62, w: 104, h: 14 });
+    this.items.push({ kind: 'reset', x: 312, y: 112, w: 104, h: 16 });
+    this.items.push({ kind: 'back', x: 10, y: 220, w: 60, h: 14 });
+    this.focus = 0;
+    this.hover = null;
+  }
+  get capturing() { return !!this.capture; }
+  get buttons() { return this.items; }
+
+  activate(it) {
+    if (it.kind === 'key') { this.capture = { p: it.p, a: it.a }; this.note = null; }
+    else if (it.kind === 'touch') setTouchControls(!getTouchControls());
+    else if (it.kind === 'reset') {
+      resetControls();
+      setTouchControls(true);
+      this.say('모든 설정을 기본값으로 되돌렸습니다', UI.gold);
+    } else if (it.kind === 'back') this.onBack();
+  }
+  say(text, color = UI.paper) { this.note = { text, color, until: this.t + 240 }; }
+
+  onKey(e) {
+    if (this.capture) {
+      e.preventDefault?.();
+      if (e.code === 'Escape') { this.capture = null; return true; }
+      if (RESERVED_KEYS.has(e.code)) { this.say(`${keyLabel(e.code)} 키는 메뉴용이라 쓸 수 없습니다`, UI.red); return true; }
+      const { p, a } = this.capture;
+      const r = assignKey(p, a, e.code);
+      this.capture = null;
+      if (r.swapped) this.say(`P${p + 1} ${ACTION_LABELS[a]} ↔ P${r.swapped[0] + 1} ${ACTION_LABELS[r.swapped[1]]} 키를 서로 바꿨습니다`, UI.gold);
+      else this.say(`P${p + 1} ${ACTION_LABELS[a]} = ${keyLabel(e.code)}`, UI.paper);
+      return true;
+    }
+    const it = this.items[this.focus];
+    const move = (to) => { if (to >= 0 && to < this.items.length) this.focus = to; return true; };
+    if (BACK.includes(e.code)) { this.onBack(); return true; }
+    if (CONFIRM.includes(e.code)) { this.activate(it); return true; }
+    if (it.kind === 'key') {
+      const idx = it.row * 2 + it.p;
+      if (e.code === 'ArrowDown') return move(it.row === ACTIONS.length - 1 ? ACTIONS.length * 2 : idx + 2);
+      if (e.code === 'ArrowUp') return move(Math.max(0, idx - 2));
+      if (e.code === 'ArrowRight') return move(it.p === 0 ? idx + 1 : ACTIONS.length * 2);
+      if (e.code === 'ArrowLeft') return move(it.p === 1 ? idx - 1 : idx);
+    } else {
+      const base = ACTIONS.length * 2;
+      if (e.code === 'ArrowDown') return move(Math.min(this.items.length - 1, this.focus + 1));
+      if (e.code === 'ArrowUp') return move(this.focus === base ? 1 : this.focus - 1);
+      if (e.code === 'ArrowLeft') return move(1);
+    }
+    return false;
+  }
+  onClick(x, y) {
+    const i = this.items.findIndex((b) => hit(b, x, y));
+    if (i < 0) { this.capture = null; return false; }
+    this.focus = i;
+    this.activate(this.items[i]);
+    return true;
+  }
+  onMove(x, y) { this.hover = this.items.find((b) => hit(b, x, y)) ?? null; }
+
+  draw(ctx) {
+    this.t++;
+    background(ctx, 0.9);
+    text(ctx, '설정', 20, 12, UI.paper, { size: 14 });
+    // 키 배치 표
+    text(ctx, '키 배치', 20, 32, UI.dim, { size: 11 });
+    text(ctx, 'P1', 176, 34, TEAM[0].ui); text(ctx, 'P2', 254, 34, TEAM[1].ui);
+    ACTIONS.forEach((a, row) => text(ctx, ACTION_LABELS[a], 20, 46 + row * 15, UI.paper, { size: 11 }));
+    const focused = this.items[this.focus];
+    for (const it of this.items) {
+      const on = it === focused || it === this.hover;
+      if (it.kind === 'key') {
+        const cap = this.capture && this.capture.p === it.p && this.capture.a === it.a;
+        rect(ctx, it.x, it.y - 1, it.w, it.h, cap ? '#3a3220' : on ? '#323745' : '#20242d');
+        rect(ctx, it.x, it.y + it.h - 2, it.w, 1, cap ? UI.gold : on ? '#5b616e' : '#2c303b');
+        const label = cap ? (this.t % 40 < 26 ? '키를 누르세요' : '') : keyLabel(CONTROLS[it.p][it.a][0]);
+        const extra = !cap && CONTROLS[it.p][it.a].length > 1 ? ` +${CONTROLS[it.p][it.a].length - 1}` : '';
+        if (label) text(ctx, label + extra, it.x + it.w / 2, it.y + (cap ? 0 : 2), cap ? UI.gold : UI.paper, cap ? { size: 11, align: 'center' } : { align: 'center' });
+      }
+    }
+    // 오른쪽: 화면 버튼 · 되돌리기
+    const touch = this.items.find((i) => i.kind === 'touch');
+    text(ctx, '화면 버튼 (터치 화면)', 312, 46, UI.dim, { size: 11 });
+    const tOn = getTouchControls();
+    rect(ctx, touch.x, touch.y, touch.w, touch.h, focused === touch || this.hover === touch ? '#323745' : '#20242d');
+    text(ctx, tOn ? '켜짐' : '꺼짐', touch.x + 8, touch.y + 1, tOn ? UI.gold : UI.dim, { size: 11 });
+    text(ctx, '바꾸기', touch.x + touch.w - 8, touch.y + 1, UI.dim, { size: 11, align: 'right' });
+    const reset = this.items.find((i) => i.kind === 'reset');
+    const resetOn = focused === reset || this.hover === reset;
+    rect(ctx, reset.x, reset.y, reset.w, reset.h, resetOn ? '#3a3220' : '#20242d');
+    rect(ctx, reset.x, reset.y + reset.h - 1, reset.w, 1, resetOn ? UI.gold : '#2c303b');
+    text(ctx, '기본값으로 되돌리기', reset.x + reset.w / 2, reset.y + 2, resetOn ? UI.gold : UI.paper, { size: 11, align: 'center' });
+    text(ctx, isDefaultControls() && tOn ? '지금 기본값입니다' : '바뀐 설정이 있습니다', 312, 134, '#5d636f', { size: 11 });
+    // 안내
+    const help = this.capture ? '새 키를 누르세요 · ESC 취소 (이미 쓰는 키면 서로 바뀝니다)' : '칸을 누르거나 방향키로 고른 뒤 ENTER, 그다음 새 키를 누르세요';
+    text(ctx, help, 20, 172, this.capture ? UI.gold : '#5d636f', { size: 11 });
+    if (this.note && this.t < this.note.until) text(ctx, this.note.text, 20, 188, this.note.color, { size: 11 });
+    text(ctx, '설정은 이 기기에 저장됩니다', PW - 12, 224, '#5d636f', { size: 11, align: 'right' });
+    const back = this.items.find((i) => i.kind === 'back');
+    const bw = keycap(ctx, 'ESC', back.x, back.y + 1);
+    text(ctx, '돌아가기', back.x + bw + 5, back.y, focused === back || this.hover === back ? UI.gold : UI.paper, { size: 11 });
+  }
 }
 
 // -----------------------------------------------------------------------------
