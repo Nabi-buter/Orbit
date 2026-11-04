@@ -57,25 +57,45 @@ const CSS = `
 /* 버튼 끔: 일시정지·켜기 버튼만 남김 (키보드를 연결해 할 때) */
 #touch.off .tpad, #touch.off .tbtn[data-k] { display: none; }
 /* 세로 화면: 게임 화면은 위, 버튼은 그 아래 빈 곳에 크게 */
-@media (orientation: portrait) {
-  .tpad { left: 4vw; bottom: max(7vh, env(safe-area-inset-bottom)); width: 46vw; aspect-ratio: 1.15; }
-  .tpad .z { font-size: 6vw; border-radius: 12px; }
-  .tbtn { font-size: 4.6vw; }
-  .tbtn.light { right: 21vw; bottom: max(7vh, env(safe-area-inset-bottom)); width: 22vw; font-size: 6vw; }
-  .tbtn.heavy { right: 3vw; bottom: calc(7vh + 18vw); width: 19vw; }
-  .tbtn.guard { right: 44vw; bottom: max(5vh, env(safe-area-inset-bottom)); width: 0; display: none; }
-  .tbtn.dash { right: 22vw; bottom: calc(7vh + 27vw); width: 16vw; }
-  .tbtn.ult { right: 4vw; bottom: calc(7vh + 39vw); width: 15vw; }
-  .tbtn.pause { left: auto; right: 22vw; top: calc(56.3vw + 16px + env(safe-area-inset-top)); transform: none; width: 12vw; font-size: 4vw; }
-  .tbtn.toggle { left: auto; right: 5vw; top: calc(56.3vw + 16px + env(safe-area-inset-top)); width: 15vw; font-size: 3.4vw; }
-}
+/* 묶음: 가로에서는 상자 없이(버튼은 위 절대 위치 그대로), 세로에서는 격자로 */
+.ttop, .tright { display: contents; }
 .tpad .zd { display: none; left: 30%; width: 40%; }
-/* 세로: 가드는 방향 패드 아래칸 (가로에서는 오른쪽 가드 버튼) */
-@media (orientation: portrait) { .tpad .zd { display: grid; } }
+
+/* ---------------------------------------------------------------------------
+   세로 화면: 게임 화면 아래 남은 공간을 격자로 나눠 버튼을 배치 → 어떤 화면 비율에서도 겹치지 않음
+   위 줄: 일시정지 · 버튼 끄기 / 아래: 왼쪽 방향 패드, 오른쪽 2×2 (대시 궁 / 강 약)
+   크기는 남은 높이와 폭 중 작은 쪽 기준
+   --------------------------------------------------------------------------- */
 @media (orientation: portrait) {
-  .tpad .zu { top: 0; height: 28%; }
-  .tpad .zl, .tpad .zr { bottom: auto; top: 31%; height: 36%; }
-  .tpad .zd { bottom: auto; top: 70%; height: 30%; }
+  #touch.on {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    grid-template-rows: auto 1fr;
+    column-gap: 4vw;
+    padding: calc(56.25vw + 20px + env(safe-area-inset-top)) 4vw calc(4vh + env(safe-area-inset-bottom));
+    box-sizing: border-box;
+  }
+  #touch .tpad, #touch .tbtn { position: relative; inset: auto; left: auto; right: auto; top: auto; bottom: auto; transform: none; }
+  .ttop { display: flex; grid-column: 1 / 3; grid-row: 1; justify-content: flex-end; gap: 3vw; }
+  .ttop .tbtn { width: min(14vw, 8vh); height: min(14vw, 8vh); aspect-ratio: auto; border-radius: 10px; font-size: min(3.4vw, 2vh); }
+  .ttop .tbtn.toggle { width: min(20vw, 11vh); }
+  .tpad { grid-column: 1; grid-row: 2; align-self: end; justify-self: start; width: min(44vw, 30vh); aspect-ratio: 1; }
+  .tpad .z { font-size: min(6vw, 3.6vh); border-radius: 12px; }
+  .tpad .zu { left: 31%; top: 0; width: 38%; height: 30%; }
+  .tpad .zl { left: 0; top: 35%; width: 36%; height: 30%; bottom: auto; }
+  .tpad .zr { right: 0; top: 35%; width: 36%; height: 30%; bottom: auto; }
+  .tpad .zd { display: grid; left: 31%; top: 70%; width: 38%; height: 30%; bottom: auto; }
+  .tright {
+    display: grid; grid-column: 2; grid-row: 2; align-self: end; justify-self: end;
+    grid-template-columns: repeat(2, min(20vw, 13vh)); grid-auto-rows: min(20vw, 13vh); gap: min(3vw, 2vh);
+    grid-template-areas: "dash ult" "heavy light";
+  }
+  .tright .tbtn { width: 100%; height: 100%; aspect-ratio: auto; font-size: min(4.6vw, 2.8vh); }
+  .tright .tbtn.light { grid-area: light; font-size: min(5.6vw, 3.4vh); border-width: 3px; }
+  .tright .tbtn.heavy { grid-area: heavy; }
+  .tright .tbtn.dash { grid-area: dash; }
+  .tright .tbtn.ult { grid-area: ult; }
+  .tright .tbtn.guard { display: none; } /* 세로에서는 방향 패드 아래칸이 가드 */
 }
 `;
 
@@ -93,13 +113,17 @@ export function setupTouch(stage, app) {
   root.id = 'touch';
   root.innerHTML = `
     <div class="tpad"><div class="z zu">▲</div><div class="z zl">◀</div><div class="z zr">▶</div><div class="z zd">가드</div></div>
-    <div class="tbtn light" data-k="light">약<small>공격</small></div>
-    <div class="tbtn heavy" data-k="heavy">강<small>공격</small></div>
-    <div class="tbtn guard" data-k="guard">가드</div>
-    <div class="tbtn dash" data-k="dash">대시</div>
-    <div class="tbtn ult" data-k="ult">궁</div>
-    <div class="tbtn pause" data-tap="Escape">II</div>
-    <div class="tbtn toggle" data-toggle="1" aria-label="화면 버튼 끄기/켜기"></div>`;
+    <div class="tright">
+      <div class="tbtn light" data-k="light">약<small>공격</small></div>
+      <div class="tbtn heavy" data-k="heavy">강<small>공격</small></div>
+      <div class="tbtn guard" data-k="guard">가드</div>
+      <div class="tbtn dash" data-k="dash">대시</div>
+      <div class="tbtn ult" data-k="ult">궁</div>
+    </div>
+    <div class="ttop">
+      <div class="tbtn pause" data-tap="Escape">II</div>
+      <div class="tbtn toggle" data-toggle="1" aria-label="화면 버튼 끄기/켜기"></div>
+    </div>`;
   // 화면 전체 위에 깐다 (세로 화면에서는 게임 화면 아래 빈 곳에 버튼이 놓인다)
   document.body.append(root);
 
