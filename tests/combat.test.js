@@ -267,7 +267,7 @@ test('가드 브레이크 → 특수강공 → 중립 거리 재대치, 가드 �
   until(m, () => b.state === S.IDLE && !b.slide && !a.slide && a.state !== S.SPECIAL);
   assert.ok(Math.abs(Math.abs(b.x - a.x) - B.special.neutralDistance) < 2, '중립 거리');
   assert.equal(b.guard, B.fighter.maxGuard);
-  assert.ok(B.fighter.maxHp - hpAfter >= B.special.damage);
+  assert.ok(b.maxHp - hpAfter >= B.special.damage); // 무기별 체력 배율이 있으므로 그 캐릭터의 최대 체력 기준
 });
 
 test('특수강공 피해는 고정값이며 벽 근처에서도 중립 거리를 만든다', () => {

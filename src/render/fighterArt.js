@@ -9,6 +9,26 @@ import { drawWeapon, drawFist, weaponSprite } from './weaponArt.js';
 import { line, disc, px, rect, PX } from './pixel.js';
 import { evalMotion, backHand, STANCE, GUARD_POSE, DEFLECT_FRAMES, WEIGHT } from './motions.js';
 import { drawBot } from './botRig.js';
+import { BALANCE } from '../config/balance.js';
+
+/**
+ * 상태 진행도 (그리기 전용): 상태가 바뀐 프레임과 그때의 남은 경직을 기억해
+ * 피격·넉백·패링당함·가드 브레이크·착지 같은 반응을 한 장의 자세 대신 시간에 따라 움직이게 한다.
+ * @returns {{t:number, el:number}} t 0(막 시작) → 1(끝), el 경과 프레임
+ */
+const stateMem = new WeakMap();
+function stateProgress(f, frame) {
+  let m = stateMem.get(f);
+  if (!m || m.state !== f.state || frame < m.start || (f.timer > m.timer0)) {
+    m = { state: f.state, start: frame, timer0: Math.max(1, f.timer) };
+    stateMem.set(f, m);
+  }
+  const el = frame - m.start;
+  return { t: Math.max(0, Math.min(1, 1 - f.timer / m.timer0)), el };
+}
+/** 충격 곡선: 처음 몇 프레임에 확 젖혔다가 천천히 돌아옴 (0→1→0) */
+const shock = (t, peak = 0.15) => (t < peak ? t / peak : 1 - smoothstep((t - peak) / (1 - peak)));
+const smoothstep = (t) => { t = Math.max(0, Math.min(1, t)); return t * t * (3 - 2 * t); };
 
 const SWING = {
   slash: [1.9, -0.6], 'slash-wide': [1.7, -0.9], overhead: [2.4, -0.9], 'overhead-big': [2.7, -1.15],
@@ -100,55 +120,94 @@ export function computePose(f, frame) {
       break;
     }
     case S.DASH: {
+      // 박차고 나가며 몸이 숙여졌다가(앞) 젖혀졌다가(뒤) 끝에서 다시 선다
       const back = f.dash && f.dash.dir !== f.facing;
-      p.lean = back ? -0.25 : 0.32;
-      p.crouch = 10;
-      p.stride = back ? -10 : 16;
-      p.wAngle = back ? 1.0 : 0.1;
-      p.hand = back ? [14, 80] : [24, 70];
+      const u = Math.min(1, (f.dash?.frame ?? 0) / BALANCE.dash.duration);
+      const k = u < 0.3 ? smoothstep(u / 0.3) : 1 - smoothstep((u - 0.6) / 0.4) * 0.6;
+      const base = { a: p.wAngle, h: p.hand };
+      p.lean = (back ? -0.25 : 0.32) * k;
+      p.crouch = 10 * k;
+      p.stride = (back ? -10 : 16) * k;
+      p.wAngle = lerp(base.a, back ? 1.0 : 0.1, k);
+      p.hand = [lerp(base.h[0], back ? 14 : 24, k), lerp(base.h[1], back ? 80 : 70, k)];
+      p.hand2 = backHand(weaponId, { ...(st ?? {}), a: p.wAngle, h: p.hand });
       break;
     }
-    case S.JUMP:
-      p.tuck = 1;
-      p.wAngle = 1.1;
-      p.hand = [18, 90];
+    case S.JUMP: {
+      // 오를 때는 다리를 접으며 무기를 들고, 꼭대기에서 가장 웅크리고, 내려올 때는 착지하려 다리를 편다
+      const vy = f.vy ?? 0;
+      const apex = 1 - Math.min(1, Math.abs(vy) / BALANCE.jump.velocity);
+      p.tuck = vy > 0 ? 0.55 + 0.45 * apex : 0.35 + 0.65 * apex;
+      p.wAngle = vy > 0 ? 1.25 : lerp(0.5, 1.1, apex);
+      p.hand = vy > 0 ? [16, 96] : [20, lerp(84, 90, apex)];
+      p.lean = vy > 0 ? -0.06 : 0.1 * (1 - apex);
+      p.hand2 = backHand(weaponId, { ...(st ?? {}), a: p.wAngle, h: p.hand });
       break;
+    }
     case S.PLUNGE:
       p.tuck = 0.6;
       p.wAngle = -1.5;
       p.hand = [14, 60];
       p.hand2 = [8, 62];
       break;
-    case S.LANDING:
-      p.crouch = 16;
-      p.wAngle = f.attack ? -1.3 : 0.4;
-      p.hand = [24, 58];
+    case S.LANDING: {
+      // 무릎으로 충격을 받았다가 일어선다
+      const { t } = stateProgress(f, frame);
+      const k = shock(t, 0.2);
+      const plunge = !!f.attack;
+      p.crouch = 16 * k + breathe * (1 - k);
+      p.lean = (plunge ? 0.2 : 0.08) * k;
+      p.wAngle = lerp(p.wAngle, plunge ? -1.3 : 0.4, plunge ? Math.max(k, 0.5) : k);
+      p.hand = [lerp(p.hand[0], 24, k), lerp(p.hand[1], 58, plunge ? Math.max(k, 0.5) : k * 0.7)];
+      p.hand2 = backHand(weaponId, { ...(st ?? {}), a: p.wAngle, h: p.hand });
       break;
-    case S.HITSTUN:
-      p.lean = -0.3;
-      p.wAngle = -0.2;
-      p.hand = [6, 78];
+    }
+    case S.HITSTUN: {
+      // 맞은 순간 머리·상체가 뒤로 젖혀지고 무기 끝이 처졌다가, 경직이 풀리며 자세로 돌아옴
+      const { t } = stateProgress(f, frame);
+      const k = shock(t, 0.12);
+      p.lean = -0.08 - 0.3 * k;
+      p.crouch = 2 + 6 * k;
+      p.wAngle = lerp(p.wAngle, -0.25, k);
+      p.hand = [lerp(p.hand[0], 4, k), lerp(p.hand[1], 76, k)];
+      p.hand2 = st?.h2 ? [lerp(st.h2[0], -8, k), lerp(st.h2[1], 84, k)] : backHand(weaponId, { a: p.wAngle, h: p.hand });
       break;
-    case S.PARRIED:
-      p.lean = -0.38;
-      p.crouch = 4;
-      p.wAngle = 2.5;
-      p.hand = [-6, 96];
-      p.hand2 = [-12, 84];
+    }
+    case S.PARRIED: {
+      // 완벽패링당함: 무기가 위로 튕겨 나가 몸이 젖혀졌다가, 휘청이며 천천히 무기를 내림
+      const { t, el } = stateProgress(f, frame);
+      const k = 1 - smoothstep((t - 0.25) / 0.75);
+      const wob = Math.sin(el * 0.35) * 0.06 * k;
+      p.lean = -0.38 * k + wob;
+      p.crouch = 4 * k;
+      p.wAngle = lerp(p.wAngle, 2.5, k);
+      p.hand = [lerp(p.hand[0], -6, k), lerp(p.hand[1], 96, k)];
+      p.hand2 = weaponId === 'knuckle' || st?.h2 ? [lerp((st?.h2 ?? p.hand2)[0], -12, k), lerp((st?.h2 ?? p.hand2)[1], 84, k)] : backHand(weaponId, { a: p.wAngle, h: p.hand });
       break;
-    case S.GUARD_BREAK:
-      p.lean = 0.35;
-      p.crouch = 24;
-      p.wAngle = -0.35;
-      p.hand = [20, 52];
-      p.hand2 = [8, 54];
+    }
+    case S.GUARD_BREAK: {
+      // 자세가 무너짐: 앞으로 꺾여 숨을 몰아쉬다(흔들림) 끝 무렵 몸을 일으킴
+      const { t, el } = stateProgress(f, frame);
+      const k = t < 0.12 ? smoothstep(t / 0.12) : 1 - smoothstep((t - 0.8) / 0.2);
+      const pant = Math.sin(el * 0.22) * 2 * k;
+      p.lean = 0.35 * k;
+      p.crouch = 24 * k + pant;
+      p.wAngle = lerp(p.wAngle, -0.35, k);
+      p.hand = [lerp(p.hand[0], 20, k), lerp(p.hand[1], 52 - pant, k)];
+      p.hand2 = weaponId === 'knuckle' || st?.h2 ? [lerp((st?.h2 ?? p.hand2)[0], 8, k), lerp((st?.h2 ?? p.hand2)[1], 54, k)] : backHand(weaponId, { a: p.wAngle, h: p.hand });
       break;
-    case S.KNOCKBACK:
-      p.lean = -0.55;
-      p.crouch = 6;
-      p.wAngle = 2.0;
-      p.hand = [-4, 88];
+    }
+    case S.KNOCKBACK: {
+      // 크게 밀려남: 젖혀진 채 미끄러지다 버티며 자세를 되찾음
+      const { t } = stateProgress(f, frame);
+      const k = shock(t, 0.1);
+      p.lean = -0.55 * k;
+      p.crouch = 6 * k + 4 * Math.sin(Math.PI * t);
+      p.wAngle = lerp(p.wAngle, 2.0, k);
+      p.hand = [lerp(p.hand[0], -4, k), lerp(p.hand[1], 88, k)];
+      p.hand2 = st?.h2 ? st.h2 : backHand(weaponId, { a: p.wAngle, h: p.hand });
       break;
+    }
     case S.KO:
       p.spin = Math.PI / 2; // 뒤로 쓰러짐
       p.wAngle = Math.PI / 2; // 쓰러진 몸과 나란히

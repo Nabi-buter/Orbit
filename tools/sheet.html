@@ -9,9 +9,11 @@ import { drawFighter } from '../src/render/fighterArt.js';
 import { TEAM } from '../src/render/renderer.js';
 const q = new URLSearchParams(location.search);
 const w = WEAPONS[q.get('w')], step = Number(q.get('s') ?? 3);
-const rows = [...w.lights.map((d) => ['L ' + d.name, d]), ...w.heavies.map((d) => ['H ' + d.name, d]), ['U ' + w.ultimate.name, w.ultimate], ['walk', null], ['guard', 'g']];
+const rows = [...w.lights.map((d) => ['L ' + d.name, d]), ...w.heavies.map((d) => ['H ' + d.name, d]), ['U ' + w.ultimate.name, w.ultimate], ['walk', null], ['guard', 'g'], ...(q.get('r') ? [['피격', 'r:hitstun:24'], ['넉백', 'r:knockback:34'], ['패링당함', 'r:parried:38'], ['가드 브레이크', 'r:guardBreak:60'], ['착지', 'r:landing:12'], ['점프', 'j'], ['대시', 'd']] : [])];
 const CW = 64, CH = 60;
-const n = Math.max(...rows.map(([, d]) => (d && d !== 'g' ? Math.ceil(d.duration / step) : 8)));
+const isAtk = (d) => d && typeof d === 'object';
+const lenOf = (d) => isAtk(d) ? Math.ceil(d.duration / step) : typeof d === 'string' && d.startsWith('r:') ? Math.ceil(Number(d.split(':')[2]) / step) + 1 : d === 'j' ? Math.ceil(38 / step) : d === 'd' ? 6 : 8;
+const n = Math.max(...rows.map(([, d]) => lenOf(d)));
 const c = document.getElementById('c'); c.width = CW * n + 70; c.height = CH * rows.length;
 c.style.width = c.width * 2 + 'px'; c.style.height = c.height * 2 + 'px';
 const ctx = c.getContext('2d');
@@ -20,15 +22,18 @@ rows.forEach(([label, def], r) => {
   const y0 = r * CH;
   ctx.fillStyle = '#8a909e'; ctx.font = '8px sans-serif'; ctx.fillText(label, 2, y0 + 30);
   const f = createFighter({ id: 0, x: 0, facing: 1, weapon: w });
-  const cnt = def && def !== 'g' ? Math.ceil(def.duration / step) : 8;
+  const cnt = lenOf(def);
   for (let k = 0; k < cnt; k++) {
     const frame = k * step, x0 = 70 + k * CW;
-    const active = def && def !== 'g' && def.hits.some((h) => frame >= h.from && frame <= h.to);
+    const active = isAtk(def) && def.hits.some((h) => frame >= h.from && frame <= h.to);
     ctx.fillStyle = active ? '#4a3d20' : (k % 2 ? '#262b36' : '#2b303b'); ctx.fillRect(x0, y0, CW, CH - 1);
     if (!def) { f.state = S.WALK; f.attack = null; f.x = k * 9; f.vx = 4; }
+    else if (typeof def === 'string' && def.startsWith('r:')) { const [, stn, len] = def.split(':'); f.state = S[Object.keys(S).find((k) => S[k] === stn)]; f.attack = null; f.timer = Math.max(0, Number(len) - frame); }
+    else if (def === 'j') { f.state = S.JUMP; f.attack = null; f.vy = 15 - 0.8 * frame; f.y = 1; }
+    else if (def === 'd') { f.state = S.DASH; f.attack = null; f.dash = { dir: 1, frame: k * 2 }; f.y = 0; }
     else if (def === 'g') { f.state = k < 4 ? S.GUARD : S.BLOCKSTUN; f.timer = k < 4 ? 0 : 12 - (k - 4) * 3; f.attack = null; }
     else { f.state = def.kind === 'ultimate' ? S.ULTIMATE : S.ATTACK; f.attack = { def, frame }; }
-    drawFighter(ctx, f, x0 + 20, y0 + CH - 5, { ...TEAM[0], weapon: w.color }, frame, { smooth: false });
+    drawFighter(ctx, f, x0 + 20, y0 + CH - 5 - (def === 'j' ? 0 : 0), { ...TEAM[0], weapon: w.color }, r * 1000 + frame, { smooth: false });
     ctx.fillStyle = '#6b7180'; ctx.fillText(frame, x0 + 2, y0 + 8);
   }
 });

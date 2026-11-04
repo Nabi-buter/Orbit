@@ -80,7 +80,7 @@ function followRate(f) {
 }
 function smoothPose(f, frame, pose, wAngle) {
   let st = smoothState.get(f);
-  const target = { a: wAngle, h: pose.hand, h2: pose.hand2, lean: pose.lean, crouch: pose.crouch };
+  const target = { a: wAngle, h: pose.hand, h2: pose.hand2, lean: pose.lean, crouch: pose.crouch, stride: pose.stride ?? 0 };
   if (!st || frame - st.frame > 3 || frame < st.frame) {
     st = { frame, ...target, h: [...target.h], h2: [...target.h2] };
     smoothState.set(f, st);
@@ -94,6 +94,7 @@ function smoothPose(f, frame, pose, wAngle) {
     st.h2 = [lerp(st.h2[0], target.h2[0], k), lerp(st.h2[1], target.h2[1], k)];
     st.lean = lerp(st.lean, target.lean, k);
     st.crouch = lerp(st.crouch, target.crouch, k);
+    st.stride = lerp(st.stride ?? 0, target.stride, k); // 발도 미끄러지듯 (딛고 있던 발이 순간이동하지 않게)
   }
   st.frame = frame;
   return st;
@@ -161,7 +162,7 @@ export function drawBot(ctx, f, ax, ay, pal, frame, opts = {}) {
     const sm = smoothPose(f, frame, pose, pose.wAngle);
     // 양손 무기: 뒷손이 자루를 잡고 있던 자세면 부드럽게 한 뒤에도 자루 위에 붙인다
     const onGrip = GRIP[weaponId] && (() => { const g = backHand(weaponId, { a: pose.wAngle, h: pose.hand }); return Math.hypot(g[0] - pose.hand2[0], g[1] - pose.hand2[1]) < 1; })();
-    pose.wAngle = sm.a; pose.hand = sm.h; pose.lean = sm.lean; pose.crouch = sm.crouch;
+    pose.wAngle = sm.a; pose.hand = sm.h; pose.lean = sm.lean; pose.crouch = sm.crouch; pose.stride = sm.stride;
     pose.hand2 = onGrip ? backHand(weaponId, { a: sm.a, h: sm.h }) : sm.h2;
   }
   const R = BOT_RIG;

@@ -11,13 +11,14 @@ const w = WEAPONS[id];
 // a=walk|idle: 이동 상태 (프레임마다 x 를 옮기며)
 const loco = which === 'walk' || which === 'idle';
 const def = loco ? { duration: 48, hits: [] } : which[0] === 'u' ? w.ultimate : (which[0] === 'l' ? w.lights : w.heavies)[Number(which.slice(1))];
-const CW = 76, CH = 64, n = Math.ceil(def.duration / step);
-const c = document.getElementById('c'); c.width = CW * n; c.height = CH;
-c.style.width = CW * n * 4 + 'px'; c.style.height = CH * 4 + 'px';
+const CW = 76, CH = 64, n = Math.ceil(def.duration / step), cols = Number(q.get('cols') ?? n), rowsN = Math.ceil(n / cols);
+const c = document.getElementById('c'); c.width = CW * cols; c.height = CH * rowsN;
+c.style.width = c.width * 4 + 'px'; c.style.height = c.height * 4 + 'px';
 const ctx = c.getContext('2d');
 const f = createFighter({ id: 0, x: 0, facing: 1, weapon: w });
 for (let k = 0; k < n; k++) {
   const frame = k * step;
+  ctx.save(); ctx.translate(-(k - (k % cols)) * CW, Math.floor(k / cols) * CH);
   const active = def.hits.some((h) => frame >= h.from && frame <= h.to);
   ctx.fillStyle = active ? '#4a3d20' : (k % 2 ? '#262b36' : '#2b303b'); ctx.fillRect(k * CW, 0, CW, CH);
   if (loco) { f.state = which === 'walk' ? S.WALK : S.IDLE; f.attack = null; f.x = frame * 4.2; f.vx = which === 'walk' ? 4.2 : 0; }
@@ -34,6 +35,7 @@ for (let k = 0; k < n; k++) {
     ctx.restore();
   }
   ctx.fillStyle = '#8a909e'; ctx.font = '7px monospace'; ctx.fillText(frame, k * CW + 2, 8);
+  ctx.restore();
 }
 document.title = 'ready';
 </script></body></html>

@@ -223,6 +223,38 @@ function mix(p, q, t) {
   };
 }
 
+/**
+ * 자연스러운 이동: 손은 어깨를 중심으로 호를 그리며(직선 대신), 몸은 먼저 · 팔은 그다음 · 무기 끝은 조금 늦게 따라온다.
+ * u 는 0→1 진행도, ease 는 팔(손)의 속도 곡선. 끝(u=1)에서는 모든 부분이 q 에 정확히 닿는다 → 판정 순간 자세는 그대로.
+ */
+const SHOULDER = [0, 96];
+const ARC = 0.6; // 호와 직선을 섞는 비율 (1 = 완전한 호)
+function arcHand(p, q, t) {
+  const a = [p[0] - SHOULDER[0], p[1] - SHOULDER[1]], b = [q[0] - SHOULDER[0], q[1] - SHOULDER[1]];
+  const ra = Math.hypot(...a), rb = Math.hypot(...b);
+  if (ra < 4 || rb < 4) return [lerp(p[0], q[0], t), lerp(p[1], q[1], t)];
+  const ta = Math.atan2(a[1], a[0]);
+  let d = Math.atan2(b[1], b[0]) - ta;
+  if (d > Math.PI) d -= 2 * Math.PI; else if (d < -Math.PI) d += 2 * Math.PI;
+  const r = lerp(ra, rb, t), th = ta + d * t;
+  const arc = [SHOULDER[0] + Math.cos(th) * r, SHOULDER[1] + Math.sin(th) * r];
+  return [lerp(lerp(p[0], q[0], t), arc[0], ARC), lerp(lerp(p[1], q[1], t), arc[1], ARC)];
+}
+function flow(p, q, u, ease) {
+  u = clamp01(u);
+  const tB = smooth(Math.min(1, u * 1.35));       // 몸(기울기·보폭·웅크림)이 먼저
+  const tH = ease(Math.min(1, u * 1.1));           // 손
+  const tA = ease(u) ** 1.15;                      // 무기 끝은 살짝 늦게 (끝에서 따라잡음)
+  return {
+    a: lerp(p.a, q.a, tA),
+    h: arcHand(p.h, q.h, tH),
+    h2: p.h2 && q.h2 ? arcHand(p.h2, q.h2, tH) : tH < 0.5 ? p.h2 : q.h2,
+    lean: lerp(p.lean ?? 0, q.lean ?? 0, tB),
+    stride: lerp(p.stride ?? 0, q.stride ?? 0, tB),
+    crouch: lerp(p.crouch ?? 0, q.crouch ?? 0, tB),
+  };
+}
+
 /** p 에서 q 방향의 반대쪽으로 k 만큼 더 (코일), 또는 같은 방향으로 더 (오버슈트) */
 function extend(p, q, k, handMax = 6) {
   const r = mix(p, q, 1 + k);
@@ -263,7 +295,7 @@ export function evalMotion(weaponId, def, frame, start = null) {
     const t = frame / s0;
     const first = beat(0).from;
     const coil = extend(beat(0).to, first, coilK); // to → from 방향으로 더 = 뒤로 젖힘
-    if (t < 0.7) return mix(start ?? idle, first, smooth(t / 0.7));
+    if (t < 0.7) return flow(start ?? idle, first, t / 0.7, smooth);
     return mix(first, coil, easeOutCubic((t - 0.7) / 0.3));
   }
   let prevEnd = s0, prevPose = extend(beat(0).to, beat(0).from, coilK);
@@ -274,10 +306,10 @@ export function evalMotion(weaponId, def, frame, start = null) {
     const end = contact + follow;
     const nextFrom = i + 1 < hits.length ? hits[i + 1].from - lead : Infinity;
     // 판정 사이: 이전 자세 → 다음 시작 자세
-    if (frame < start) return mix(prevPose, b.from, smooth((frame - prevEnd) / Math.max(1, start - prevEnd)));
+    if (frame < start) return flow(prevPose, b.from, (frame - prevEnd) / Math.max(1, start - prevEnd), smooth);
     // 2) 휘두름 (시작 자세 또는 코일 → 끝 자세)
     const from = i === 0 ? prevPose : b.from;
-    if (frame <= contact) return mix(from, b.to, swingEase((frame - start) / Math.max(1, contact - start)));
+    if (frame <= contact) return flow(from, b.to, (frame - start) / Math.max(1, contact - start), swingEase);
     // 3) 따라가기 (다단 히트는 다음 타 직전까지만)
     const over = extend(b.from, b.to, overK, 2);
     const fEnd = Math.min(end, nextFrom);
@@ -288,7 +320,7 @@ export function evalMotion(weaponId, def, frame, start = null) {
   // 4) 회수: 무게만큼 버틴 뒤 기본 자세로
   const t = (frame - prevEnd) / Math.max(1, def.duration - prevEnd);
   const hold = 0.1 + W * 0.25;
-  return mix(prevPose, idle, smooth((t - hold) / (1 - hold)));
+  return flow(prevPose, idle, (t - hold) / (1 - hold), smooth);
 }
 
 /** 뒷손 위치: 지정값 > 양손 무기 자루 > 몸 옆 */

@@ -76,13 +76,13 @@ export const KNOBS = {
   // 공격 시간(speed)은 모티브(Dueling Grounds) 무기 성격에 맞춘 약공 발동 목표에서 예측 → 테스트(scripts/tune.js, ±10% 안)로 조정
   // 새 시드 검증 승률 48~53%
   // 규칙: 모든 무기 강공 콤보 ≥ 2, 강공 콤보 < 약공 콤보
-  longsword: { combo: { lightMax: 3, heavyMax: 2, maxTotal: 4 }, reach: 1.01, damage: 1.05, speed: 1.28, hp: 1.05, guardTaken: 1, windup: 1.25 },
-  rapier: { combo: { lightMax: 3, heavyMax: 2, maxTotal: 4 }, reach: 1, damage: 0.82, speed: 1.4, hp: 0.98, guardTaken: 1.05 }, // 추가 시 64% → 데미지·속도 조정 50%
+  longsword: { combo: { lightMax: 3, heavyMax: 2, maxTotal: 4 }, reach: 1.01, damage: 1.0, speed: 1.28, hp: 1.05, guardTaken: 1, windup: 1.25 },
+  rapier: { combo: { lightMax: 3, heavyMax: 2, maxTotal: 4 }, reach: 1, damage: 0.86, speed: 1.4, hp: 0.98, guardTaken: 1.05 }, // 추가 시 64% → 데미지·속도 조정 50%
   greatsword: { combo: { lightMax: 3, heavyMax: 2, maxTotal: 3 }, reach: 1, damage: 0.86, speed: 1.34, hp: 1.08, guardTaken: 1, windup: 1.3 },
   dagger: { combo: { lightMax: 3, heavyMax: 2, maxTotal: 5 }, reach: 1.04, damage: 0.94, speed: 1.53, hp: 1, guardTaken: 1 },
-  axe: { combo: { lightMax: 3, heavyMax: 2, maxTotal: 3 }, reach: 1.05, damage: 1.08, speed: 1.44, hp: 1.18, guardTaken: 1, windup: 1.3 },
+  axe: { combo: { lightMax: 3, heavyMax: 2, maxTotal: 3 }, reach: 1.05, damage: 1.03, speed: 1.44, hp: 1.18, guardTaken: 1, windup: 1.3 },
   spear: { combo: { lightMax: 3, heavyMax: 2, maxTotal: 3 }, reach: 0.9, damage: 0.78, speed: 1.05, hp: 1.17, guardTaken: 1, windup: 1.1 },
-  knuckle: { combo: { lightMax: 5, heavyMax: 3, maxTotal: 8 }, reach: 1.15, damage: 0.97, speed: 1.52, hp: 1.03, guardTaken: 0.91 },
+  knuckle: { combo: { lightMax: 5, heavyMax: 3, maxTotal: 8 }, reach: 1.15, damage: 1.01, speed: 1.52, hp: 1.03, guardTaken: 0.91 },
 };
 
 const DEFS = {
