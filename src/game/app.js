@@ -334,6 +334,8 @@ export class App {
         ai: this.ai ? this.aiInfo() : null,
       });
     }
+    // 대전 위에 메뉴(일시정지·결과·온라인 메뉴)를 띄울 때는 층을 나눠 메뉴가 대전 글자를 덮게
+    if (this.match && this.screen) this.renderer.flushLayer();
     this.screen?.draw(ctx);
     this.renderer.present();
     requestAnimationFrame((t) => this.loop(t));

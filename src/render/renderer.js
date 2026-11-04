@@ -9,7 +9,7 @@ import { drawFighter, weaponTip } from './fighterArt.js';
 import { Effects } from './effects.js';
 import { playEvent } from './sfx.js';
 import { GUARD_POSE } from './motions.js';
-import { PX, PW, PH, createArtCanvas, rect, line, px, disc, text, panel } from './pixel.js';
+import { PX, PW, PH, createArtCanvas, rect, line, px, disc, text, panel, useHiResText, takeTextQueue, FONT_STACK } from './pixel.js';
 
 const GY = STAGE.groundY;
 export const GROUND = Math.round(GY / PX);
@@ -62,6 +62,7 @@ export class Renderer {
     const a = createArtCanvas();
     this.art = a.canvas;
     this.actx = a.ctx;
+    useHiResText(this.actx); // 한글은 화면 해상도로
     this.showBoxes = false;
     this.fx = new Effects();
     this.bg = null;
@@ -90,14 +91,44 @@ export class Renderer {
     return this.actx;
   }
 
-  /** 아트 캔버스를 최근접 보간으로 확대 출력 */
-  present() {
+  /**
+   * 한 층 출력: 아트 캔버스를 최근접 보간으로 확대해 얹고, 그 층의 글자를 화면 해상도로 그린 뒤 아트를 비운다.
+   * 대전 위에 메뉴를 띄울 때처럼 위 층이 아래 층의 글자를 덮어야 하면 층 사이에 부른다.
+   */
+  flushLayer() {
     const c = this.ctx;
     c.setTransform(1, 0, 0, 1, 0, 0);
+    if (!this.layered) {
+      c.globalAlpha = 1;
+      c.fillStyle = UI.ink;
+      c.fillRect(0, 0, this.canvas.width, this.canvas.height);
+      this.layered = true;
+    }
     c.imageSmoothingEnabled = false;
-    c.fillStyle = UI.ink;
-    c.fillRect(0, 0, this.canvas.width, this.canvas.height);
+    c.globalAlpha = 1;
     c.drawImage(this.art, 0, 0, PW, PH, 0, 0, this.canvas.width, this.canvas.height);
+    // 글자: 아트 1px = s 화면 px
+    const s = this.canvas.width / PW;
+    c.textBaseline = 'top';
+    c.textAlign = 'left';
+    for (const t of takeTextQueue()) {
+      c.globalAlpha = Math.max(0, Math.min(1, t.alpha));
+      c.font = `${t.weight} ${Math.round(t.size * s)}px ${FONT_STACK}`;
+      const x = (t.x + 1) * s, y = t.y * s;
+      if (t.shadow) { c.fillStyle = t.shadow; c.fillText(t.str, x + s, y + s); }
+      c.fillStyle = t.color;
+      c.fillText(t.str, x, y);
+    }
+    c.globalAlpha = 1;
+    // 다음 층을 위해 아트를 투명하게
+    this.actx.setTransform(1, 0, 0, 1, 0, 0);
+    this.actx.clearRect(0, 0, PW, PH);
+  }
+
+  /** 프레임 마무리: 남은 층 출력 */
+  present() {
+    this.flushLayer();
+    this.layered = false;
   }
 
   /** 화면 좌표 → 아트 좌표 (마우스) */

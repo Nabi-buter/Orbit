@@ -257,7 +257,18 @@ function textWidth(str, scale) { return Math.max(0, str.length * 6 - 1) * scale;
 // -----------------------------------------------------------------------------
 // 한글 등 일반 텍스트: 시스템 폰트를 작은 크기로 그린 뒤 알파를 이진화해 도트처럼 만든다
 // -----------------------------------------------------------------------------
-const FONT_STACK = '"Malgun Gothic", "Apple SD Gothic Neo", "Noto Sans KR", "Noto Sans CJK KR", sans-serif';
+export const FONT_STACK = '"Malgun Gothic", "Apple SD Gothic Neo", "Noto Sans KR", "Noto Sans CJK KR", sans-serif';
+
+// -----------------------------------------------------------------------------
+// 고해상도 글자 층: 한글 등은 저해상도 아트 캔버스에 찍지 않고 기록만 해 두었다가,
+// 아트를 화면 크기로 확대한 뒤 화면 해상도 그대로 그린다 (Renderer.flushLayer).
+// → 획이 뭉개지지 않고 정확한 한글. 영문·숫자 비트맵 폰트(도트 글자)는 그대로 아트에 그린다.
+// -----------------------------------------------------------------------------
+let hiText = null; // { art: 아트 캔버스 ctx, list: [...] }
+/** 이 아트 캔버스에 그리는 한글은 고해상도 층으로 보낸다 */
+export function useHiResText(artCtx) { hiText = { art: artCtx, list: [] }; }
+/** 지금까지 기록된 글자를 꺼낸다 (층마다) */
+export function takeTextQueue() { if (!hiText) return []; const l = hiText.list; hiText.list = []; return l; }
 const cache = new Map();
 
 function rasterize(str, size, color, weight) {
@@ -297,6 +308,12 @@ export function text(ctx, str, x, y, color, opts = {}) {
   const size = Math.max(11, opts.size ?? 11); // 한글은 11px 미만이면 뭉개진다
   const sp = rasterize(str, size, color, opts.weight ?? 700);
   const ox = align === 'center' ? -Math.floor(sp.w / 2) : align === 'right' ? -sp.w : 0;
+  if (hiText && ctx === hiText.art) {
+    // 고해상도 층에 기록: 지금 좌표 변환(카메라·흔들림)과 투명도까지 같이
+    const t = ctx.getTransform();
+    hiText.list.push({ str, x: x + ox + t.e, y: y + t.f, color, size, weight: opts.weight ?? 700, shadow: opts.shadow, alpha: ctx.globalAlpha });
+    return sp.w;
+  }
   if (opts.shadow) blit(ctx, rasterize(str, size, opts.shadow, opts.weight ?? 700), x + ox + 1, y + 1 - 1);
   blit(ctx, sp, x + ox, y - 1);
   return sp.w;
