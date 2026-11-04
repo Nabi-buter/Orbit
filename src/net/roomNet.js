@@ -16,6 +16,8 @@
 import { WEAPON_ORDER } from '../config/weapons.js';
 
 const FRAME_MS = 1000 / 60;
+/** 참가자 목록에서 빠진 상대를 나간 것으로 보기까지 (짧은 재연결은 무시) */
+const GONE_GRACE = 6000;
 export const ROOM_NET = {
   flushMs: 50,        // 입력 묶음 전송 주기 (3프레임)
   window: 24,         // 한 메시지에 다시 싣는 최근 입력 프레임 수 (빠진 메시지 복구)
@@ -28,7 +30,8 @@ export const ROOM_NET = {
 /** 방에서 쓰는 주제 (게시할 때 참여자 이상에게 열어 둔다) */
 export const ROOM_TOPICS = ['hello', 'assign', 'lobby', 'ctl', 'start', 'in', 'hs', 'pg', 'po', 'bye'];
 
-const CODE_CHARS = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+/** 방 코드에 쓰는 글자 (헷갈리는 I·O·0·1 제외, 서버와 같음) */
+export const CODE_CHARS = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
 export function makeCode(rand = Math.random) {
   let c = '';
   for (let i = 0; i < 4; i++) c += CODE_CHARS[Math.floor(rand() * CODE_CHARS.length)];
@@ -80,6 +83,7 @@ export class RoomNet {
     this.lastStart = null;
     this.want = null;
     this.matchIdle = false;
+    this.goneAt = null;
   }
 
   on(type, fn) { this.handlers.set(type, fn); return this; }
@@ -131,7 +135,11 @@ export class RoomNet {
     this.code = code;
     this.room = await this.lobby.join(`duel-${code.toLowerCase()}`);
     const r = this.room;
-    const on = (topic, fn) => this.unsubs.push(r.on(topic, (m) => { if (!m.isMe) fn(m.data ?? {}, m); }));
+    const on = (topic, fn) => this.unsubs.push(r.on(topic, (m) => {
+      if (m.isMe) return;
+      if (m.peer === this.otherPeer) this.goneAt = null; // 소식이 오면 살아 있음
+      fn(m.data ?? {}, m);
+    }));
     on('hello', (d, m) => this.host && this.onHello(m.peer));
     on('assign', (d, m) => this.onAssign(d, m.peer));
     on('lobby', (d, m) => { if (!this.host && m.peer === this.otherPeer) this.applyLobby(d); });
@@ -145,8 +153,15 @@ export class RoomNet {
       this.rtt = Math.min(2000, this.now() - d.ts);
       this.emitLocal('ping', { rtt: this.rtt, peerRtt: this.peerRtt });
     });
+    // 확실히 나감(bye)은 바로, 참가자 목록에서 잠깐 빠진 것은 재연결일 수 있으니 유예 후 판단
     on('bye', (d, m) => { if (m.peer === this.otherPeer) this.onPeerGone(); });
-    this.unsubs.push(r.onPeers((ch) => { if (this.otherPeer && ch.left.some((p) => p.peer === this.otherPeer)) this.onPeerGone(); }));
+    this.unsubs.push(r.onPeers((ch) => {
+      if (!this.otherPeer) return;
+      const gone = ch.left.find((p) => p.peer === this.otherPeer);
+      if (gone?.final) this.onPeerGone();      // 전송 방식이 확실하다고 알려 줌 (직접 연결 닫힘)
+      else if (gone) this.suspectGone();
+      if (ch.joined.some((p) => p.peer === this.otherPeer)) this.goneAt = null;
+    }));
     this.intervals.push(this.timers.setInterval(() => this.tick(), this.cfg.flushMs));
     this.intervals.push(this.timers.setInterval(() => this.otherPeer && r.emit('pg', { ts: this.now(), rtt: this.rtt }).catch(() => {}), this.cfg.pingEveryMs));
     return r;
@@ -329,7 +344,16 @@ export class RoomNet {
     d.b.forEach((bits, i) => this.emitLocal('input', { m: d.m, f: d.f0 + i, i: bits | 0 }));
   }
 
+  /** 상대가 목록에서 빠짐: GONE_GRACE 동안 아무 소식이 없으면 나간 것으로 본다 */
+  suspectGone() {
+    if (this.goneAt != null) return;
+    this.goneAt = this.now();
+    const token = this.goneAt;
+    this.timers.setTimeout(() => { if (this.goneAt === token) this.onPeerGone(); }, GONE_GRACE);
+  }
+
   onPeerGone() {
+    this.goneAt = null;
     const wasPlaying = this.state?.playing || this.matchId > 0;
     if (this.host) {
       this.otherPeer = null;
@@ -337,10 +361,10 @@ export class RoomNet {
       this.emitLocal('peerLeft');
       this.broadcastLobby();
     } else {
-      // 호스트가 나가면 방이 없어진다
+      // 호스트가 나가면 방이 없어진다 → 방 화면을 닫고 처음(방 만들기/참가)으로
       this.emitLocal('peerLeft');
       this.leaveRoom(true);
-      this.emitLocal('error', { msg: '상대가 방을 나갔습니다.' });
+      this.emitLocal('roomClosed', { msg: '방장이 방을 나갔습니다. 새 방을 만들거나 다른 코드로 참가하세요.' });
     }
     return wasPlaying;
   }

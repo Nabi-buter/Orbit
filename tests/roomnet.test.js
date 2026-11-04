@@ -63,6 +63,8 @@ function makePlayer(world, peer, weapon) {
   net.on('joined', (m) => { p.joined = m; net.send({ t: 'select', weapon }); })
     .on('lobby', (m) => { p.lobby = m; })
     .on('error', (m) => p.errors.push(m.msg))
+    .on('roomClosed', (m) => { p.closed = m.msg; })
+    .on('peerLeft', () => { p.left = (p.left ?? 0) + 1; })
     .on('start', (m) => {
       p.match = new Match({ weapons: m.weapons });
       p.ls = new Lockstep({ slot: m.slot, delay: m.delay, matchId: m.matchId, send: (x) => net.send(x) });
@@ -135,4 +137,28 @@ test('없는 코드로 참가하면 오류, 입력 지연은 왕복 지연에 �
   assert.ok(b.errors.some((e) => e.includes('찾을 수 없')), b.errors.join());
   assert.ok(roomDelayFor([60, 80]) >= 3 && roomDelayFor([60, 80]) <= 12);
   assert.ok(roomDelayFor([400, 400]) > roomDelayFor([40, 40]));
+});
+
+test('잠깐 연결이 흔들려도 방이 깨지지 않고, 방장이 정말 나가면 손님은 처음 화면으로', async () => {
+  const world = makeWorld();
+  const a = makePlayer(world, 'peer-a', 'axe');
+  const b = makePlayer(world, 'peer-b', 'spear');
+  a.net.send({ t: 'create' });
+  await world.advance(50);
+  b.net.send({ t: 'join', code: a.joined.code });
+  for (let t = 0; t < 4000 && !b.joined; t += 100) await world.advance(100);
+  assert.equal(b.joined?.slot, 1);
+  // 방장의 참가자 표시가 잠깐 빠졌다가 돌아옴 (재연결)
+  const members = [...world.rooms.values()][0];
+  const guest = [...members].find((m) => m.peer === 'peer-b');
+  guest.peerFns.forEach((fn) => fn({ left: [{ peer: 'peer-a' }], joined: [], updated: [], peers: [] }));
+  await world.advance(1500);
+  guest.peerFns.forEach((fn) => fn({ left: [], joined: [{ peer: 'peer-a' }], updated: [], peers: [] }));
+  await world.advance(8000);
+  assert.equal(b.closed, undefined, '짧은 흔들림으로 방이 닫히면 안 됨');
+  assert.equal(b.left ?? 0, 0);
+  // 방장이 정말 나감
+  await a.net.close();
+  await world.advance(500);
+  assert.ok(b.closed?.includes('방장이 방을 나갔'), b.closed);
 });

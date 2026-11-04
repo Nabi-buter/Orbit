@@ -60,7 +60,7 @@ class PeerRoom {
     const gone = () => {
       if (!this.conns.has(id)) return;
       this.conns.delete(id);
-      const left = [{ peer: id }];
+      const left = [{ peer: id, final: true }]; // 직접 연결이 닫힘 = 확실히 나감 (재연결 아님)
       for (const fn of this.peerFns) fn({ peers: this.peers(), joined: [], left, updated: [] });
     };
     conn.on('close', gone);

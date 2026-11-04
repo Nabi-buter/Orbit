@@ -97,8 +97,20 @@ function assert(c, msg) { if (!c) throw new Error('E2E(Pages) 실패: ' + msg); 
     await B.evaluate(() => window.__game.screen.setWeapon('knuckle'));
     await key(B, 'Enter');
     await B.waitForFunction(() => window.__game.netState?.phase === 'connect', null, { timeout: 5000 });
-    for (const ch of code) await key(B, /\d/.test(ch) ? `Digit${ch}` : `Key${ch}`);
-    await key(B, 'Enter');
+    // 화면 입력판으로 코드 입력 (모바일과 같은 방식: 탭)
+    const tapArt = async (p, x, y) => {
+      const box = await p.locator('#game').boundingBox();
+      await p.mouse.click(box.x + (x / 427) * box.width, box.y + (y / 240) * box.height);
+      await p.waitForTimeout(50);
+    };
+    for (const ch of code) {
+      const k = await B.evaluate((c) => { const b = window.__game.screen.keys.find((x) => x.label === c); return [b.x + b.w / 2, b.y + b.h / 2]; }, ch);
+      await tapArt(B, ...k);
+    }
+    assert(await B.evaluate(() => window.__game.screen.code) === code, '입력판으로 코드 입력');
+    out && await B.screenshot({ path: path.join(out, 'pages-online-keypad.png') });
+    const jk = await B.evaluate(() => { const b = window.__game.screen.keys.find((x) => x.label === '참가'); return [b.x + b.w / 2, b.y + b.h / 2]; });
+    await tapArt(B, ...jk);
     await B.waitForFunction(() => window.__game.netState?.code, null, { timeout: 8000 });
     assert(true, '코드로 참가');
     await A.waitForTimeout(800);
@@ -120,6 +132,25 @@ function assert(c, msg) { if (!c) throw new Error('E2E(Pages) 실패: ' + msg); 
     const sa = await st(A), sb = await st(B);
     assert(sa.f > 100 && Math.abs(sa.f - sb.f) <= 12, `진행 ${sa.f}/${sb.f}`);
     assert(sa.d === null && sb.d === null, '동기화 해시 일치');
+    // 경기 종료(시간) → 양쪽 '로비로' → 같은 방에서 재대결 준비 상태여야 한다 (상대가 나갔다는 오류 없이)
+    await A.evaluate(() => { window.__game.match.timeLeft = 2; });
+    await B.evaluate(() => { window.__game.match.timeLeft = 2; });
+    await A.waitForFunction(() => window.__game.scene === 'result', null, { timeout: 8000 });
+    await B.waitForFunction(() => window.__game.scene === 'result', null, { timeout: 8000 });
+    await key(A, 'Enter'); await key(B, 'Enter');
+    await A.waitForTimeout(1500);
+    out && await A.screenshot({ path: path.join(out, 'pages-online-rematch-A.png') });
+    out && await B.screenshot({ path: path.join(out, 'pages-online-rematch-B.png') });
+    const ns = (p) => p.evaluate(() => ({ scene: window.__game.scene, phase: window.__game.netState?.phase, error: window.__game.netState?.error ?? null, connected: window.__game.netState?.connected }));
+    const ra = await ns(A), rb = await ns(B);
+    assert(ra.scene === 'online' && rb.scene === 'online', `양쪽 로비 (${ra.scene}/${rb.scene})`);
+    assert(ra.phase === 'room' && rb.phase === 'room' && !ra.error && !rb.error, `같은 방 유지, 오류 없음 A=${JSON.stringify(ra)} B=${JSON.stringify(rb)}`);
+    assert(ra.connected?.[1] && rb.connected?.[0], '상대 접속 상태 유지');
+    // 재대결
+    await key(A, 'KeyJ'); await key(B, 'KeyJ');
+    await A.waitForFunction(() => window.__game.scene === 'battle', null, { timeout: 8000 });
+    await B.waitForFunction(() => window.__game.scene === 'battle', null, { timeout: 8000 });
+    assert(true, '재대결 시작');
     assert(errors.length === 0, `콘솔 오류 없음 ${errors.length ? JSON.stringify(errors) : ''}`);
     console.log('E2E(Pages 온라인) 통과');
   } catch (e) {

@@ -189,7 +189,8 @@ export class App {
       onLeave: () => { this.net?.send({ t: 'leave' }); this.setNet({ phase: 'connect', error: null }); },
     });
     this.screen = screen;
-    if (this.net?.connected && this.netState?.phase === 'room') { screen.setState(this.netState); return; }
+    // 이미 방에 있으면 그대로 돌아간다 (잠깐 연결이 흔들려도 다시 접속하지 않음 — 다시 접속하면 방을 나가게 된다)
+    if (this.net && this.netState?.phase === 'room') { screen.setState(this.netState); return; }
     this.setNet({ phase: 'connecting', error: null });
     try {
       this.net?.close();
@@ -233,6 +234,7 @@ export class App {
       })
       .on('lobby', (m) => this.setNet({ ...this.netState, phase: 'room', code: m.code, connected: m.connected, weapons: m.weapons, ready: m.ready, playing: m.playing }))
       .on('error', (m) => this.setNet({ ...this.netState, error: m.msg }))
+      .on('roomClosed', (m) => this.setNet({ phase: 'connect', error: m.msg }))
       .on('ping', (m) => { if (this.netState) { this.netState.rtt = m.rtt; this.netState.peerRtt = m.peerRtt; } })
       .on('start', (m) => this.startOnlineMatch(m))
       .on('input', (m) => { if (this.lockstep && m.m === this.lockstep.matchId) this.lockstep.onRemoteInput(m.f, m.i); })

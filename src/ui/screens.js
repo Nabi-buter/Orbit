@@ -9,6 +9,7 @@ import { PW, PH, rect, px, text, textW, createArtCanvas } from '../render/pixel.
 import { UI, TEAM, buildBackground } from '../render/renderer.js';
 import { drawFighter } from '../render/fighterArt.js';
 import { drawWeaponIcon } from '../render/weaponArt.js';
+import { CODE_CHARS } from '../net/roomNet.js';
 import { WEAPONS, WEAPON_ORDER } from '../config/weapons.js';
 import { CONTROLS, KEY_LABELS } from '../config/controls.js';
 import { DIFFICULTY } from '../ai/ai.js';
@@ -443,21 +444,23 @@ export class OnlineScreen {
     this.build();
   }
   setState(st) { this.state = st; this.build(); }
+  /** 왼쪽 띠 안에서 줄바꿈한 오류 문구 (띠 폭을 넘지 않게) */
+  errorLines() { return this.state.error ? wrap(this.state.error, 165) : []; }
   build() {
     const st = this.state;
+    this.keys = [];
+    const below = 44 + this.errorLines().length * 12 + 12; // 오류 문구 아래부터
     if (st.phase === 'connect') {
       this.menu = new TextMenu([
-        { label: '방 만들기', sub: '코드를 상대에게 알려 주세요', onClick: this.cb.onCreate },
-        { label: '코드로 참가', onClick: () => {
-          // 키보드가 없는 터치 화면: 입력창으로 코드 받기
-          if (this.code.length !== 4 && typeof prompt === 'function' && (navigator.maxTouchPoints ?? 0) > 0) {
-            const v = (prompt('방 코드 4자리를 입력하세요') || '').toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 4);
-            if (v) this.code = v;
-          }
-          if (this.code.length === 4) this.cb.onJoin(this.code);
-        } },
+        { label: '방 만들기', onClick: this.cb.onCreate },
+        { label: '코드로 참가', onClick: () => this.join() },
         { label: '뒤로', onClick: this.cb.onBack },
-      ], 34, 74);
+      ], 34, Math.max(74, below));
+      // 화면 코드 입력판 (터치·마우스): 코드 글자 32개 + 지우기 + 참가
+      const cw = 23, ch = 19, x0 = 224, y0 = 62;
+      [...CODE_CHARS].forEach((c, i) => this.keys.push({ label: c, x: x0 + (i % 8) * cw, y: y0 + Math.floor(i / 8) * ch, w: cw - 2, h: ch - 2, act: () => this.type(c) }));
+      this.keys.push({ label: '지우기', x: x0, y: y0 + 4 * ch + 4, w: cw * 3 - 2, h: 16, act: () => { this.code = this.code.slice(0, -1); } });
+      this.keys.push({ label: '참가', x: x0 + cw * 5, y: y0 + 4 * ch + 4, w: cw * 3 - 2, h: 16, primary: true, act: () => this.join() });
     } else if (st.phase === 'room') {
       const me = st.slot, op = 1 - me;
       this.menu = new TextMenu([
@@ -465,10 +468,12 @@ export class OnlineScreen {
         { label: '방 나가기', onClick: this.cb.onLeave },
       ], 34, 190);
     } else {
-      this.menu = new TextMenu([{ label: '뒤로', onClick: this.cb.onBack }], 34, 190);
+      this.menu = new TextMenu([{ label: '뒤로', onClick: this.cb.onBack }], 34, Math.max(190, below));
     }
   }
-  get buttons() { return this.menu.rows(); }
+  type(c) { if (this.code.length < 4) this.code += c; }
+  join() { if (this.code.length === 4) this.cb.onJoin(this.code); }
+  get buttons() { return [...this.menu.rows(), ...this.keys]; }
   onKey(e) {
     const st = this.state;
     if (st.phase === 'connect') {
@@ -491,8 +496,12 @@ export class OnlineScreen {
     if (BACK.includes(e.code)) { this.cb.onBack(); return true; }
     return this.menu.onKey(e);
   }
-  onClick(x, y) { return this.menu.onClick(x, y); }
-  onMove(x, y) { this.menu.onMove(x, y); }
+  onClick(x, y) {
+    const k = this.keys.find((b) => hit(b, x, y));
+    if (k) { k.act(); return true; }
+    return this.menu.onClick(x, y);
+  }
+  onMove(x, y) { this.hoverKey = this.keys.find((b) => hit(b, x, y)) ?? null; this.menu.onMove(x, y); }
   draw(ctx) {
     this.t++;
     background(ctx, 0.4);
@@ -501,16 +510,30 @@ export class OnlineScreen {
     const st = this.state;
     text(ctx, '온라인 대전', 34, 16, UI.paper, { size: 14 });
     rect(ctx, 34, 36, 18, 2, UI.gold);
-    if (st.error) wrap(st.error, PW - 70).forEach((l, i) => text(ctx, l, 34, 44 + i * 12, UI.red, { size: 11, forceRaster: true }));
+    this.errorLines().forEach((l, i) => text(ctx, l, 34, 44 + i * 12, UI.red, { size: 11, forceRaster: true }));
     if (st.phase === 'connecting' && !st.error) text(ctx, '연결 중…', 34, 74, UI.dim, { size: 11 });
     if (st.phase === 'connect') {
-      text(ctx, '방 코드', 34, 130, UI.dim, { size: 11 });
+      // 오른쪽: 코드 입력판 (어두운 판 위)
+      ctx.globalAlpha = 0.82; rect(ctx, 216, 16, 202, 168, UI.ink); ctx.globalAlpha = 1;
+      text(ctx, '참가할 방 코드', 224, 26, UI.dim, { size: 11 });
       for (let k = 0; k < 4; k++) {
-        const x = 84 + k * 16;
-        rect(ctx, x, 142, 12, 1, k === this.code.length && this.t % 40 < 20 ? UI.gold : '#5b616e');
-        if (this.code[k]) text(ctx, this.code[k], x + 6, 132, UI.gold, { scale: 1, align: 'center' });
+        const x = 318 + k * 18;
+        rect(ctx, x, 40, 14, 1, k === this.code.length && this.t % 40 < 20 ? UI.gold : '#5b616e');
+        if (this.code[k]) text(ctx, this.code[k], x + 7, 30, UI.gold, { scale: 1, align: 'center' });
       }
-      text(ctx, '키보드로 입력 후 ENTER', 34, 150, '#5d636f', { size: 11 });
+      for (const b of this.keys) {
+        const hov = this.hoverKey === b;
+        const off = b.primary && this.code.length !== 4;
+        rect(ctx, b.x, b.y, b.w, b.h, b.primary && !off ? '#3a3220' : hov ? '#323745' : '#232733');
+        rect(ctx, b.x, b.y + b.h - 1, b.w, 1, '#0d0f13');
+        rect(ctx, b.x, b.y, b.w, 1, hov ? '#5b616e' : '#363b48');
+        const korean = /[^\x00-\x7f]/.test(b.label);
+        text(ctx, b.label, b.x + b.w / 2, b.y + (korean ? 2 : 5), off ? '#565c69' : b.primary ? UI.gold : UI.paper, korean ? { size: 11, align: 'center' } : { align: 'center' });
+      }
+      text(ctx, '키보드로 입력해도 됩니다', 224, 166, '#5d636f', { size: 11 });
+      // 왼쪽 메뉴 아래 안내
+      text(ctx, '방을 만들면 4자리 코드가', 34, this.menu.y + 58, '#5d636f', { size: 11 });
+      text(ctx, '나옵니다. 상대에게 알려 주세요.', 34, this.menu.y + 70, '#5d636f', { size: 11 });
     }
     if (st.phase === 'room') {
       const me = st.slot, op = 1 - me;
