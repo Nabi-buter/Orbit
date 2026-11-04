@@ -96,7 +96,7 @@ function handle(conn, msg) {
 
     case 'create': {
       if (room) leave(conn);
-      const r = { code: makeCode(), players: [conn, null], weapons: ['longsword', 'longsword'], ready: [false, false], playing: false, matchId: 0, time: BALANCE.round.timeSeconds };
+      const r = { code: makeCode(), players: [conn, null], weapons: ['longsword', 'longsword'], ready: [false, false], playing: false, matchId: 0, time: BALANCE.round.onlineDefault };
       rooms.set(r.code, r);
       conn.room = r; conn.slot = 0;
       conn.send({ t: 'joined', code: r.code, slot: 0 });

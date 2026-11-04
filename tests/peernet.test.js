@@ -72,7 +72,7 @@ function makeBroker({ latency = 25 } = {}) {
 }
 
 function makePlayer(w, weapon) {
-  const net = new RoomNet(new PeerLobby(w.Peer), { ...w.clock, net: { flushMs: 17, window: 12 } });
+  const net = new RoomNet(new PeerLobby(w.Peer), { ...w.clock, net: { flushMs: 17 } });
   const p = { net, lobby: null, joined: null, match: null, ls: null, errors: [], frames: 0, left: 0 };
   net.on('joined', (m) => { p.joined = m; net.send({ t: 'select', weapon }); })
     .on('lobby', (m) => { p.lobby = m; })

@@ -9,7 +9,8 @@
 //   로비 상태(무기·준비)는 호스트가 정하고 1초마다 다시 알림 (메시지가 빠져도 맞춰짐)
 //   시간 제한: 방장만 바꿀 수 있고(무제한 포함) 로비 상태와 start 에 실려 양쪽이 같은 값으로 경기를 만든다
 //   시작: 호스트가 양쪽 준비를 확인하면 start (상대 첫 입력이 올 때까지 반복)
-//   입력: 3프레임마다 묶어 보내고, 매번 최근 24프레임을 함께 실어 빠진 메시지를 다음 메시지가 메운다
+//   입력: 3프레임마다 묶어 보낸다. 상대가 "여기까지 받았다"(a)고 알려 줄 때까지 받지 못한 입력을 계속 다시 싣는다
+//         (화면이 잠깐 멈췄다 몰아서 진행해도 빠지는 프레임이 없다 — 예전 '최근 N프레임만 다시 보내기'는 서로 기다리며 멈췄음)
 //   나감: bye 또는 방 참가자 목록에서 사라지면 peerLeft
 // 전송 제한(초당 약 40회, 4KB)을 지키도록 입력 20회/초 + 핑 1회/초 + 해시 1회/초.
 // =============================================================================
@@ -26,7 +27,7 @@ const FRAME_MS = 1000 / 60;
 const GONE_GRACE = 6000;
 export const ROOM_NET = {
   flushMs: 50,        // 입력 묶음 전송 주기 (3프레임)
-  window: 24,         // 한 메시지에 다시 싣는 최근 입력 프레임 수 (빠진 메시지 복구)
+  maxBatch: 120,      // 한 메시지에 싣는 최대 입력 프레임 수 (받았다는 확인이 올 때까지 다시 보냄)
   lobbyEveryMs: 1000, // 로비 상태 재전송
   pingEveryMs: 1000,
   joinTimeoutMs: 4000,
@@ -83,6 +84,7 @@ export class RoomNet {
     this.otherPeer = null;
     this.state = null;       // 호스트: { weapons, ready, playing, matchId, delay }
     this.matchId = 0;
+    this.recvNext = 0; this.peerAck = 0; this.recvDirty = false;
     this.sentInputs = new Map();
     this.pending = false;
     this.startAcked = true;
@@ -90,6 +92,8 @@ export class RoomNet {
     this.want = null;
     this.matchIdle = false;
     this.goneAt = null;
+    this.seenTime = null;
+    this.lastLobby = null;
   }
 
   on(type, fn) { this.handlers.set(type, fn); return this; }
@@ -123,8 +127,8 @@ export class RoomNet {
       case 'end': this.control({ op: 'end', m: msg.m }); break;
       case 'input':
         if (msg.m !== this.matchId) return;
+        if (msg.f < this.peerAck) return;
         this.sentInputs.set(msg.f, msg.i);
-        if (this.sentInputs.size > this.cfg.window * 4) this.sentInputs.delete(Math.min(...this.sentInputs.keys()));
         this.pending = true;
         break;
       case 'hash':
@@ -143,7 +147,7 @@ export class RoomNet {
     this.room = await this.lobby.join(`duel-${code.toLowerCase()}`);
     const r = this.room;
     const on = (topic, fn) => this.unsubs.push(r.on(topic, (m) => {
-      if (m.isMe) return;
+      if (m.sameTab) return; // 내 메아리만 무시 (isMe 는 "같은 계정의 다른 탭·기기"도 포함 → 혼자 두 기기로 시험할 때 막힘)
       if (m.peer === this.otherPeer) this.goneAt = null; // 소식이 오면 살아 있음
       fn(m.data ?? {}, m);
     }));
@@ -179,7 +183,7 @@ export class RoomNet {
       await this.enter(makeCode(this.rand));
       this.host = true;
       this.slot = 0;
-      this.state = { weapons: ['longsword', 'longsword'], ready: [false, false], playing: false, matchId: 0, time: BALANCE.round.timeSeconds };
+      this.state = { weapons: ['longsword', 'longsword'], ready: [false, false], playing: false, matchId: 0, time: BALANCE.round.onlineDefault };
       this.lastLobbyAt = 0;
       this.emitLocal('joined', { code: this.code, slot: 0 });
       this.broadcastLobby();
@@ -258,8 +262,15 @@ export class RoomNet {
 
   applyLobby(d) {
     if (this.slot !== 1) return;
+    this.lastLobby = d;
     this.matchIdle = !d.playing;
-    this.emitLocal('lobby', { code: d.code, connected: d.connected, weapons: d.weapons, ready: d.ready, playing: d.playing, time: validTime(d.time) ? d.time : BALANCE.round.timeSeconds });
+    // 방장이 시간을 바꾸면 양쪽 준비가 풀린다 → 내가 다시 보내던 '준비' 도 내려놓는다 (안 그러면 혼자 다시 준비됨)
+    if (this.seenTime != null && d.time !== this.seenTime && this.want) this.want.ready = false;
+    this.seenTime = d.time;
+    // 내가 방금 바꾼 준비 상태는 방장 확인이 오기 전에도 그대로 보여 준다 (눌렀는데 안 바뀐 것처럼 보이지 않게)
+    const ready = Array.isArray(d.ready) ? [...d.ready] : [false, false];
+    if (!d.playing && this.want && typeof this.want.ready === 'boolean' && this.now() - (this.wantAt ?? -1e9) < 1500) ready[1] = this.want.ready;
+    this.emitLocal('lobby', { code: d.code, connected: d.connected, weapons: d.weapons, ready, playing: d.playing, time: validTime(d.time) ? d.time : BALANCE.round.onlineDefault });
   }
 
   control(op) {
@@ -268,6 +279,8 @@ export class RoomNet {
     // 손님: 원하는 상태(무기·준비)를 기억해 두고 주기적으로 다시 알린다 (메시지가 빠져도 맞춰짐)
     if (op.op === 'select') this.want = { ...(this.want ?? {}), weapon: op.weapon, ready: false };
     if (op.op === 'ready') this.want = { ...(this.want ?? {}), ready: !!op.ready };
+    if (op.op === 'select' || op.op === 'ready') this.wantAt = this.now();
+    if (op.op === 'ready' && this.lastLobby) this.applyLobby(this.lastLobby); // 내 화면은 바로 바꿔 보여 준다
     this.room.emit('ctl', op).catch(() => {});
     this.lastWantAt = this.now();
   }
@@ -312,7 +325,7 @@ export class RoomNet {
     this.lastStart = { matchId: s.matchId, weapons: [...s.weapons], delay, time: s.time };
     this.startAcked = false;
     this.room.emit('start', this.lastStart).catch(() => {});
-    this.beginMatch(s.matchId);
+    this.beginMatch(s.matchId, delay);
     this.emitLocal('start', { ...this.lastStart, slot: 0 });
   }
 
@@ -320,14 +333,18 @@ export class RoomNet {
     if (this.slot !== 1 || d.matchId === this.matchId) return; // 같은 시작 신호 반복은 무시
     this.matchIdle = false;
     if (this.want) this.want.ready = false;
-    this.beginMatch(d.matchId);
-    this.emitLocal('start', { matchId: d.matchId, weapons: d.weapons, delay: d.delay, time: validTime(d.time) ? d.time : BALANCE.round.timeSeconds, slot: 1 });
+    this.beginMatch(d.matchId, d.delay);
+    this.emitLocal('start', { matchId: d.matchId, weapons: d.weapons, delay: d.delay, time: validTime(d.time) ? d.time : BALANCE.round.onlineDefault, slot: 1 });
   }
 
-  beginMatch(id) {
+  beginMatch(id, delay = 0) {
     this.matchId = id;
     this.sentInputs = new Map();
     this.pending = false;
+    // 입력 확인: 처음 delay 프레임은 양쪽 모두 빈 입력으로 정해져 있다
+    this.recvNext = delay | 0;   // 상대 입력을 여기 전까지 빠짐없이 받았다
+    this.peerAck = delay | 0;    // 상대가 내 입력을 여기 전까지 받았다
+    this.recvDirty = false;      // 새로 받은 입력이 있어 확인을 보내야 함
   }
 
   // --- 입력 묶음 ------------------------------------------------------------
@@ -340,19 +357,33 @@ export class RoomNet {
       this.room.emit('ctl', { op: 'sync', ...this.want }).catch(() => {});
       this.lastWantAt = this.now();
     }
-    if (!this.sentInputs.size) return;
-    // 새 입력이 없어도 보낸다: 상대가 빠진 프레임을 기다리는 중일 수 있다
-    const frames = [...this.sentInputs.keys()].sort((a, b) => a - b).slice(-this.cfg.window);
-    const f0 = frames[0];
+    this.flushInputs();
+  }
+
+  /** 상대가 아직 받았다고 확인하지 않은 입력을 오래된 것부터 보낸다 (+ 내가 받은 곳까지 확인) */
+  flushInputs() {
+    if (!this.matchId) return;
+    for (const f of this.sentInputs.keys()) if (f < this.peerAck) this.sentInputs.delete(f);
+    if (!this.sentInputs.size && !this.recvDirty) return;
+    const frames = [...this.sentInputs.keys()].sort((a, b) => a - b);
+    const f0 = frames.length ? frames[0] : this.peerAck;
     const bits = [];
-    for (let f = f0; f <= frames.at(-1); f++) bits.push(this.sentInputs.get(f) ?? 0);
-    this.room.emit('in', { m: this.matchId, f0, b: bits }).catch(() => {});
+    for (let f = f0; f <= (frames.at(-1) ?? f0 - 1) && bits.length < this.cfg.maxBatch; f++) {
+      if (!this.sentInputs.has(f)) break; // (생기지 않지만) 빈 곳은 보내지 않는다
+      bits.push(this.sentInputs.get(f));
+    }
+    this.room.emit('in', { m: this.matchId, f0, b: bits, a: this.recvNext }).catch(() => {});
+    this.recvDirty = false;
     this.pending = false;
   }
 
   onInputs(d) {
     if (d.m !== this.matchId || !Array.isArray(d.b) || typeof d.f0 !== 'number') return;
     if (this.host) this.startAcked = true;
+    if (typeof d.a === 'number' && d.a > this.peerAck) this.peerAck = d.a;
+    if (!d.b.length) return;
+    this.recvDirty = true;
+    if (d.f0 <= this.recvNext) this.recvNext = Math.max(this.recvNext, d.f0 + d.b.length);
     d.b.forEach((bits, i) => this.emitLocal('input', { m: d.m, f: d.f0 + i, i: bits | 0 }));
   }
 

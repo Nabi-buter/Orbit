@@ -213,7 +213,7 @@ export class App {
           return;
         } else {
           const Peer = await loadPeerJS();
-          net = new RoomNet(new PeerLobby(Peer), { net: { flushMs: 17, window: 12 } });
+          net = new RoomNet(new PeerLobby(Peer), { net: { flushMs: 17 } });
         }
       } else {
         net = new NetClient(NetClient.defaultUrl());
@@ -244,7 +244,15 @@ export class App {
       .on('roomClosed', (m) => this.setNet({ phase: 'connect', error: m.msg }))
       .on('ping', (m) => { if (this.netState) { this.netState.rtt = m.rtt; this.netState.peerRtt = m.peerRtt; } })
       .on('start', (m) => this.startOnlineMatch(m))
-      .on('input', (m) => { if (this.lockstep && m.m === this.lockstep.matchId) this.lockstep.onRemoteInput(m.f, m.i); })
+      .on('input', (m) => {
+        if (!this.lockstep || m.m !== this.lockstep.matchId) return;
+        this.lockstep.onRemoteInput(m.f, m.i);
+        // 이 탭이 가려져 있으면(다른 탭·창 뒤, 앱 전환) 화면 루프가 멈춘다 → 상대 입력이 올 때마다 따라 진행
+        if (typeof document !== 'undefined' && document.hidden && !this.catchUpQueued) {
+          this.catchUpQueued = true;
+          queueMicrotask(() => { this.catchUpQueued = false; this.catchUpHidden(); });
+        }
+      })
       .on('hash', (m) => { if (this.lockstep && m.m === this.lockstep.matchId) this.lockstep.onRemoteHash(m.f, m.h); })
       .on('peerLeft', () => {
         if (this.scene === 'battle' && this.mode === 'online' && !this.match.over) this.toResult({ peerLeft: true });
@@ -271,10 +279,27 @@ export class App {
     this.weapons = [...msg.weapons];
     this.slot = msg.slot;
     this.netDelay = msg.delay;
-    this.netTime = msg.time ?? BALANCE.round.timeSeconds;
+    this.netTime = msg.time ?? BALANCE.round.onlineDefault;
     this.lockstep = new Lockstep({ slot: msg.slot, delay: msg.delay, matchId: msg.matchId, send: (m) => this.net?.send(m) });
     this.onlineMenuOpen = false;
     this.startMatch();
+  }
+
+  /**
+   * 가려진 탭에서 온라인 대전 따라가기: 브라우저가 화면 루프(requestAnimationFrame)와 타이머를 멈추거나 늦추므로,
+   * 상대 입력이 도착하면 진행할 수 있는 만큼 진행하고 내 입력(빈 입력)을 바로 보낸다.
+   * 안 하면 상대는 내 입력을, 나는 화면이 돌아오기를 기다리며 양쪽이 멈춘다.
+   */
+  catchUpHidden() {
+    if (this.scene !== 'battle' || this.mode !== 'online') return;
+    for (let i = 0; i < 900; i++) {
+      const ls = this.lockstep;
+      if (!ls || this.scene !== 'battle') break;
+      const s0 = ls.stalled;
+      this.tick();
+      if (ls.stalled > s0) break; // 상대 입력을 기다리는 곳까지 왔다
+    }
+    this.net?.flushInputs?.();
   }
 
   toggleOnlineMenu() {
@@ -316,7 +341,7 @@ export class App {
   loop(now) {
     const dt = Math.min(250, now - this.last);
     this.last = now;
-    if (this.scene === 'battle' && !this.paused) {
+    if (this.scene === 'battle' && !this.paused && !(typeof document !== 'undefined' && document.hidden)) {
       this.acc += dt;
       while (this.acc >= STEP) {
         this.tick();

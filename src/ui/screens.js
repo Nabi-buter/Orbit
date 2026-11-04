@@ -552,7 +552,7 @@ export class MenuOverlay {
 // 온라인 로비
 // -----------------------------------------------------------------------------
 /** 시간 제한 표시 (0 = 무제한) */
-export function timeLabel(s) { return !s ? '무제한' : s % 60 === 0 && s >= 120 ? `${s / 60}분` : `${s}초`; }
+export function timeLabel(s) { return !s ? '무제한' : `${s}초`; }
 
 export class OnlineScreen {
   /** cb: {onCreate, onJoin(code), onSelect(w), onReady(bool), onLeave, onBack} */
@@ -600,7 +600,7 @@ export class OnlineScreen {
     const st = this.state;
     if (st.phase !== 'room' || st.slot !== 0 || !this.cb.onTime) return;
     const opts = TIME_OPTIONS;
-    const i = Math.max(0, opts.indexOf(st.time ?? BALANCE.round.timeSeconds));
+    const i = Math.max(0, opts.indexOf(st.time ?? BALANCE.round.onlineDefault));
     this.cb.onTime(opts[(i + d + opts.length) % opts.length]);
   }
   type(c) { if (this.code.length < 4) this.code += c; }
@@ -678,7 +678,7 @@ export class OnlineScreen {
       // 시간 제한
       const host = me === 0;
       text(ctx, '시간 제한', 34, 90, UI.dim, { size: 11 });
-      text(ctx, timeLabel(st.time ?? BALANCE.round.timeSeconds), 88, 105, UI.gold, { size: 13, align: 'center', shadow: UI.ink });
+      text(ctx, timeLabel(st.time ?? BALANCE.round.onlineDefault), 88, 105, UI.gold, { size: 13, align: 'center', shadow: UI.ink });
       if (host) {
         for (const b of this.keys) {
           const hov = this.hoverKey === b;

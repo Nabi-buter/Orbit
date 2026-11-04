@@ -130,7 +130,8 @@ export const BALANCE = {
 
   round: {
     timeSeconds: 99,      // [TEMP]
-    timeOptions: [60, 99, 180, 300, 0], // 온라인 방장이 고르는 시간 제한 (0 = 무제한)
+    timeOptions: [60, 90, 120, 0], // 온라인 방장이 고르는 시간 제한 (0 = 무제한). AI 대전·로컬 2인은 timeSeconds
+    onlineDefault: 90,    // 온라인 방의 처음 시간 제한
     koDelay: 90,          // KO 후 다음 라운드(또는 결과)까지 대기
     lives: 2,             // 목숨 수
     introFrames: 75,      // 라운드 사이 정지 (ROUND 2 / FIGHT 표시)
