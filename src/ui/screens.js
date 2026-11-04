@@ -495,7 +495,7 @@ export class OnlineScreen {
     text(ctx, '온라인 대전', 34, 16, UI.paper, { size: 14 });
     rect(ctx, 34, 36, 18, 2, UI.gold);
     if (st.error) wrap(st.error, PW - 70).forEach((l, i) => text(ctx, l, 34, 44 + i * 12, UI.red, { size: 11, forceRaster: true }));
-    if (st.phase === 'connecting' && !st.error) text(ctx, '서버에 연결 중…', 34, 74, UI.dim, { size: 11 });
+    if (st.phase === 'connecting' && !st.error) text(ctx, '연결 중…', 34, 74, UI.dim, { size: 11 });
     if (st.phase === 'connect') {
       text(ctx, '방 코드', 34, 130, UI.dim, { size: 11 });
       for (let k = 0; k < 4; k++) {

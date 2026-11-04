@@ -13,6 +13,7 @@ import { Keyboard } from '../input/keyboard.js';
 import { Renderer, hitstopFor, UI, TEAM } from '../render/renderer.js';
 import { sfx, playEvent } from '../render/sfx.js';
 import { NetClient } from '../net/client.js';
+import { RoomNet, openRoom } from '../net/roomNet.js';
 import { Lockstep } from '../net/lockstep.js';
 import { TitleScreen, LoadoutScreen, HelpScreen, MenuOverlay, OnlineScreen } from '../ui/screens.js';
 
@@ -187,21 +188,28 @@ export class App {
     });
     this.screen = screen;
     if (this.net?.connected && this.netState?.phase === 'room') { screen.setState(this.netState); return; }
-    if (window.ORBIT_STATIC) {
-      this.setNet({ phase: 'connecting', error: '이 링크는 게임 파일만 제공해 온라인 대전을 할 수 없습니다. 온라인 대전은 npm start 로 실행한 서버 주소에서 이용하세요.' });
-      return;
-    }
     this.setNet({ phase: 'connecting', error: null });
     try {
       this.net?.close();
-      const net = new NetClient(NetClient.defaultUrl());
+      // 공유 링크(게임 파일만 있는 페이지): 서버 대신 페이지의 실시간 방 기능으로 중계
+      let net;
+      if (window.ORBIT_STATIC) {
+        const room = await openRoom();
+        if (!room) {
+          this.setNet({ phase: 'connecting', error: '이 화면에서는 온라인 대전을 쓸 수 없습니다. claude.ai 에 로그인한 상태로 공유 링크를 열어 주세요 (참여자 이상 권한 필요).' });
+          return;
+        }
+        net = new RoomNet(room);
+      } else {
+        net = new NetClient(NetClient.defaultUrl());
+      }
       this.net = net;
       this.bindNet(net);
       await net.connect();
       if (this.net !== net) return;
       this.setNet({ phase: 'connect', error: null });
     } catch (e) {
-      this.setNet({ phase: 'connect', error: `${e.message} npm start 로 실행한 서버 주소로 접속했는지 확인하세요.` });
+      this.setNet({ phase: 'connect', error: window.ORBIT_STATIC ? e.message : `${e.message} npm start 로 실행한 서버 주소로 접속했는지 확인하세요.` });
     }
   }
 
