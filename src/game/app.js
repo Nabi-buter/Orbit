@@ -185,7 +185,7 @@ export class App {
 
   playerNames() {
     if (this.mode === 'online') return this.slot === 0 ? ['나', '상대'] : ['상대', '나'];
-    return this.mode === 'pve' ? ['플레이어', `CPU ${DIFFICULTY[this.difficulty].label}`] : ['P1', 'P2'];
+    return this.mode === 'pve' ? ['플레이어', DIFFICULTY[this.difficulty].name] : ['P1', 'P2'];
   }
 
   // --- 온라인 대전 ------------------------------------------------------------
