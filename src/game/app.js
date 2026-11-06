@@ -19,6 +19,8 @@ import { Lockstep } from '../net/lockstep.js';
 import { TitleScreen, LoadoutScreen, HelpScreen, MenuOverlay, OnlineScreen, SettingsScreen } from '../ui/screens.js';
 
 const STEP = 1000 / FPS;
+/** 훈련장 더미의 몸(체력 등)으로 쓸 무기 — 무기는 그리지 않는다 */
+const DUMMY_BODY = 'longsword';
 const INTRO_FRAMES = 96;
 
 export class App {
@@ -32,7 +34,6 @@ export class App {
     this.weapons = ['longsword', 'longsword'];
     this.difficulty = 'normal';
     this.cpuWeapon = 'random';
-    this.dummyWeapon = 'longsword'; // 훈련장 더미가 드는 무기
     this.picks = [null, null]; // 무기 선택 화면에서 고른 것 ('random' 이면 대전마다 새로 뽑음)
     this.match = null;
     this.paused = false;
@@ -86,15 +87,13 @@ export class App {
       mode: o.mode ?? (['online', 'training'].includes(this.mode) ? this.mode : 'pve'),
       difficulty: this.difficulty,
       cpuWeapon: this.cpuWeapon,
-      dummyWeapon: this.dummyWeapon,
       onBack: () => this.toTitle(),
-      onStart: ({ weapon, pick, mode, difficulty, cpuWeapon, dummyWeapon }) => {
+      onStart: ({ weapon, pick, mode, difficulty, cpuWeapon }) => {
         this.weapons[0] = weapon;
         this.picks[0] = pick;
         this.mode = mode;
         this.difficulty = difficulty;
         this.cpuWeapon = cpuWeapon;
-        this.dummyWeapon = dummyWeapon;
         if (mode === 'online') this.toOnline();
         else this.startMatch(); // AI 대전 · 훈련장
       },
@@ -105,7 +104,8 @@ export class App {
     // 무작위로 고른 쪽은 대전(재시작·다시 대전 포함)마다 새로 뽑는다. 온라인은 방에서 정한 무기 그대로
     if (this.mode !== 'online') {
       if (this.picks[0] === 'random') this.weapons[0] = randomWeapon();
-      const other = this.mode === 'training' ? this.dummyWeapon : this.cpuWeapon;
+      // 훈련장 더미는 무기를 들지 않는다 (판정·체력 계산용 기본 무기만 두고 그리지 않음)
+      const other = this.mode === 'training' ? DUMMY_BODY : this.cpuWeapon;
       this.weapons[1] = other === 'random' ? randomWeapon() : other;
     }
     this.scene = 'battle';
@@ -114,6 +114,7 @@ export class App {
     // 훈련장: 시간 제한 없음 (더미는 쓰러지지 않음 — tick 의 trainingAssist)
     const roundSeconds = this.mode === 'online' && this.netTime != null ? this.netTime : this.mode === 'training' ? 0 : undefined;
     this.match = new Match({ weapons: this.weapons, ...(roundSeconds !== undefined ? { roundSeconds } : {}) });
+    if (this.mode === 'training') this.match.fighters[1].unarmed = true;
     this.ai = this.mode === 'pve' ? new AIController(this.difficulty) : null;
     this.renderer.reset();
     this.hitstop = 0;
@@ -180,6 +181,7 @@ export class App {
    */
   trainingAssist(m) {
     const [me, dummy] = m.fighters;
+    dummy.unarmed = true; // (라운드가 바뀌어 새로 만들어져도)
     if (me.state !== 'ultimate') me.ult = Math.max(me.ult, BALANCE.ultimate.cost);
     const since = m.frame - (dummy.flash?.frame ?? -999);
     if (dummy.hp < dummy.maxHp * 0.35 || (since > 120 && dummy.hp < dummy.maxHp)) dummy.hp = dummy.maxHp;

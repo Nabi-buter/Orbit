@@ -132,7 +132,7 @@ export function drawBot(ctx, f, ax, ay, pal, frame, opts = {}) {
   const { pal: P, key } = paletteFor(team, tint);
   ax = Math.round(ax); ay = Math.round(ay);
   const weaponId = f.weapon.id;
-  const showWeapon = !opts.silhouette;
+  const showWeapon = !opts.silhouette && !f.unarmed;
 
   // --- 1) 시트 프레임 그대로 ------------------------------------------------
   // 대기·걷기·대시·점프도 관절 리그로 그린다 → 무기를 든 자세에서 공격으로 끊김 없이 이어짐

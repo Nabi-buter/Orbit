@@ -208,7 +208,6 @@ export class LoadoutScreen {
     this.mode = o.mode ?? 'pve';
     this.difficulty = o.difficulty ?? 'normal';
     this.cpuWeapon = o.cpuWeapon ?? 'random';
-    this.dummyWeapon = o.dummyWeapon ?? 'longsword';
     this.puppet = new Puppet(this.weapon === 'random' ? WEAPON_ORDER[0] : this.weapon, this.player, 1);
     this.hover = null;
     this.t = 0;
@@ -237,9 +236,8 @@ export class LoadoutScreen {
   cycleWeapon(d) { const i = PICKS.indexOf(this.weapon); this.setWeapon(PICKS[(i + d + PICKS.length) % PICKS.length]); }
   cycleDiff(d) { const k = Object.keys(DIFFICULTY); this.difficulty = k[(k.indexOf(this.difficulty) + d + k.length) % k.length]; }
   cycleCpu(d) { const list = ['random', ...WEAPON_ORDER]; this.cpuWeapon = list[(list.indexOf(this.cpuWeapon) + d + list.length) % list.length]; }
-  cycleDummy(d) { const list = [...WEAPON_ORDER, 'random']; this.dummyWeapon = list[(list.indexOf(this.dummyWeapon) + d + list.length) % list.length]; }
   /** 무작위면 지금 하나를 뽑아 넘긴다 (pick 에는 고른 것 그대로 — 다시 대전할 때 새로 뽑도록) */
-  confirm() { this.o.onStart({ weapon: this.weapon === 'random' ? randomWeapon() : this.weapon, pick: this.weapon, mode: this.mode, difficulty: this.difficulty, cpuWeapon: this.cpuWeapon, dummyWeapon: this.dummyWeapon }); }
+  confirm() { this.o.onStart({ weapon: this.weapon === 'random' ? randomWeapon() : this.weapon, pick: this.weapon, mode: this.mode, difficulty: this.difficulty, cpuWeapon: this.cpuWeapon }); }
 
   keys() {
     return this.player === 1
@@ -249,8 +247,6 @@ export class LoadoutScreen {
 
   onKey(e) {
     const k = this.keys();
-    // 훈련장: ← → 는 더미 무기 (내 무기는 A D)
-    if (this.mode === 'training' && (e.code === 'ArrowLeft' || e.code === 'ArrowRight')) { this.cycleDummy(e.code === 'ArrowLeft' ? -1 : 1); return true; }
     if (k.left.includes(e.code)) { this.cycleWeapon(-1); return true; }
     if (k.right.includes(e.code)) { this.cycleWeapon(1); return true; }
     if (k.ok.includes(e.code)) { this.confirm(); return true; }
@@ -274,7 +270,6 @@ export class LoadoutScreen {
       if (hit(this.diffRow, x, y)) { this.cycleDiff(1); return true; }
       if (hit(this.cpuRow, x, y)) { this.cycleCpu(1); return true; }
     }
-    if (this.mode === 'training' && hit(this.cpuRow, x, y)) { this.cycleDummy(1); return true; }
     if (hit(this.start, x, y)) { this.start.onClick(); return true; }
     if (hit(this.back, x, y)) { this.back.onClick(); return true; }
     return false;
@@ -340,18 +335,9 @@ export class LoadoutScreen {
       text(ctx, '상대', 312, 144, UI.dim, { size: 11 });
       text(ctx, `< ${this.cpuWeapon === 'random' ? '무작위' : WEAPONS[this.cpuWeapon].name} >`, PW - 12, 144, ch ? UI.gold : UI.paper, { size: 11, align: 'right' });
     } else if (this.mode === 'training') {
-      // 더미: 고른 무기를 든 채 가만히 서 있는 상대 (드는 자세와 무기 생김새 보기, 내 무기 시험)
-      const ch = this.hover === this.cpuRow;
-      text(ctx, '가만히 서 있는 상대', 312, 112, '#5d636f', { size: 11 });
-      text(ctx, '더미', 312, 144, UI.dim, { size: 11 });
-      text(ctx, `< ${this.dummyWeapon === 'random' ? '무작위' : WEAPONS[this.dummyWeapon].name} >`, PW - 12, 144, ch ? UI.gold : UI.paper, { size: 11, align: 'right' });
-      if (!this.dummyPuppet || this.dummyPuppet.key !== this.dummyWeapon) {
-        const id = this.dummyWeapon === 'random' ? WEAPON_ORDER[0] : this.dummyWeapon;
-        this.dummyPuppet = new Puppet(id, 1, -1); this.dummyPuppet.key = this.dummyWeapon; this.dummyPuppet.idle = true;
-      }
-      if (this.dummyWeapon === 'random' && this.t % 36 === 0) { const cur = this.dummyPuppet.f.weapon.id; this.dummyPuppet.setWeapon(WEAPON_ORDER[(WEAPON_ORDER.indexOf(cur) + 1) % WEAPON_ORDER.length]); this.dummyPuppet.idle = true; }
-      this.dummyPuppet.t++; // 숨쉬기만 (공격 시연 없음)
-      this.dummyPuppet.draw(ctx, 372, 104);
+      text(ctx, '더미', 312, 112, UI.dim, { size: 11 });
+      text(ctx, '맨손으로 서 있는 상대', 312, 126, UI.paper, { size: 11 });
+      text(ctx, '쓰러지지 않음', 312, 140, '#5d636f', { size: 11 });
     } else {
       text(ctx, '다음: 방 만들기·참가', 312, 136, UI.dim, { size: 11 });
     }
@@ -376,7 +362,7 @@ export class LoadoutScreen {
     text(ctx, '대전 시작', sb.x + kw + 5, sb.y, this.hover === sb ? UI.gold : UI.paper, { size: 11 });
     const bw = keycap(ctx, 'ESC', this.back.x, this.back.y + 1);
     text(ctx, '뒤로', this.back.x + bw + 5, this.back.y, UI.dim, { size: 11 });
-    text(ctx, this.mode === 'training' ? 'A D 내 무기 · ← → 더미 · Q E 모드' : 'A D 무기 · Q E 모드', PW / 2, 221, '#5d636f', { size: 11, align: 'center' });
+    text(ctx, 'A D 무기 · Q E 모드', PW / 2, 221, '#5d636f', { size: 11, align: 'center' });
   }
 }
 

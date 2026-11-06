@@ -445,7 +445,7 @@ export class Renderer {
       const name = opts.names?.[i] ?? `P${i + 1}`;
       // 이름 · 무기
       const nw = text(ctx, name, X, 7, UI.paper, { size: 11, align: al, shadow: UI.ink });
-      text(ctx, f.weapon.name, X + s * (nw + 6), 7, TEAM[i].ui, { size: 11, align: al, shadow: UI.ink });
+      if (!f.unarmed) text(ctx, f.weapon.name, X + s * (nw + 6), 7, TEAM[i].ui, { size: 11, align: al, shadow: UI.ink });
       // 목숨: 체력 막대 끝 위에 작은 칸 (남은 목숨 = 채움)
       const lives = match.lives?.[i] ?? 1, maxLives = BALANCE.round.lives;
       for (let k = 0; k < maxLives; k++) {

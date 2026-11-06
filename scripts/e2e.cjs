@@ -166,16 +166,13 @@ function assert(c, msg) { if (!c) throw new Error('E2E 실패: ' + msg); console
     await wait(400);
     assert(await scene() === 'result', '시간 종료 → 결과');
 
-    // 훈련장: 내 무기 + 더미 무기, 더미는 움직이지 않고 쓰러지지 않음, 시간 제한 없음, 궁극기 무제한
+    // 훈련장: 내 무기만 고름, 더미는 맨손으로 움직이지 않고 쓰러지지 않음, 시간 제한 없음, 궁극기 무제한
     await page.evaluate(() => window.__game.toLoadout({ mode: 'training' }));
     await page.evaluate(() => window.__game.screen.setWeapon('dagger'));
-    await key('ArrowRight'); await key('ArrowRight'); // 더미 무기: 장검 → 레이피어 → 대검
-    const dw = await page.evaluate(() => window.__game.screen.dummyWeapon);
-    assert(dw === 'greatsword', `훈련장 더미 무기 선택 ${dw}`);
     await shot(page, '06-loadout-training');
     await key('Enter');
-    const tw = await page.evaluate(() => window.__game.match.fighters.map((f) => f.weapon.id));
-    assert(await scene() === 'battle' && tw[0] === 'dagger' && tw[1] === 'greatsword', `훈련장 시작 ${tw}`);
+    const tw = await page.evaluate(() => window.__game.match.fighters.map((f) => [f.weapon.id, !!f.unarmed]));
+    assert(await scene() === 'battle' && tw[0][0] === 'dagger' && !tw[0][1] && tw[1][1], `훈련장 시작: 내 무기 단검, 더미는 맨손 ${JSON.stringify(tw)}`);
     assert(await page.evaluate(() => window.__game.match.unlimited), '훈련장 시간 무제한');
     await wait(1800);
     const d0 = await page.evaluate(() => window.__game.match.fighters[1].x);

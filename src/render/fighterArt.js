@@ -73,8 +73,9 @@ export function computePose(f, frame) {
   p.crouch = breathe;
   const weaponId = f.weapon.id;
   // 무기별 기본 자세
-  const st = STANCE[weaponId];
-  if (st) { p.wAngle = st.a; p.hand = [...st.h]; p.hand2 = backHand(weaponId, st); }
+  // 맨손(훈련장 더미): 팔을 편하게 내린 자세
+  const st = f.unarmed ? { a: -1.2, h: [10, 70], h2: [-2, 70] } : STANCE[weaponId];
+  if (st) { p.wAngle = st.a; p.hand = [...st.h]; p.hand2 = f.unarmed ? [...st.h2] : backHand(weaponId, st); }
 
   // 가만히 서 있어도 숨에 맞춰 무기가 아주 조금 오르내린다 (무거울수록 덜)
   const W = WEIGHT[weaponId] ?? 0.5;
