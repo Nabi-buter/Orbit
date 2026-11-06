@@ -335,9 +335,7 @@ export class LoadoutScreen {
       text(ctx, '상대', 312, 144, UI.dim, { size: 11 });
       text(ctx, `< ${this.cpuWeapon === 'random' ? '무작위' : WEAPONS[this.cpuWeapon].name} >`, PW - 12, 144, ch ? UI.gold : UI.paper, { size: 11, align: 'right' });
     } else if (this.mode === 'training') {
-      text(ctx, '더미', 312, 112, UI.dim, { size: 11 });
-      text(ctx, '맨손으로 서 있는 상대', 312, 126, UI.paper, { size: 11 });
-      text(ctx, '쓰러지지 않음', 312, 140, '#5d636f', { size: 11 });
+      // 훈련장: 오른쪽 안내 없음
     } else {
       text(ctx, '다음: 방 만들기·참가', 312, 136, UI.dim, { size: 11 });
     }
