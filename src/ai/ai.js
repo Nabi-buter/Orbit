@@ -17,7 +17,7 @@ import { OpponentModel, PatternDetector } from './predictor.js';
 
 export const DIFFICULTY = {
   easy: {
-    label: '쉬움',
+    label: 'EASY',
     reaction: 24,        // 인지 지연(프레임)
     reactionJitter: 6,   // 반응 속도 흔들림(±프레임)
     thinkEvery: 14,      // 판단 주기
@@ -36,7 +36,7 @@ export const DIFFICULTY = {
     predictMin: 0.32,    // 예측 확률이 이 이상일 때만 예측대로 대응
   },
   normal: {
-    label: '보통',
+    label: 'NORMAL',
     reaction: 16,
     reactionJitter: 4,
     thinkEvery: 9,
@@ -55,7 +55,7 @@ export const DIFFICULTY = {
     predictMin: 0.28,
   },
   hard: {
-    label: '어려움',
+    label: 'HARD',
     reaction: 11,
     reactionJitter: 3,
     thinkEvery: 6,
