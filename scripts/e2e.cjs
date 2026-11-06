@@ -56,13 +56,14 @@ function assert(c, msg) { if (!c) throw new Error('E2E 실패: ' + msg); console
     assert(await page.evaluate(() => window.__game.screen.capturing), '칸 클릭 → 새 키 대기');
     await shot(page, '01b-settings-capture');
     await key('KeyL');
-    assert(await binding(0, 'light') === 'KeyL', 'P1 약공격 = L');
+    assert(await binding(0, 'light') === 'KeyL', '약공격 = L');
     await clickArt(...(await cell(0, 'light')));
     await key('KeyK'); // 강공격 키 → 서로 바뀜
     assert(await binding(0, 'light') === 'KeyK' && await binding(0, 'heavy') === 'KeyL', '이미 쓰는 키는 서로 바뀜 (약공 K, 강공 L)');
-    await clickArt(...(await cell(1, 'guard')));
+    assert(await page.evaluate(() => window.__game.screen.items.every((i) => i.kind !== 'key' || i.p === 0)), '키 배치는 플레이어 한 명(P2 칸 없음)');
+    await clickArt(...(await cell(0, 'guard')));
     await key('Escape');
-    assert(await binding(1, 'guard') === 'ArrowDown' && await scene() === 'settings', 'ESC 로 입력 취소');
+    assert(await binding(0, 'guard') === 'KeyS' && await scene() === 'settings', 'ESC 로 입력 취소');
     await shot(page, '01c-settings');
     await page.reload(); await wait(300);
     assert(await binding(0, 'light') === 'KeyK', '새로고침해도 저장됨');
@@ -87,13 +88,13 @@ function assert(c, msg) { if (!c) throw new Error('E2E 실패: ' + msg); console
 
     // Q / E 로 모드 전환
     await key('KeyE');
-    assert(await page.evaluate(() => window.__game.screen.mode) === 'local', 'E → 로컬 2인');
-    await key('KeyE');
     assert(await page.evaluate(() => window.__game.screen.mode) === 'online', 'E → 온라인');
+    await key('KeyE');
+    assert(await page.evaluate(() => window.__game.screen.mode) === 'training', 'E → 훈련장');
     await key('KeyE');
     assert(await page.evaluate(() => window.__game.screen.mode) === 'pve', 'E → AI 대전 (순환)');
     await key('KeyQ');
-    assert(await page.evaluate(() => window.__game.screen.mode) === 'online', 'Q → 온라인 (역순)');
+    assert(await page.evaluate(() => window.__game.screen.mode) === 'training', 'Q → 훈련장 (역순)');
     await key('KeyQ'); await key('KeyQ');
     assert(await page.evaluate(() => window.__game.screen.mode) === 'pve', 'Q → AI 대전');
 
@@ -165,19 +166,31 @@ function assert(c, msg) { if (!c) throw new Error('E2E 실패: ' + msg); console
     await wait(400);
     assert(await scene() === 'result', '시간 종료 → 결과');
 
-    // 로컬 2인: P1 → P2 선택
-    await page.evaluate(() => window.__game.toLoadout({ mode: 'local' }));
-    await key('KeyD');
-    const p1w = await page.evaluate(() => window.__game.screen.weapon);
+    // 훈련장: 내 무기 + 더미 무기, 더미는 움직이지 않고 쓰러지지 않음, 시간 제한 없음, 궁극기 무제한
+    await page.evaluate(() => window.__game.toLoadout({ mode: 'training' }));
+    await page.evaluate(() => window.__game.screen.setWeapon('dagger'));
+    await key('ArrowRight'); await key('ArrowRight'); // 더미 무기: 장검 → 레이피어 → 대검
+    const dw = await page.evaluate(() => window.__game.screen.dummyWeapon);
+    assert(dw === 'greatsword', `훈련장 더미 무기 선택 ${dw}`);
+    await shot(page, '06-loadout-training');
     await key('Enter');
-    assert(await page.evaluate(() => window.__game.screen.player) === 1, '로컬 2인: P2 무기 선택 화면');
-    await shot(page, '06-loadout-p2');
-    await page.evaluate(() => window.__game.screen.setWeapon('spear')); // 앞 대전의 AI 무작위 무기와 상관없이 (← 로 '무작위' 칸에 가지 않게)
-    await key('ArrowLeft');
-    const p2w = await page.evaluate(() => window.__game.screen.weapon);
-    await key('Numpad1');
-    const lw = await page.evaluate(() => window.__game.match.fighters.map((f) => f.weapon.id));
-    assert(await scene() === 'battle' && lw[0] === p1w && lw[1] === p2w, `로컬 2인 시작 ${lw}`);
+    const tw = await page.evaluate(() => window.__game.match.fighters.map((f) => f.weapon.id));
+    assert(await scene() === 'battle' && tw[0] === 'dagger' && tw[1] === 'greatsword', `훈련장 시작 ${tw}`);
+    assert(await page.evaluate(() => window.__game.match.unlimited), '훈련장 시간 무제한');
+    await wait(1800);
+    const d0 = await page.evaluate(() => window.__game.match.fighters[1].x);
+    // P2 였던 키(방향키·숫자패드)를 눌러도 더미는 움직이지 않는다
+    await page.keyboard.down('ArrowLeft'); await key('Numpad1'); await wait(500); await page.keyboard.up('ArrowLeft');
+    assert(await page.evaluate(() => window.__game.match.fighters[1].x) === d0 && await page.evaluate(() => window.__game.match.fighters[1].state) === 'idle', '더미는 조작되지 않음');
+    // 마구 때려도 쓰러지지 않음 · 궁극기 계속 가능
+    await page.evaluate(() => { const [a, b] = window.__game.match.fighters; a.x = b.x - 70; });
+    for (let k = 0; k < 14; k++) { await key(k % 3 ? 'KeyJ' : 'KeyK'); await wait(160); }
+    await key('KeyI'); await wait(1200); await key('KeyI'); await wait(1200);
+    const tr = await page.evaluate(() => { const g = window.__game, [a, b] = g.match.fighters; return { over: g.match.over, lives: g.match.lives[1], hp: b.hp, max: b.maxHp, ult: a.ult, hits: a.stats.hitsLanded }; });
+    assert(!tr.over && tr.lives === 2 && tr.hp > 0, `더미는 쓰러지지 않음 ${JSON.stringify(tr)}`);
+    assert(tr.hits > 0, '내 무기로 더미 공격');
+    await shot(page, '06b-training');
+    await key('Escape');
 
     // 새로고침
     await page.reload();

@@ -188,8 +188,8 @@ export class TitleScreen {
 // -----------------------------------------------------------------------------
 const MODES = [
   { id: 'pve', label: 'AI 대전' },
-  { id: 'local', label: '로컬 2인' },
   { id: 'online', label: '온라인' },
+  { id: 'training', label: '훈련장' },
 ];
 function speedWord(startup) {
   return startup <= 8 ? '빠름' : startup <= 13 ? '보통' : '느림';
@@ -208,6 +208,7 @@ export class LoadoutScreen {
     this.mode = o.mode ?? 'pve';
     this.difficulty = o.difficulty ?? 'normal';
     this.cpuWeapon = o.cpuWeapon ?? 'random';
+    this.dummyWeapon = o.dummyWeapon ?? 'longsword';
     this.puppet = new Puppet(this.weapon === 'random' ? WEAPON_ORDER[0] : this.weapon, this.player, 1);
     this.hover = null;
     this.t = 0;
@@ -236,8 +237,9 @@ export class LoadoutScreen {
   cycleWeapon(d) { const i = PICKS.indexOf(this.weapon); this.setWeapon(PICKS[(i + d + PICKS.length) % PICKS.length]); }
   cycleDiff(d) { const k = Object.keys(DIFFICULTY); this.difficulty = k[(k.indexOf(this.difficulty) + d + k.length) % k.length]; }
   cycleCpu(d) { const list = ['random', ...WEAPON_ORDER]; this.cpuWeapon = list[(list.indexOf(this.cpuWeapon) + d + list.length) % list.length]; }
+  cycleDummy(d) { const list = [...WEAPON_ORDER, 'random']; this.dummyWeapon = list[(list.indexOf(this.dummyWeapon) + d + list.length) % list.length]; }
   /** 무작위면 지금 하나를 뽑아 넘긴다 (pick 에는 고른 것 그대로 — 다시 대전할 때 새로 뽑도록) */
-  confirm() { this.o.onStart({ weapon: this.weapon === 'random' ? randomWeapon() : this.weapon, pick: this.weapon, mode: this.mode, difficulty: this.difficulty, cpuWeapon: this.cpuWeapon }); }
+  confirm() { this.o.onStart({ weapon: this.weapon === 'random' ? randomWeapon() : this.weapon, pick: this.weapon, mode: this.mode, difficulty: this.difficulty, cpuWeapon: this.cpuWeapon, dummyWeapon: this.dummyWeapon }); }
 
   keys() {
     return this.player === 1
@@ -247,6 +249,8 @@ export class LoadoutScreen {
 
   onKey(e) {
     const k = this.keys();
+    // 훈련장: ← → 는 더미 무기 (내 무기는 A D)
+    if (this.mode === 'training' && (e.code === 'ArrowLeft' || e.code === 'ArrowRight')) { this.cycleDummy(e.code === 'ArrowLeft' ? -1 : 1); return true; }
     if (k.left.includes(e.code)) { this.cycleWeapon(-1); return true; }
     if (k.right.includes(e.code)) { this.cycleWeapon(1); return true; }
     if (k.ok.includes(e.code)) { this.confirm(); return true; }
@@ -270,6 +274,7 @@ export class LoadoutScreen {
       if (hit(this.diffRow, x, y)) { this.cycleDiff(1); return true; }
       if (hit(this.cpuRow, x, y)) { this.cycleCpu(1); return true; }
     }
+    if (this.mode === 'training' && hit(this.cpuRow, x, y)) { this.cycleDummy(1); return true; }
     if (hit(this.start, x, y)) { this.start.onClick(); return true; }
     if (hit(this.back, x, y)) { this.back.onClick(); return true; }
     return false;
@@ -334,8 +339,21 @@ export class LoadoutScreen {
       text(ctx, `< ${DIFFICULTY[this.difficulty].label} >`, PW - 12, 128, dh ? UI.gold : UI.paper, { size: 11, align: 'right' });
       text(ctx, '상대', 312, 144, UI.dim, { size: 11 });
       text(ctx, `< ${this.cpuWeapon === 'random' ? '무작위' : WEAPONS[this.cpuWeapon].name} >`, PW - 12, 144, ch ? UI.gold : UI.paper, { size: 11, align: 'right' });
+    } else if (this.mode === 'training') {
+      // 더미: 고른 무기를 든 채 가만히 서 있는 상대 (드는 자세와 무기 생김새 보기, 내 무기 시험)
+      const ch = this.hover === this.cpuRow;
+      text(ctx, '가만히 서 있는 상대', 312, 112, '#5d636f', { size: 11 });
+      text(ctx, '더미', 312, 144, UI.dim, { size: 11 });
+      text(ctx, `< ${this.dummyWeapon === 'random' ? '무작위' : WEAPONS[this.dummyWeapon].name} >`, PW - 12, 144, ch ? UI.gold : UI.paper, { size: 11, align: 'right' });
+      if (!this.dummyPuppet || this.dummyPuppet.key !== this.dummyWeapon) {
+        const id = this.dummyWeapon === 'random' ? WEAPON_ORDER[0] : this.dummyWeapon;
+        this.dummyPuppet = new Puppet(id, 1, -1); this.dummyPuppet.key = this.dummyWeapon; this.dummyPuppet.idle = true;
+      }
+      if (this.dummyWeapon === 'random' && this.t % 36 === 0) { const cur = this.dummyPuppet.f.weapon.id; this.dummyPuppet.setWeapon(WEAPON_ORDER[(WEAPON_ORDER.indexOf(cur) + 1) % WEAPON_ORDER.length]); this.dummyPuppet.idle = true; }
+      this.dummyPuppet.t++; // 숨쉬기만 (공격 시연 없음)
+      this.dummyPuppet.draw(ctx, 372, 104);
     } else {
-      text(ctx, this.mode === 'local' ? '다음: P2 선택' : '다음: 방 만들기·참가', 312, 136, UI.dim, { size: 11 });
+      text(ctx, '다음: 방 만들기·참가', 312, 136, UI.dim, { size: 11 });
     }
 
     // 하단: 어두운 띠 + 무기 거치대
@@ -358,7 +376,7 @@ export class LoadoutScreen {
     text(ctx, '대전 시작', sb.x + kw + 5, sb.y, this.hover === sb ? UI.gold : UI.paper, { size: 11 });
     const bw = keycap(ctx, 'ESC', this.back.x, this.back.y + 1);
     text(ctx, '뒤로', this.back.x + bw + 5, this.back.y, UI.dim, { size: 11 });
-    text(ctx, this.player === 1 ? '← → 무기' : 'A D 무기 · Q E 모드', PW / 2, 221, '#5d636f', { size: 11, align: 'center' });
+    text(ctx, this.mode === 'training' ? 'A D 내 무기 · ← → 더미 · Q E 모드' : 'A D 무기 · Q E 모드', PW / 2, 221, '#5d636f', { size: 11, align: 'center' });
   }
 }
 
@@ -372,14 +390,12 @@ export class HelpScreen {
     background(ctx, 0.9);
     text(ctx, '조작법', 20, 12, UI.paper, { size: 14 });
     const rows = [['이동', 'left', 'right'], ['점프', 'up'], ['가드·패링', 'guard'], ['약공', 'light'], ['강공', 'heavy'], ['대시', 'dash'], ['궁극기', 'ult']];
-    text(ctx, 'P1', 104, 42, TEAM[0].ui); text(ctx, 'P2', 160, 42, TEAM[1].ui);
+    text(ctx, '키', 104, 42, UI.dim, { size: 11 });
     rows.forEach(([label, ...acts], i) => {
       const y = 56 + i * 14;
       text(ctx, label, 20, y, UI.paper, { size: 11 });
-      [0, 1].forEach((p) => {
-        const keys = acts.map((a) => keyLabel(CONTROLS[p][a][0])).join(' ');
-        text(ctx, keys.replace('←', '<').replace('→', '>').replace('↑', 'UP').replace('↓', 'DN'), p === 0 ? 104 : 160, y + 2, UI.dim);
-      });
+      const keys = acts.map((a) => keyLabel(CONTROLS[0][a][0])).join(' ');
+      text(ctx, keys, 104, y + 2, UI.dim);
     });
     // 오른쪽: 짧은 요령 (화면 폭 안에서 줄바꿈)
     const tx = 220, tw = PW - tx - 14;
@@ -417,7 +433,7 @@ export class SettingsScreen {
     this.note = null;      // 바꾼 결과 안내 {text, color, until}
     this.t = 0;
     this.items = [];
-    ACTIONS.forEach((a, row) => [0, 1].forEach((p) => this.items.push({ kind: 'key', p, a, row, x: p ? 228 : 150, y: 46 + row * 15, w: 70, h: 13 })));
+    ACTIONS.forEach((a, row) => this.items.push({ kind: 'key', p: 0, a, row, x: 150, y: 46 + row * 15, w: 110, h: 13 }));
     this.items.push({ kind: 'touch', x: 312, y: 62, w: 104, h: 14 });
     this.items.push({ kind: 'reset', x: 312, y: 112, w: 104, h: 16 });
     this.items.push({ kind: 'back', x: 10, y: 220, w: 60, h: 14 });
@@ -446,25 +462,23 @@ export class SettingsScreen {
       const { p, a } = this.capture;
       const r = assignKey(p, a, e.code);
       this.capture = null;
-      if (r.swapped) this.say(`P${p + 1} ${ACTION_LABELS[a]} ↔ P${r.swapped[0] + 1} ${ACTION_LABELS[r.swapped[1]]} 키를 서로 바꿨습니다`, UI.gold);
-      else this.say(`P${p + 1} ${ACTION_LABELS[a]} = ${keyLabel(e.code)}`, UI.paper);
+      if (r.swapped) this.say(`${ACTION_LABELS[a]} ↔ ${ACTION_LABELS[r.swapped[1]]} 키를 서로 바꿨습니다`, UI.gold);
+      else this.say(`${ACTION_LABELS[a]} = ${keyLabel(e.code)}`, UI.paper);
       return true;
     }
     const it = this.items[this.focus];
     const move = (to) => { if (to >= 0 && to < this.items.length) this.focus = to; return true; };
     if (BACK.includes(e.code)) { this.onBack(); return true; }
     if (CONFIRM.includes(e.code)) { this.activate(it); return true; }
+    const base = ACTIONS.length; // 키 칸 다음부터 오른쪽 항목
     if (it.kind === 'key') {
-      const idx = it.row * 2 + it.p;
-      if (e.code === 'ArrowDown') return move(it.row === ACTIONS.length - 1 ? ACTIONS.length * 2 : idx + 2);
-      if (e.code === 'ArrowUp') return move(Math.max(0, idx - 2));
-      if (e.code === 'ArrowRight') return move(it.p === 0 ? idx + 1 : ACTIONS.length * 2);
-      if (e.code === 'ArrowLeft') return move(it.p === 1 ? idx - 1 : idx);
+      if (e.code === 'ArrowDown') return move(it.row + 1);
+      if (e.code === 'ArrowUp') return move(Math.max(0, it.row - 1));
+      if (e.code === 'ArrowRight') return move(base);
     } else {
-      const base = ACTIONS.length * 2;
       if (e.code === 'ArrowDown') return move(Math.min(this.items.length - 1, this.focus + 1));
-      if (e.code === 'ArrowUp') return move(this.focus === base ? 1 : this.focus - 1);
-      if (e.code === 'ArrowLeft') return move(1);
+      if (e.code === 'ArrowUp') return move(this.focus === base ? 0 : this.focus - 1);
+      if (e.code === 'ArrowLeft') return move(0);
     }
     return false;
   }
@@ -483,7 +497,6 @@ export class SettingsScreen {
     text(ctx, '설정', 20, 12, UI.paper, { size: 14 });
     // 키 배치 표
     text(ctx, '키 배치', 20, 32, UI.dim, { size: 11 });
-    text(ctx, 'P1', 176, 34, TEAM[0].ui); text(ctx, 'P2', 254, 34, TEAM[1].ui);
     ACTIONS.forEach((a, row) => text(ctx, ACTION_LABELS[a], 20, 46 + row * 15, UI.paper, { size: 11 }));
     const focused = this.items[this.focus];
     for (const it of this.items) {

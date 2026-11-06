@@ -508,6 +508,7 @@ export class Renderer {
       const t = Math.ceil(match.timeLeft / 60);
       text(ctx, String(t).padStart(2, '0'), PW / 2, 12, t <= 10 ? UI.red : UI.paper, { scale: 2, align: 'center', shadow: UI.ink });
     }
+    if (opts.note) text(ctx, opts.note, PW / 2, 31, UI.dim, { size: 11, align: 'center', shadow: UI.ink });
     if (opts.net) {
       text(ctx, opts.net.text, PW / 2, 31, UI.cyan, { size: 11, align: 'center', shadow: UI.ink });
       if (opts.net.waiting) text(ctx, '상대 입력을 기다리는 중…', PW / 2, 70, UI.gold, { size: 12, align: 'center', shadow: UI.ink });

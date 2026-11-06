@@ -32,6 +32,7 @@ export class App {
     this.weapons = ['longsword', 'longsword'];
     this.difficulty = 'normal';
     this.cpuWeapon = 'random';
+    this.dummyWeapon = 'longsword'; // 훈련장 더미가 드는 무기
     this.picks = [null, null]; // 무기 선택 화면에서 고른 것 ('random' 이면 대전마다 새로 뽑음)
     this.match = null;
     this.paused = false;
@@ -82,33 +83,21 @@ export class App {
     this.screen = new LoadoutScreen({
       player: 0,
       weapon: this.picks[0] ?? this.weapons[0],
-      mode: o.mode ?? (this.mode === 'online' ? 'online' : this.mode === 'local' ? 'local' : 'pve'),
+      mode: o.mode ?? (['online', 'training'].includes(this.mode) ? this.mode : 'pve'),
       difficulty: this.difficulty,
       cpuWeapon: this.cpuWeapon,
+      dummyWeapon: this.dummyWeapon,
       onBack: () => this.toTitle(),
-      onStart: ({ weapon, pick, mode, difficulty, cpuWeapon }) => {
+      onStart: ({ weapon, pick, mode, difficulty, cpuWeapon, dummyWeapon }) => {
         this.weapons[0] = weapon;
         this.picks[0] = pick;
         this.mode = mode;
         this.difficulty = difficulty;
         this.cpuWeapon = cpuWeapon;
-        if (mode === 'pve') {
-          this.startMatch();
-        } else if (mode === 'local') {
-          this.toLoadoutP2();
-        } else {
-          this.toOnline();
-        }
+        this.dummyWeapon = dummyWeapon;
+        if (mode === 'online') this.toOnline();
+        else this.startMatch(); // AI 대전 · 훈련장
       },
-    });
-  }
-
-  toLoadoutP2() {
-    this.scene = 'loadout';
-    this.screen = new LoadoutScreen({
-      player: 1, weapon: this.picks[1] ?? this.weapons[1], mode: 'local', lockMode: true, title: 'P2 준비',
-      onBack: () => this.toLoadout({ mode: 'local' }),
-      onStart: ({ weapon, pick }) => { this.weapons[1] = weapon; this.picks[1] = pick; this.startMatch(); },
     });
   }
 
@@ -116,13 +105,15 @@ export class App {
     // 무작위로 고른 쪽은 대전(재시작·다시 대전 포함)마다 새로 뽑는다. 온라인은 방에서 정한 무기 그대로
     if (this.mode !== 'online') {
       if (this.picks[0] === 'random') this.weapons[0] = randomWeapon();
-      if (this.mode === 'pve') this.weapons[1] = this.cpuWeapon === 'random' ? randomWeapon() : this.cpuWeapon;
-      else if (this.picks[1] === 'random') this.weapons[1] = randomWeapon();
+      const other = this.mode === 'training' ? this.dummyWeapon : this.cpuWeapon;
+      this.weapons[1] = other === 'random' ? randomWeapon() : other;
     }
     this.scene = 'battle';
     this.paused = false;
     this.screen = null;
-    this.match = new Match({ weapons: this.weapons, ...(this.mode === 'online' && this.netTime != null ? { roundSeconds: this.netTime } : {}) });
+    // 훈련장: 시간 제한 없음 (더미는 쓰러지지 않음 — tick 의 trainingAssist)
+    const roundSeconds = this.mode === 'online' && this.netTime != null ? this.netTime : this.mode === 'training' ? 0 : undefined;
+    this.match = new Match({ weapons: this.weapons, ...(roundSeconds !== undefined ? { roundSeconds } : {}) });
     this.ai = this.mode === 'pve' ? new AIController(this.difficulty) : null;
     this.renderer.reset();
     this.hitstop = 0;
@@ -183,9 +174,21 @@ export class App {
     this.screen = new MenuOverlay({ title, titleColor: color, subtitle: reason, lines, items });
   }
 
+  /**
+   * 훈련장 보조: 더미는 쓰러지지 않고(체력이 줄면 다시 채움), 잠시 안 맞으면 체력·자세가 회복된다.
+   * 플레이어는 궁극기 게이지가 늘 차 있어 궁극기도 바로 시험할 수 있다.
+   */
+  trainingAssist(m) {
+    const [me, dummy] = m.fighters;
+    if (me.state !== 'ultimate') me.ult = Math.max(me.ult, BALANCE.ultimate.cost);
+    const since = m.frame - (dummy.flash?.frame ?? -999);
+    if (dummy.hp < dummy.maxHp * 0.35 || (since > 120 && dummy.hp < dummy.maxHp)) dummy.hp = dummy.maxHp;
+    if (since > 120) dummy.guard = BALANCE.fighter.maxGuard;
+  }
+
   playerNames() {
     if (this.mode === 'online') return this.slot === 0 ? ['나', '상대'] : ['상대', '나'];
-    return this.mode === 'pve' ? ['플레이어', DIFFICULTY[this.difficulty].name] : ['P1', 'P2'];
+    return this.mode === 'pve' ? ['플레이어', DIFFICULTY[this.difficulty].name] : ['플레이어', '더미'];
   }
 
   // --- 온라인 대전 ------------------------------------------------------------
@@ -365,6 +368,7 @@ export class App {
         frozen: this.paused || this.hitstop > 0,
         intro: this.introText(),
         net: this.mode === 'online' && this.scene === 'battle' ? this.netInfo() : null,
+        note: this.mode === 'training' && this.scene === 'battle' ? '훈련장 · F2 판정 보기' : null,
         ai: this.ai ? this.aiInfo() : null,
       });
     }
@@ -416,8 +420,7 @@ export class App {
       if (ls.needsLocal()) {
         const mine = { ...EMPTY_INPUT };
         if (!this.onlineMenuOpen) {
-          const a = this.keyboard.sample(0), b = this.keyboard.sample(1);
-          for (const k of Object.keys(mine)) mine[k] = a[k] || b[k];
+          Object.assign(mine, this.keyboard.sample(0));
         }
         ls.pushLocal(mine);
         this.keyboard.endFrame();
@@ -426,9 +429,11 @@ export class App {
       if (!inputs) return;
     } else {
       const p1 = this.keyboard.sample(0);
-      const p2 = this.ai ? this.ai.think(m, 1) : this.keyboard.sample(1);
+      // 훈련장 더미는 아무 조작도 하지 않는다 (무기를 든 자세 그대로)
+      const p2 = this.ai ? this.ai.think(m, 1) : EMPTY_INPUT;
       inputs = [p1, p2];
       this.keyboard.endFrame();
+      if (this.mode === 'training') this.trainingAssist(m);
     }
     const events = m.step(inputs);
     this.lockstep?.afterStep(m);

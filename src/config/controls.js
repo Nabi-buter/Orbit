@@ -55,7 +55,8 @@ function save() {
 
 /** 이 키를 쓰고 있는 곳 [플레이어, 동작] (없으면 null) */
 export function findKey(code) {
-  for (let p = 0; p < 2; p++) for (const a of ACTIONS) if (CONTROLS[p][a].includes(code)) return [p, a];
+  // 조작하는 사람은 한 명(P1)뿐 — 저장 형식은 예전(두 명)과 같게 두고 P1 만 본다
+  for (const a of ACTIONS) if (CONTROLS[0][a].includes(code)) return [0, a];
   return null;
 }
 

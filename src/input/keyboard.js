@@ -44,5 +44,5 @@ export class Keyboard {
 
 /** 게임 키는 브라우저 기본 동작(스크롤 등)을 막는다 — 설정에서 바뀔 수 있어 매번 확인 */
 function isGameKey(code) {
-  return code === 'Space' || code === 'Escape' || CONTROLS.some((m) => Object.values(m).some((list) => list.includes(code)));
+  return code === 'Space' || code === 'Escape' || Object.values(CONTROLS[0]).some((list) => list.includes(code));
 }
