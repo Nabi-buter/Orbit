@@ -29,9 +29,12 @@ function lowest(id, hand, a) {
 /** 땅에 걸리지 않는 각도 (걸리지 않으면 그대로) */
 export function clampToGround(id, hand, a) {
   if (id === 'knuckle' || lowest(id, hand, a) <= FLOOR) return a;
-  // 앞을 향하면 위(+)로, 뒤를 향하면 반대로 돌려 땅 위로 올린다
-  const step = Math.cos(a) >= 0 ? 0.04 : -0.04;
-  let b = a;
+  // 땅에 닿은 무기는 앞쪽으로 눕힌다. 수직 아래를 조금 지나친 정도(내려찍기의 따라가기)도 앞쪽 —
+  // 예전처럼 cos 부호로 고르면 수직을 살짝 넘는 순간 칼끝이 뒤로 휙 꺾였다. 확실히 뒤를 향할 때만 뒤로.
+  const n = Math.atan2(Math.sin(a), Math.cos(a)); // -π~π
+  const backward = n < -Math.PI / 2 - 0.6 || n > Math.PI / 2;
+  const step = backward ? -0.04 : 0.04;
+  let b = a; // 원래 각도에서 출발 (감긴 각도 그대로 — 그리기 쪽 부드럽게 하기와 이어지게)
   for (let i = 0; i < 60 && lowest(id, hand, b) > FLOOR; i++) b += step;
   return b;
 }

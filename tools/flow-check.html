@@ -1,0 +1,40 @@
+<!doctype html><html><head><meta charset="utf-8"></head><body>
+<canvas id="c" width="427" height="240"></canvas>
+<script type="module">
+// 무기 흐름 점검: 모든 무기의 약공·강공 콤보를 (1) 헛칠 때 (2) 맞힐 때 실제 시뮬레이션으로 진행하며
+// 화면에 그려지는 무기 각도(부드럽게 하기 · 바닥 처리 포함)를 프레임마다 기록해, 순간적으로 거꾸로 꺾이는 곳을 찾는다.
+import { Match } from '../src/core/match.js';
+import { EMPTY_INPUT } from '../src/core/fighter.js';
+import { drawFighter } from '../src/render/fighterArt.js';
+import { TEAM } from '../src/render/renderer.js';
+import { WEAPON_ORDER } from '../src/config/weapons.js';
+const ctx = document.getElementById('c').getContext('2d');
+const out = [];
+for (const id of WEAPON_ORDER) for (const kind of ['light', 'heavy']) for (const mode of ['whiff', 'hit']) {
+  const m = new Match({ weapons: [id, 'longsword'] });
+  const [a, b] = m.fighters;
+  b.x = a.x + (mode === 'hit' ? 70 : 900);
+  let prev = null, prevD = 0, worst = { d: 0 }, rev = 0;
+  const flips = [];
+  for (let f = 0; f < 200; f++) {
+    m.step([{ ...EMPTY_INPUT, [kind]: f % 10 < 2 && f < 120 }, EMPTY_INPUT]);
+    b.hp = b.maxHp; // 맞혀도 쓰러지지 않게
+    ctx.clearRect(0, 0, 427, 240);
+    const r = drawFighter(ctx, a, 200, 200, { ...TEAM[0], weapon: '#fff' }, m.frame);
+    const ang = r.wAngle * a.facing; // 로컬 각도
+    if (prev != null) {
+      const d = ang - prev;
+      // 한 프레임에 0.9rad 넘게 튀거나, 크게 움직이던 방향이 갑자기 반대로 크게 바뀜
+      if (Math.abs(d) > 0.8) flips.push({ f, name: a.attack?.def.name ?? a.state, d: +d.toFixed(2), ang: +ang.toFixed(2) });
+      if (Math.abs(d) > Math.abs(worst.d)) worst = { f, d: +d.toFixed(2), name: a.attack?.def.name ?? a.state };
+      // 빠르게 움직이던 무기가 다음 프레임에 반대 방향으로 빠르게 (튕김)
+      if (Math.abs(d) > 0.35 && Math.abs(prevD) > 0.35 && Math.sign(d) !== Math.sign(prevD)) { rev++; flips.push({ f, name: a.attack?.def.name ?? a.state, rev: [+prevD.toFixed(2), +d.toFixed(2)] }); }
+      prevD = d;
+    }
+    prev = ang;
+  }
+  out.push({ id, kind, mode, hits: a.stats.hitsLanded, worst, flips: flips.slice(0, 4) });
+}
+window.__result = out;
+document.title = 'ready';
+</script></body></html>

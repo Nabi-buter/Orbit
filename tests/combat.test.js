@@ -35,7 +35,7 @@ test('강공격은 약공격보다 느리고 강하며 사거리가 길다', () 
 });
 
 test('중거리에서는 약공격이 헛치고 강공격이 적중한다 (빠른 공격이 항상 이기지 않음)', () => {
-  const m = setup({ distance: 165 });
+  const m = setup({ distance: 175 }); // 장검 약공 사거리와 강공 사거리 사이
   const [a, b] = m.fighters;
   // P1 강공, P2 같은 프레임에 약공
   m.step([I({ heavy: true }), I({ light: true })]);
@@ -48,7 +48,7 @@ test('중거리에서는 약공격이 헛치고 강공격이 적중한다 (빠�
 });
 
 test('헛친 약공격은 후딜레이 중 반격당한다 (읽고 내민 강공이 후딜에 들어감)', () => {
-  const m = setup({ distance: 165 });
+  const m = setup({ distance: 175 });
   const [a, b] = m.fighters;
   // A 는 닿지 않는 약공을 헛치고, B 는 그걸 읽고 사거리가 긴 강공을 동시에 시작
   m.step([I({ light: true }), I({ heavy: true })]);

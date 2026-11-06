@@ -69,7 +69,8 @@ function rot([x, y], a) { const c = Math.cos(a), s = Math.sin(a); return [x * c 
 // 공격 중에는 모션 자체가 곡선이므로 거의 그대로, 피격은 빠르게(충격감), 그 외는 부드럽게.
 // -----------------------------------------------------------------------------
 const smoothState = new WeakMap();
-const angLerp = (a, b, t) => { let d = b - a; while (d > Math.PI) d -= Math.PI * 2; while (d < -Math.PI) d += Math.PI * 2; return a + d * t; };
+// 무기 각도는 모션에서 끊김 없이 이어지는 값이라 그대로 보간한다 (한 바퀴 짧은 쪽으로 돌리면 크게 휘두를 때 거꾸로 돌아 보였음)
+const angLerp = (a, b, t) => a + (b - a) * t;
 function followRate(f) {
   switch (f.state) {
     case S.ATTACK: case S.SPECIAL: case S.ULTIMATE: return 0.75;

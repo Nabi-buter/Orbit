@@ -1,0 +1,22 @@
+<!doctype html><html><head><meta charset="utf-8"></head><body><canvas id="c" width="427" height="240"></canvas>
+<script type="module">
+// 한 경우의 프레임별 각도: ?w=무기&k=light|heavy&mode=whiff|hit&from=&to=
+import { Match } from '../src/core/match.js';
+import { EMPTY_INPUT } from '../src/core/fighter.js';
+import { drawFighter, computePose } from '../src/render/fighterArt.js';
+import { TEAM } from '../src/render/renderer.js';
+import { evalMotion } from '../src/render/motions.js';
+const q = new URLSearchParams(location.search);
+const ctx = document.getElementById('c').getContext('2d');
+const m = new Match({ weapons: [q.get('w'), 'longsword'] });
+const [a, b] = m.fighters; b.x = a.x + (q.get('mode') === 'hit' ? 70 : 900);
+const rows = [];
+for (let f = 0; f < 200; f++) {
+  m.step([{ ...EMPTY_INPUT, [q.get('k')]: f % 10 < 2 && f < 120 }, EMPTY_INPUT]); b.hp = b.maxHp;
+  ctx.clearRect(0, 0, 427, 240);
+  const raw = a.attack ? evalMotion(a.weapon.id, a.attack.def, a.attack.frame) : null;
+  const r = drawFighter(ctx, a, 200, 200, { ...TEAM[0], weapon: '#fff' }, m.frame);
+  if (f >= +q.get('from') && f <= +q.get('to')) rows.push(`${f} ${a.state} ${a.attack?.def.name ?? ''} af=${a.attack?.frame ?? ''} raw=${raw ? raw.a.toFixed(2) : '-'} pose=${computePose(a, m.frame).wAngle.toFixed(2)} drawn=${(r.wAngle * a.facing).toFixed(2)}`);
+}
+window.__rows = rows; document.title = 'ready';
+</script></body></html>

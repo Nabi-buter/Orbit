@@ -95,7 +95,11 @@ export const MOTIONS = {
         { from: P(0.2, 10, 88, { lean: 0.1, stride: 8 }), to: P(-0.15, 36, 80, { lean: 0.3, stride: 14 }) },
       ],
     },
-    '돌려 베기': { beats: [{ from: P(2.5, -10, 96, { lean: -0.2 }), to: P(-0.65, 40, 76, { lean: 0.32, stride: 18 }) }] },
+    // 두 번 벤다: 위에서 크게 내려 그은 뒤, 칼을 돌려 아래에서 위로 되받아 벤다 (다시 머리 뒤로 감아 올리지 않음)
+    '돌려 베기': { beats: [
+      { from: P(2.5, -10, 96, { lean: -0.2 }), to: P(-0.65, 40, 76, { lean: 0.32, stride: 18 }) },
+      { from: P(-0.95, 34, 70, { lean: 0.28, stride: 16 }), to: P(1.05, 42, 102, { lean: 0.3, stride: 18 }) },
+    ] },
   },
   axe: {
     '내려찍기': { beats: [{ from: P(2.35, 0, 108, { lean: -0.12 }), to: P(-0.95, 30, 66, { lean: 0.26, stride: 12, crouch: 6 }) }] },
@@ -105,8 +109,8 @@ export const MOTIONS = {
     '휘둘러 찍기': { beats: [{ from: P(1.3, -18, 84, { lean: -0.2, crouch: 4 }), to: P(-0.55, 42, 70, { lean: 0.36, stride: 18 }) }] },
   },
   spear: {
-    '찌르기': { beats: [{ from: P(0.05, -4, 84, { lean: -0.08 }), to: P(0, 44, 84, { lean: 0.26, stride: 18 }) }] },
-    '재찌르기': { beats: [{ from: P(0.18, 0, 92, { lean: 0.02 }), to: P(0.1, 46, 94, { lean: 0.26, stride: 18 }) }] },
+    '찌르기': { beats: [{ from: P(0.05, -4, 84, { lean: -0.08 }), to: P(0, 48, 84, { lean: 0.3, stride: 26 }) }] },
+    '재찌르기': { beats: [{ from: P(0.18, 0, 92, { lean: 0.02 }), to: P(0.1, 50, 94, { lean: 0.26, stride: 18 }) }] },
     '밀어 찌르기': { beats: [{ from: P(-0.05, -12, 80, { crouch: 5, lean: -0.1 }), to: P(0, 50, 82, { lean: 0.42, stride: 26 }) }] },
     '휘두르기': { beats: [{ from: P(1.45, -6, 100, { lean: -0.12 }), to: P(-0.3, 36, 74, { lean: 0.3, stride: 14 }) }] },
     '회전 베기': { beats: [{ from: P(2.7, -14, 104, { lean: -0.2 }), to: P(-0.6, 40, 78, { lean: 0.36, stride: 18 }) }] },
@@ -131,7 +135,12 @@ export const MOTIONS = {
         { from: P(0, 12, 84, { h2: [10, 90], crouch: 8 }), to: P(0, 44, 70, { h2: [10, 88], lean: 0.3, stride: 16, crouch: 10 }) },
       ],
     },
-    '스트레이트': { beats: [{ from: P(0, 8, 90, { h2: [6, 92], lean: -0.15 }), to: P(0, 56, 90, { h2: [8, 88], lean: 0.38, stride: 24 }) }] },
+    // 잽 · 반대손 · 몸을 실은 스트레이트 (판정 3번)
+    '스트레이트': { beats: [
+      { from: P(0, 16, 92, { h2: [10, 88] }), to: P(0, 44, 92, { h2: [10, 88], lean: 0.2, stride: 12 }) },
+      { from: P(0, 16, 92, { h2: [12, 90] }), to: P(0, 16, 90, { h2: [46, 92], lean: 0.22, stride: 14 }) },
+      { from: P(0, 8, 90, { h2: [6, 92], lean: -0.15 }), to: P(0, 56, 90, { h2: [8, 88], lean: 0.38, stride: 24 }) },
+    ] },
   },
 };
 
@@ -210,7 +219,9 @@ const clamp01 = (t) => Math.max(0, Math.min(1, t));
 const smooth = (t) => { t = clamp01(t); return t * t * (3 - 2 * t); };
 const easeOutCubic = (t) => { t = clamp01(t); return 1 - (1 - t) ** 3; };
 /** 휘두름: 처음엔 느리게 출발해 판정 근처에서 가장 빠름 */
-const swingEase = (t) => { t = clamp01(t); return t < 0.6 ? 0.5 * (t / 0.6) ** 2 : 0.5 + 0.5 * easeOutCubic((t - 0.6) / 0.4); };
+// f(t) = t²(2.2 − 1.2t): 속도가 끊김 없이 올라 60% 지점에서 가장 빠르고, 닿는 순간에도 아직 빠르게 움직인다(f'(1)=0.8)
+// (예전 곡선은 60% 지점에서 속도가 2배로 뛰어 칼이 순간이동하듯 보였음)
+const swingEase = (t) => { t = clamp01(t); return t * t * (2.2 - 1.2 * t); };
 
 function mix(p, q, t) {
   return {
@@ -238,7 +249,9 @@ function arcHand(p, q, t) {
   if (d > Math.PI) d -= 2 * Math.PI; else if (d < -Math.PI) d += 2 * Math.PI;
   const r = lerp(ra, rb, t), th = ta + d * t;
   const arc = [SHOULDER[0] + Math.cos(th) * r, SHOULDER[1] + Math.sin(th) * r];
-  return [lerp(lerp(p[0], q[0], t), arc[0], ARC), lerp(lerp(p[1], q[1], t), arc[1], ARC)];
+  const x = lerp(lerp(p[0], q[0], t), arc[0], ARC);
+  // 호가 앞으로 부풀어 시작·끝 자세보다 손이 더 앞으로 나가지 않게 (보이는 칼과 판정의 사거리가 늘지 않도록)
+  return [Math.min(x, Math.max(p[0], q[0])), lerp(lerp(p[1], q[1], t), arc[1], ARC)];
 }
 function flow(p, q, u, ease) {
   u = clamp01(u);
@@ -284,7 +297,8 @@ export function evalMotion(weaponId, def, frame, start = null) {
   const idle = { ...STANCE[weaponId], lean: 0, stride: 0, crouch: 0 };
   const hits = def.hits, beats = m.beats;
   const beat = (i) => beats[Math.min(i, beats.length - 1)];
-  const lead = Math.round(1 + W * 3);        // 판정 몇 프레임 전부터 휘두르기 시작
+  // 판정 몇 프레임 전부터 휘두르기 시작: 길수록 호가 눈에 보인다 (짧으면 2~3프레임 만에 반 바퀴를 돌아 순간이동처럼 보였음)
+  const lead = Math.round(3 + W * 5);
   const follow = Math.round(2 + W * 6);      // 판정 뒤 흘러가는 프레임
   const coilK = 0.06 + W * 0.12;             // 젖히는 정도
   const overK = 0.05 + W * 0.1;              // 지나치는 정도
