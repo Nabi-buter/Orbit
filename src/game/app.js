@@ -246,7 +246,7 @@ export class App {
         Object.assign(this.netState, { phase: 'room', code: m.code, slot: m.slot, error: null });
         net.send({ t: 'select', weapon: this.weapons[0] }); // 로드아웃에서 고른 무기
       })
-      .on('lobby', (m) => this.setNet({ ...this.netState, phase: 'room', code: m.code, connected: m.connected, weapons: m.weapons, ready: m.ready, playing: m.playing, time: m.time }))
+      .on('lobby', (m) => this.setNet({ ...this.netState, error: this.netState?.phase === 'room' && m.connected?.[1] && !this.netState?.connected?.[1] ? null : this.netState?.error, phase: 'room', code: m.code, connected: m.connected, weapons: m.weapons, ready: m.ready, playing: m.playing, time: m.time }))
       .on('error', (m) => this.setNet({ ...this.netState, error: m.msg }))
       .on('roomClosed', (m) => this.setNet({ phase: 'connect', error: m.msg }))
       .on('ping', (m) => { if (this.netState) { this.netState.rtt = m.rtt; this.netState.peerRtt = m.peerRtt; } })

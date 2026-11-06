@@ -32,6 +32,11 @@ jobs:
           cp -r index.html src _site/
           # Pages 에는 게임 서버가 없다 → 정적 모드 (온라인 대전은 안내 문구)
           sed -i 's|<script type="module" src="src/main.js"></script>|<script>window.ORBIT_STATIC = true;</script>\n  <script type="module" src="src/main.js"></script>|' _site/index.html
+          # 빌드 번호: 온라인 대전에서 두 기기의 버전이 같은지 확인 + 캐시된 예전 파일과 섞이지 않게 모든 모듈 주소에 붙임
+          V="${GITHUB_SHA::7}"
+          sed -i "s|<script>window.ORBIT_STATIC = true;</script>|<script>window.ORBIT_STATIC = true; window.ORBIT_VERSION = '$V';</script>|; s|src=\"src/main.js\"|src=\"src/main.js?v=$V\"|" _site/index.html
+          find _site/src -name '*.js' -exec sed -i -E "s#((from|import)\s*\(?\s*['\"])(\.{1,2}/[^'\"]+\.js)(['\"])#\1\3?v=$V\4#g" {} +
+          grep -q "ORBIT_VERSION = '$V'" _site/index.html
           touch _site/.nojekyll
       - uses: actions/configure-pages@v5
         with:

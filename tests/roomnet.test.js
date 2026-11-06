@@ -273,3 +273,23 @@ test('준비 / 준비 취소: 손님·방장 모두 바로 바뀌고, 같은 계
   await world.advance(5000);
   assert.ok(a.frames > 200 && b.frames > 200, `같은 계정끼리 진행 ${a.frames}/${b.frames}`);
 });
+
+test('게임 버전이 다르면 참가하지 못하고 양쪽에 새로고침 안내 (예전 버전을 캐시로 든 기기)', async () => {
+  const world = makeWorld({ drop: 0 });
+  const a = makePlayer(world, 'peer-a', 'axe');
+  const b = makePlayer(world, 'peer-b', 'spear');
+  b.net.version = '6-oldbuild';
+  a.net.send({ t: 'create' });
+  await world.advance(50);
+  b.net.send({ t: 'join', code: a.joined.code });
+  await world.advance(3000);
+  assert.equal(b.joined, null, '참가 안 됨');
+  assert.ok(b.errors.some((e) => e.includes('버전')), b.errors.join());
+  assert.ok(a.errors.some((e) => e.includes('버전')), a.errors.join());
+  assert.equal(a.lobby.connected[1], false, '방장 쪽 자리는 비어 있음');
+  // 새로고침해서 같은 버전으로 다시 참가하면 된다
+  const c = makePlayer(world, 'peer-c', 'spear');
+  c.net.send({ t: 'join', code: a.joined.code });
+  await world.advance(2000);
+  assert.equal(c.joined?.slot, 1);
+});

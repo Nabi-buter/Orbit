@@ -23,6 +23,16 @@ export const TIME_OPTIONS = BALANCE.round.timeOptions;
 export const validTime = (s) => TIME_OPTIONS.includes(s);
 
 const FRAME_MS = 1000 / 60;
+/**
+ * 통신 규약 버전: 메시지 모양이나 경기 진행(입력 묶음 등)을 바꾸면 올린다.
+ * 배포 주소(GitHub Pages)에서는 빌드 번호(커밋)까지 같아야 함께 할 수 있다 — 같은 입력으로 같은 결과가 나와야 하므로
+ * (기기 하나가 예전 버전을 캐시로 들고 있으면 준비·입력이 엇갈려 멈춘다).
+ */
+export const PROTOCOL = 6;
+export function buildVersion() {
+  const b = typeof window !== 'undefined' ? window.ORBIT_VERSION : null;
+  return b ? `${PROTOCOL}-${b}` : String(PROTOCOL);
+}
 /** 참가자 목록에서 빠진 상대를 나간 것으로 보기까지 (짧은 재연결은 무시) */
 const GONE_GRACE = 6000;
 export const ROOM_NET = {
@@ -69,6 +79,7 @@ export class RoomNet {
     this.rand = opts.rand ?? Math.random;
     // 전송 방식별 설정: 직접 연결(WebRTC)은 매 프레임 보낼 수 있다
     this.cfg = { ...ROOM_NET, ...(opts.net ?? {}) };
+    this.version = opts.version ?? buildVersion();
     this.room = null;        // 이름 붙은 방
     this.unsubs = [];
     this.intervals = [];
@@ -151,7 +162,7 @@ export class RoomNet {
       if (m.peer === this.otherPeer) this.goneAt = null; // 소식이 오면 살아 있음
       fn(m.data ?? {}, m);
     }));
-    on('hello', (d, m) => this.host && this.onHello(m.peer));
+    on('hello', (d, m) => this.host && this.onHello(m.peer, d.v));
     on('assign', (d, m) => this.onAssign(d, m.peer));
     on('lobby', (d, m) => { if (!this.host && m.peer === this.otherPeer) this.applyLobby(d); });
     on('ctl', (d, m) => { if (this.host && m.peer === this.otherPeer) this.hostControl(1, d); });
@@ -212,19 +223,28 @@ export class RoomNet {
         this.leaveRoom(true);
         return;
       }
-      this.room.emit('hello', { token: this.joinToken }).catch(() => {});
+      this.room.emit('hello', { token: this.joinToken, v: this.version }).catch(() => {});
       this.timers.setTimeout(hello, 700);
     };
     hello();
   }
 
-  onHello(peer) {
+  onHello(peer, v) {
+    // 게임 버전이 다르면 들이지 않는다 (서로 다른 규칙으로는 같은 경기를 계산할 수 없음)
+    if (v !== this.version && peer !== this.otherPeer) {
+      this.room.emit('assign', { to: peer, slot: -2, v: this.version }).catch(() => {});
+      if (this.badVersionPeer !== peer) {
+        this.badVersionPeer = peer;
+        this.emitLocal('error', { msg: '참가하려는 상대의 게임 버전이 다릅니다. 상대에게 페이지를 새로고침해 달라고 하세요.' });
+      }
+      return;
+    }
     if (!this.otherPeer) {
       this.otherPeer = peer;
       this.state.ready = [false, false];
     }
     // 이미 다른 사람이 2P 면 가득 참
-    this.room.emit('assign', { to: peer, slot: peer === this.otherPeer ? 1 : -1 }).catch(() => {});
+    this.room.emit('assign', { to: peer, slot: peer === this.otherPeer ? 1 : -1, v: this.version }).catch(() => {});
     this.broadcastLobby();
     this.pingNow();
   }
@@ -233,6 +253,11 @@ export class RoomNet {
     if (this.host || this.slot >= 0) return;
     const me = this.myPeer();
     if (me && d.to !== me) return;
+    if (d.slot === -2 || d.v !== this.version) {
+      this.emitLocal('error', { msg: '방장과 게임 버전이 다릅니다. 두 기기 모두 페이지를 새로고침한 뒤 다시 참가하세요.' });
+      this.leaveRoom(true);
+      return;
+    }
     if (d.slot !== 1) { this.emitLocal('error', { msg: '방이 가득 찼습니다.' }); this.leaveRoom(true); return; }
     this.slot = 1;
     this.otherPeer = from; // 자리를 배정한 쪽이 호스트

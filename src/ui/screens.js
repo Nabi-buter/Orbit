@@ -9,7 +9,7 @@ import { PW, PH, rect, px, text, textW, createArtCanvas } from '../render/pixel.
 import { UI, TEAM, buildBackground } from '../render/renderer.js';
 import { drawFighter } from '../render/fighterArt.js';
 import { drawWeaponIcon } from '../render/weaponArt.js';
-import { CODE_CHARS, TIME_OPTIONS } from '../net/roomNet.js';
+import { CODE_CHARS, TIME_OPTIONS, buildVersion } from '../net/roomNet.js';
 import { BALANCE } from '../config/balance.js';
 import { getTouchControls, setTouchControls } from './touch.js';
 import { WEAPONS, WEAPON_ORDER, randomWeapon } from '../config/weapons.js';
@@ -656,7 +656,11 @@ export class OnlineScreen {
     const st = this.state;
     text(ctx, '온라인 대전', 34, 16, UI.paper, { size: 14 });
     rect(ctx, 34, 36, 18, 2, UI.gold);
-    this.errorLines().forEach((l, i) => text(ctx, l, 34, 44 + i * 12, UI.red, { size: 11, forceRaster: true }));
+    // 오류: 방 화면에서는 방 코드 아래 빈 곳에, 그 외에는 제목 아래
+    const ey = st.phase === 'room' ? 150 : 44;
+    this.errorLines().slice(0, st.phase === 'room' ? 3 : 9).forEach((l, i) => text(ctx, l, 34, ey + i * 12, UI.red, { size: 11, forceRaster: true }));
+    // 게임 버전 (두 기기가 같은지 비교용)
+    text(ctx, `v${buildVersion()}`, 204, 228, '#454a56', { size: 9, align: 'right' });
     if (st.phase === 'connecting' && !st.error) text(ctx, '연결 중…', 34, 74, UI.dim, { size: 11 });
     if (st.phase === 'connect') {
       // 오른쪽: 코드 입력판 (어두운 판 위)
