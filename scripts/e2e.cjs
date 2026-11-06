@@ -172,6 +172,7 @@ function assert(c, msg) { if (!c) throw new Error('E2E 실패: ' + msg); console
     await key('Enter');
     assert(await page.evaluate(() => window.__game.screen.player) === 1, '로컬 2인: P2 무기 선택 화면');
     await shot(page, '06-loadout-p2');
+    await page.evaluate(() => window.__game.screen.setWeapon('spear')); // 앞 대전의 AI 무작위 무기와 상관없이 (← 로 '무작위' 칸에 가지 않게)
     await key('ArrowLeft');
     const p2w = await page.evaluate(() => window.__game.screen.weapon);
     await key('Numpad1');

@@ -29,9 +29,19 @@ export class OpponentModel {
     this.prevState = null;
     this.waitSince = 0;
     this.count = 0;
+    this.acc = 0.35;      // 예측이 맞은 비율 (처음엔 낮게 보고 시작)
+    this.pending = null;  // 맞는지 확인할 예측
   }
 
+  /** 이 예측을 믿고 움직였다 → 상대의 다음 행동으로 맞았는지 확인 */
+  commit(action) { this.pending = action; }
+
   record(action, band) {
+    // 예측 적중률: 직전에 한 예측이 실제 다음 행동과 맞았는지 (지수 평균)
+    if (this.pending) {
+      this.acc = this.acc * 0.85 + (this.pending === action ? 0.15 : 0);
+      this.pending = null;
+    }
     const d = this.decay;
     for (const t of [this.byBand[band], this.trans[this.last], this.total]) {
       for (const a of ACTIONS) t[a] *= d;
@@ -116,14 +126,22 @@ export const STYLE_LABEL = {
 //   lightSpam  약공만 연타
 //   heavySpam  강공만 연타
 //   turtle     가드만 함
+//   dashIn     대시로 파고들기를 반복
+//   jumpIn     점프로 들어와 내려찍기를 반복
+//   hitAndRun  치고 나서(또는 맞거나 막은 뒤) 바로 뒤로 대시해 빠짐
 // =============================================================================
-export const PATTERNS = ['idle', 'lightSpam', 'heavySpam', 'turtle'];
-export const PATTERN_LABEL = { idle: '가만히 있음', lightSpam: '약공 연타', heavySpam: '강공 연타', turtle: '가드만 함' };
+export const PATTERNS = ['idle', 'lightSpam', 'heavySpam', 'turtle', 'dashIn', 'jumpIn', 'hitAndRun'];
+export const PATTERN_LABEL = {
+  idle: '가만히 있음', lightSpam: '약공 연타', heavySpam: '강공 연타', turtle: '가드만 함',
+  dashIn: '대시 돌진', jumpIn: '점프 공격', hitAndRun: '치고 빠지기',
+};
 
 const WINDOW = 240; // 최근 4초
 
 export class PatternDetector {
-  constructor() {
+  /** moves: 움직임 습관(대시 돌진 · 점프 공격 · 치고 빠지기)도 찾는다 (어려움) */
+  constructor({ moves = true } = {}) {
+    this.moves = moves;
     this.log = [];       // 프레임마다 {st, start}
     this.prevAtk = null;
     this.current = null; // 확정된 패턴
@@ -135,7 +153,14 @@ export class PatternDetector {
     let start = null;
     if (seen.atk && seen.atk !== this.prevAtk && seen.state === S.ATTACK) start = seen.def?.kind === 'heavy' ? 'heavy' : 'light';
     this.prevAtk = seen.atk;
-    this.log.push({ st: seen.state, start });
+    // 대시·점프 시작, 공격·경직 직후의 뒤 대시(치고 빠지기)
+    const prev = this.prevSt;
+    if (prev === S.ATTACK || prev === S.HITSTUN || prev === S.BLOCKSTUN) this.lastBusy = frame;
+    const newDash = seen.state === S.DASH && prev !== S.DASH;
+    const move = newDash ? (seen.toward ? 'dashIn' : frame - (this.lastBusy ?? -99) < 14 ? 'run' : 'back')
+      : seen.state === S.JUMP && prev !== S.JUMP ? 'jump' : null;
+    this.prevSt = seen.state;
+    this.log.push({ st: seen.state, start, move });
     if (this.log.length > WINDOW) this.log.shift();
     const next = this.classify();
     if (next !== this.current) { this.current = next; this.since = frame; }
@@ -144,14 +169,17 @@ export class PatternDetector {
   /** 최근 n 프레임 통계 */
   stats(n) {
     const part = this.log.slice(-n);
-    let light = 0, heavy = 0, guard = 0, idle = 0;
+    let light = 0, heavy = 0, guard = 0, idle = 0, dashIn = 0, jump = 0, run = 0;
     for (const e of part) {
+      if (e.move === 'dashIn') dashIn++;
+      if (e.move === 'jump') jump++;
+      if (e.move === 'run') run++;
       if (e.start === 'light') light++;
       if (e.start === 'heavy') heavy++;
       if (e.st === S.GUARD || e.st === S.BLOCKSTUN) guard++;
       if (e.st === S.IDLE) idle++;
     }
-    return { n: part.length, light, heavy, guard, idle };
+    return { n: part.length, light, heavy, guard, idle, dashIn, jump, run };
   }
 
   classify() {
@@ -163,8 +191,17 @@ export class PatternDetector {
       heavySpam: b.heavy >= 2 && b.heavy > b.light,
       turtle: c.guard / c.n >= 0.5 && c.light + c.heavy <= 2,
       idle: c.idle / c.n >= 0.7 && c.light + c.heavy === 0,
+      dashIn: b.dashIn >= 2,
+      jumpIn: b.jump >= 2,
+      hitAndRun: b.run >= 2,
     };
     if (this.current && keep[this.current]) return this.current;
+    // 움직임 습관이 먼저 (대시·점프로 들어와 약공을 섞는 경우 '약공 연타' 보다 들어오는 방식이 핵심)
+    if (this.moves) {
+      if (b.run >= 3) return 'hitAndRun';
+      if (b.jump >= 3) return 'jumpIn';
+      if (b.dashIn >= 3) return 'dashIn';
+    }
     if (a.light >= 4 && a.heavy <= 1) return 'lightSpam';
     if (b.heavy >= 3 && b.light <= 1) return 'heavySpam';
     if (c.guard / c.n >= 0.7 && c.light + c.heavy <= 1) return 'turtle';

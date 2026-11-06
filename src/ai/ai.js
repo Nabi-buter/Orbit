@@ -31,6 +31,9 @@ export const DIFFICULTY = {
     preGuard: 0.08,      // 근거리에서 미리 가드할 확률
     adapt: 0.25,         // 상대 패턴 예측을 행동에 반영하는 정도
     exploitDelay: 90,    // 습관을 확인한 뒤 공략을 시작하기까지(프레임)
+    comboPlan: false,    // 콤보를 끝까지 계획해서 잇기 (약공으로 길게 → 강공 마무리)
+    moveHabits: false,   // 움직임 습관(대시 돌진 · 점프 공격 · 치고 빠지기)까지 읽기
+    predictMin: 0.32,    // 예측 확률이 이 이상일 때만 예측대로 대응
   },
   normal: {
     label: '보통',
@@ -47,6 +50,9 @@ export const DIFFICULTY = {
     preGuard: 0.18,
     adapt: 0.55,
     exploitDelay: 20,
+    comboPlan: false,
+    moveHabits: false,
+    predictMin: 0.28,
   },
   hard: {
     label: '어려움',
@@ -57,12 +63,17 @@ export const DIFFICULTY = {
     guardChance: 0.7,
     perfectChance: 0.45,
     perfectError: 3,
-    comboChance: 0.75,
-    punishChance: 0.85,
+    // 어려움: 완벽패링(perfectChance · perfectError)은 그대로 두고, 콤보와 상대 파악을 더 잘 한다
+    comboChance: 0.95,
+    punishChance: 0.92,
     evadeChance: 0.22,
     preGuard: 0.25,
-    adapt: 0.8,
+    adapt: 0.65,       // 예측 대응 빈도는 낮추고 적중률로 거른다 (자주 반응할수록 틀린 예측에 속음: 측정 63% → 85%)
     exploitDelay: 0,
+    comboPlan: true,
+    moveHabits: true,
+    trustAccuracy: true, // 예측 적중률만큼만 예측대로 움직임
+    predictMin: 0.28,
   },
 };
 
@@ -91,7 +102,7 @@ export class AIController {
     this.lastTap = {};      // key → 마지막 누른 프레임 (엣지 생성용)
     this.watchedAttack = null;
     this.model = new OpponentModel();
-    this.patterns = new PatternDetector(); // 최근 몇 초의 단순한 습관 (가만히 / 약공 연타 / 강공 연타 / 가드만)
+    this.patterns = new PatternDetector({ moves: !!this.p.moveHabits }); // 최근 몇 초의 단순한 습관 (가만히 / 약공 연타 / 강공 연타 / 가드만)
     this.oppAttackStarts = []; // 인지한 상대 공격 시작 시각 (연타 리듬 학습)
     this.rhythmPlanned = -1;
   }
@@ -196,10 +207,18 @@ export class AIController {
         const heavySafe = heavyGap + BALANCE.combo.minGap < oppFast;
         const opts = ['light', 'heavy'].filter((k) => comboAllows(me, k, frame, true) && dist <= reachOf(me.weapon[k]) + 10 && (k === 'light' || heavySafe));
         const other = opts.find((k) => k !== me.combo.lastType);
-        const key = other && this.chance(0.6) ? other : opts[Math.floor(this.random() * opts.length)];
+        const key = P.comboPlan ? this.planComboKey(me, opts, frame)
+          : other && this.chance(0.6) ? other : opts[Math.floor(this.random() * opts.length)];
         if (key) this.tapAt(frame + 1, key);
       }
     }
+
+    // 2-b) 상대가 콤보 사이에 가드를 끼워 넣는지 기억 (내 연결 공격이 막힘)
+    if (me.state === S.ATTACK && me.combo.total >= 2 && me.attack && this.gapSeenFor !== me.attack && opp.state === S.BLOCKSTUN) {
+      this.gapSeenFor = me.attack;
+      this.gapGuards = Math.min(5, (this.gapGuards ?? 0) + 1);
+    }
+    if (frame % 600 === 0 && this.gapGuards) this.gapGuards--; // 오래되면 잊음
 
     // 3) 상대 빈틈(완벽패링당함/착지/가드 브레이크) 반격
     if (STUNNED_OPP.has(seen.state) && isFree(me) && !this.punishing) {
@@ -267,6 +286,21 @@ export class AIController {
     if (me.state !== S.HITSTUN) this.escapeDecided = false;
 
     // 5) 궁극기 맞대응: 궁극기 인지 시 완벽패링 시도 확률↑
+  }
+
+  /**
+   * 콤보 계획 (어려움): 상한까지 최대한 길게 잇고, 마지막은 강한 공격으로.
+   *   - 약공을 상한까지 이어 타수를 채운다 (약공이 빠르고 연결이 확실함)
+   *   - 약공 상한에 닿았거나 남은 타수가 1이면 강공으로 마무리 (섞어서 끝내면 콤보 뒤 딜레이도 짧다)
+   *   - 상대가 콤보 사이에 가드를 끼워 넣는 습관이면 강공(가드 게이지 피해)을 섞는다
+   */
+  planComboKey(me, opts, frame) {
+    if (opts.length <= 1) return opts[0];
+    const s = me.weapon.combo, c = me.combo;
+    const left = s.maxTotal - c.total;
+    if (c.light + 1 >= s.lightMax || left <= 1) return 'heavy';
+    if ((this.gapGuards ?? 0) >= 2 && this.chance(0.5)) return 'heavy';
+    return 'light';
   }
 
   /** 최근 상대 공격 간격으로 연타 리듬 추정 */
@@ -536,7 +570,8 @@ export class AIController {
   /** 지금 공략 중인 습관 (난이도별로 확인 후 반응까지 시간이 다름) */
   activePattern(frame) {
     const g = this.patterns.get(frame);
-    return g && g.held >= (this.p.exploitDelay ?? 0) ? g.pattern : null;
+    if (!g || g.held < (this.p.exploitDelay ?? 0)) return null;
+    return g.pattern; // 쉬움·보통은 움직임 습관을 찾지 않는다 (PatternDetector moves)
   }
 
   /**
@@ -585,6 +620,42 @@ export class AIController {
         if (inRecovery && dist <= myLight + 8 && can('light') && left > me.weapon.light.hits[0].from + 1) return hit('light');
         return true; // 제자리에서 다음 강공을 기다렸다가 완벽패링 (가드 유지)
       }
+      case 'dashIn': {
+        // 대시로 파고드는 상대: 먼저 다가가지 않고 기다렸다가, 들어오는 길목에 공격을 미리 내민다
+        const dashing = seen.state === S.DASH && seen.toward;
+        if (dashing) {
+          // 대시가 남은 만큼 더 들어온다고 보고, 내 공격이 닿을 때 상대가 그 안에 있으면 지금 낸다
+          const travel = BALANCE.dash.speed * Math.max(0, BALANCE.dash.duration - this.reactNow / 2);
+          const key = dist - travel <= myLight + 10 && can('light') ? 'light' : dist - travel <= myHeavy && can('heavy') ? 'heavy' : null;
+          if (key) return hit(key);
+          return true;
+        }
+        if (dist <= myLight + 10) return false;    // 이미 붙었으면 평소대로
+        if (!guarding) this.release(fwd);          // 걸어 들어가지 않고 제자리에서 기다림
+        return true;
+      }
+      case 'jumpIn': {
+        // 점프로 들어오는 상대: 내려찍기 사거리 밖으로 물러나 헛치게 하고 착지를 노린다
+        if (seen.state === S.JUMP || seen.state === S.PLUNGE) {
+          this.antiAirUntil = frame + 70;
+          if (dist < 150 && me.stamina >= dashCost(me) && me.dashCooldown <= 0 && isFree(me)) { this.retreat(me, frame, 12, true); return true; }
+          if (dist < 110) { this.retreat(me, frame, 10); return true; }
+          return true;
+        }
+        if (seen.state === S.LANDING && dist <= myHeavy && can('heavy')) return hit('heavy');
+        return false;
+      }
+      case 'hitAndRun': {
+        // 치고 빠지는 상대: 뒤로 빠지는 대시를 따라 들어가 도착하자마자 친다
+        const fleeing = seen.state === S.DASH && !seen.toward;
+        if (fleeing && isFree(me) && me.stamina >= dashCost(me) && me.dashCooldown <= 0) {
+          this.release('guard');
+          this.dashIn(frame, fwd);
+          this.tapAt(frame + BALANCE.dash.duration - 2, 'light');
+          return true;
+        }
+        return false;
+      }
       default:
         return false;
     }
@@ -599,7 +670,12 @@ export class AIController {
   counterPlan(me, opp, seen, frame, dist) {
     const { action, p } = this.model.top(dist);
     this.lastPrediction = { action, p };
-    if (p < 0.28) return false;
+    if (p < (this.p.predictMin ?? 0.28)) return false;
+    // 어려움: 예측이 실제로 맞아 온 만큼만 믿는다 (틀린 예측으로 헛걸음하지 않게, 상대가 바뀌면 바로 덜 믿음)
+    if (this.p.trustAccuracy) {
+      this.model.commit(action);
+      if (!this.chance(Math.min(1, this.model.acc / 0.45))) return false;
+    }
     const fwd = me.facing > 0 ? 'right' : 'left';
     const back = me.facing > 0 ? 'left' : 'right';
     const myLight = reachOf(me.weapon.light), myHeavy = reachOf(me.weapon.heavy);
