@@ -293,3 +293,31 @@ test('게임 버전이 다르면 참가하지 못하고 양쪽에 새로고침 �
   await world.advance(2000);
   assert.equal(c.joined?.slot, 1);
 });
+
+test('참가 버튼을 여러 번 눌러도 연결이 하나만 남고, 손님 준비가 방장에게 반영되어 시작된다', async () => {
+  const world = makeWorld({ drop: 0 });
+  const a = makePlayer(world, 'peer-a', 'axe');
+  // 손님: 누를 때마다 다른 연결(PeerJS 는 참가마다 새 Peer)이 생기는 로비
+  let n = 0;
+  const base = world.client('peer-b');
+  const lobbyB = { ...base, join: (name) => world.client(`peer-b${++n}`).join(name) };
+  const b = makePlayer(world, 'peer-b', 'spear');
+  b.net.lobby = lobbyB;
+  a.net.send({ t: 'create' });
+  await world.advance(50);
+  for (let i = 0; i < 3; i++) b.net.send({ t: 'join', code: a.joined.code });
+  await world.advance(30);
+  b.net.send({ t: 'join', code: a.joined.code }); // 조금 뒤에 한 번 더
+  await world.advance(2500);
+  assert.equal(b.joined?.slot, 1, '참가');
+  b.net.send({ t: 'ready', ready: true });
+  await world.advance(800);
+  assert.equal(a.lobby.ready[1], true, '방장 화면에 손님 준비 반영');
+  a.net.send({ t: 'ready', ready: true });
+  await world.advance(800);
+  assert.ok(a.match && b.match, '시작');
+  let acc = 0;
+  world.onMs = () => { if (++acc >= 17) { acc = 0; a.tick(); b.tick(); } };
+  await world.advance(4000);
+  assert.ok(a.frames > 150 && b.frames > 150, `진행 ${a.frames}/${b.frames}`);
+});

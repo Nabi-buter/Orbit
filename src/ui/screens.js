@@ -575,7 +575,20 @@ export class OnlineScreen {
     this.t = 0;
     this.build();
   }
-  setState(st) { this.state = st; this.build(); }
+  setState(st) {
+    // 답(방에 들어감 · 오류 · 처음 화면으로)이 오면 진행 표시를 푼다
+    if (st.phase !== this.state.phase || st.error) this.pending = null;
+    this.state = st; this.build();
+  }
+  /** 방 만들기·참가를 누른 뒤 답을 기다리는 중 (여러 번 눌러도 한 번만) */
+  busy() { return this.pending && Date.now() - this.pending.at < 12000; }
+  start(kind, fn) {
+    if (this.busy()) return;
+    this.pending = { kind, at: Date.now() };
+    this.state = { ...this.state, error: null };
+    this.build();
+    fn();
+  }
   /** 왼쪽 띠 안에서 줄바꿈한 오류 문구 (띠 폭을 넘지 않게) */
   errorLines() { return this.state.error ? wrap(this.state.error, 165) : []; }
   build() {
@@ -584,15 +597,15 @@ export class OnlineScreen {
     const below = 44 + this.errorLines().length * 12 + 12; // 오류 문구 아래부터
     if (st.phase === 'connect') {
       this.menu = new TextMenu([
-        { label: '방 만들기', onClick: this.cb.onCreate },
-        { label: '코드로 참가', onClick: () => this.join() },
+        { label: this.busy() && this.pending.kind === 'create' ? '방 만드는 중…' : '방 만들기', disabled: this.busy(), onClick: () => this.start('create', this.cb.onCreate) },
+        { label: this.busy() && this.pending.kind === 'join' ? '참가하는 중…' : '코드로 참가', disabled: this.busy(), onClick: () => this.join() },
         { label: '뒤로', onClick: this.cb.onBack },
       ], 34, Math.max(74, below));
       // 화면 코드 입력판 (터치·마우스): 코드 글자 32개 + 지우기 + 참가
       const cw = 23, ch = 19, x0 = 224, y0 = 62;
       [...CODE_CHARS].forEach((c, i) => this.keys.push({ label: c, x: x0 + (i % 8) * cw, y: y0 + Math.floor(i / 8) * ch, w: cw - 2, h: ch - 2, act: () => this.type(c) }));
       this.keys.push({ label: '지우기', x: x0, y: y0 + 4 * ch + 4, w: cw * 3 - 2, h: 16, act: () => { this.code = this.code.slice(0, -1); } });
-      this.keys.push({ label: '참가', x: x0 + cw * 5, y: y0 + 4 * ch + 4, w: cw * 3 - 2, h: 16, primary: true, act: () => this.join() });
+      this.keys.push({ label: this.busy() ? '참가 중…' : '참가', x: x0 + cw * 5, y: y0 + 4 * ch + 4, w: cw * 3 - 2, h: 16, primary: true, act: () => this.join() });
     } else if (st.phase === 'room') {
       const me = st.slot, op = 1 - me;
       this.menu = new TextMenu([
@@ -616,14 +629,14 @@ export class OnlineScreen {
     this.cb.onTime(opts[(i + d + opts.length) % opts.length]);
   }
   type(c) { if (this.code.length < 4) this.code += c; }
-  join() { if (this.code.length === 4) this.cb.onJoin(this.code); }
+  join() { if (this.code.length === 4) this.start('join', () => this.cb.onJoin(this.code)); }
   get buttons() { return [...this.menu.rows(), ...this.keys]; }
   onKey(e) {
     const st = this.state;
     if (st.phase === 'connect') {
       if (/^Key[A-Z]$|^Digit\d$/.test(e.code) && this.code.length < 4) { this.code += e.code.at(-1); return true; }
       if (e.code === 'Backspace') { this.code = this.code.slice(0, -1); return true; }
-      if ((e.code === 'Enter' || e.code === 'NumpadEnter') && this.code.length === 4) { this.cb.onJoin(this.code); return true; }
+      if ((e.code === 'Enter' || e.code === 'NumpadEnter') && this.code.length === 4) { this.join(); return true; }
       if (e.code === 'Escape') { this.cb.onBack(); return true; }
       if (['ArrowDown', 'ArrowUp', 'Enter', 'NumpadEnter'].includes(e.code)) return this.menu.onKey(e);
       return false;
@@ -673,7 +686,7 @@ export class OnlineScreen {
       }
       for (const b of this.keys) {
         const hov = this.hoverKey === b;
-        const off = b.primary && this.code.length !== 4;
+        const off = b.primary && (this.code.length !== 4 || this.busy());
         rect(ctx, b.x, b.y, b.w, b.h, b.primary && !off ? '#3a3220' : hov ? '#323745' : '#232733');
         rect(ctx, b.x, b.y + b.h - 1, b.w, 1, '#0d0f13');
         rect(ctx, b.x, b.y, b.w, 1, hov ? '#5b616e' : '#363b48');

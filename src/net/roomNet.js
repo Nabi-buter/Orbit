@@ -62,6 +62,9 @@ export function roomDelayFor(rtts, flushMs = ROOM_NET.flushMs) {
   return Math.max(ROOM_NET.minDelay, Math.min(ROOM_NET.maxDelay, d));
 }
 
+/** 더 새로운 시도에 밀려 그만둔 방 들어가기 (오류로 보이지 않음) */
+const STALE = Object.freeze({ stale: true });
+
 export class RoomNet {
   /**
    * @param {object} lobbyRoom  `await claude.use("room")` 의 결과 (테스트에서는 같은 모양의 가짜)
@@ -80,6 +83,8 @@ export class RoomNet {
     // 전송 방식별 설정: 직접 연결(WebRTC)은 매 프레임 보낼 수 있다
     this.cfg = { ...ROOM_NET, ...(opts.net ?? {}) };
     this.version = opts.version ?? buildVersion();
+    this.gen = 0;          // 방 들어가기 시도 번호 (나가거나 새로 시도하면 올라감)
+    this.joining = false;  // 방 만들기·참가 진행 중
     this.room = null;        // 이름 붙은 방
     this.unsubs = [];
     this.intervals = [];
@@ -152,11 +157,18 @@ export class RoomNet {
   close() { this.leaveRoom(); }
 
   // --- 방 들어가기 ------------------------------------------------------------
+  /**
+   * 방 들어가기. 한 번에 하나만: 참가·방 만들기를 여러 번 눌러도 먼저 시작한 것만 진행하고,
+   * 늦게 끝난 예전 시도(나간 뒤 · 다른 시도에 밀린 것)가 연 연결은 바로 닫는다.
+   * (예전: 참가를 두 번 누르면 연결이 두 개 생겨, 방장은 한쪽 인사만 받고 손님은 다른 쪽으로 준비·입력을 보내 무시됨)
+   */
   async enter(code) {
-    await this.leaveRoom(true);
+    const gen = ++this.gen;
+    await this.leaveRoom(true, true);
     this.code = code;
-    this.room = await this.lobby.join(`duel-${code.toLowerCase()}`);
-    const r = this.room;
+    const r = await this.lobby.join(`duel-${code.toLowerCase()}`);
+    if (gen !== this.gen) { try { await r.leave(); } catch { /* ignore */ } throw STALE; }
+    this.room = r;
     const on = (topic, fn) => this.unsubs.push(r.on(topic, (m) => {
       if (m.sameTab) return; // 내 메아리만 무시 (isMe 는 "같은 계정의 다른 탭·기기"도 포함 → 혼자 두 기기로 시험할 때 막힘)
       if (m.peer === this.otherPeer) this.goneAt = null; // 소식이 오면 살아 있음
@@ -190,6 +202,8 @@ export class RoomNet {
   }
 
   async create() {
+    if (this.joining) return; // 진행 중이면 다시 누른 것은 무시
+    this.joining = true;
     try {
       await this.enter(makeCode(this.rand));
       this.host = true;
@@ -199,17 +213,25 @@ export class RoomNet {
       this.emitLocal('joined', { code: this.code, slot: 0 });
       this.broadcastLobby();
     } catch (e) {
-      this.emitLocal('error', { msg: e?.userMessage ?? '방을 만들 수 없습니다. 잠시 뒤 다시 시도하세요.' });
+      if (e !== STALE) this.emitLocal('error', { msg: e?.userMessage ?? '방을 만들 수 없습니다. 잠시 뒤 다시 시도하세요.' });
+    } finally {
+      this.joining = false;
     }
   }
 
   async joinCode(raw) {
     const code = String(raw || '').toUpperCase().trim();
     if (!/^[A-Z0-9]{4}$/.test(code)) { this.emitLocal('error', { msg: '코드는 4자리입니다.' }); return; }
+    // 이미 참가 중(연결 중 · 방장 답 기다리는 중 · 들어감)이면 다시 누른 것은 무시
+    if (this.joining || (this.room && this.code === code && !this.host)) return;
+    this.joining = true;
+    let gen;
     try {
       await this.enter(code);
+      gen = this.gen;
     } catch (e) {
-      this.emitLocal('error', { msg: e?.userMessage ?? '방에 들어갈 수 없습니다.' });
+      this.joining = false;
+      if (e !== STALE) this.emitLocal('error', { msg: e?.userMessage ?? '방에 들어갈 수 없습니다.' });
       return;
     }
     this.host = false;
@@ -217,8 +239,10 @@ export class RoomNet {
     // 호스트가 답할 때까지 몇 번 인사, 끝내 답이 없으면 없는 방
     let tries = 0;
     const hello = () => {
-      if (this.slot >= 0 || !this.room) return;
+      if (gen !== this.gen || !this.room) return; // 나갔거나 새 시도로 바뀜 (그 시도가 진행 표시를 맡음)
+      if (this.slot >= 0) { this.joining = false; return; }
       if (tries++ * 700 >= this.cfg.joinTimeoutMs) {
+        this.joining = false;
         this.emitLocal('error', { msg: '방을 찾을 수 없습니다.' });
         this.leaveRoom(true);
         return;
@@ -437,7 +461,8 @@ export class RoomNet {
     return wasPlaying;
   }
 
-  async leaveRoom(silent = false) {
+  async leaveRoom(silent = false, fromEnter = false) {
+    if (!fromEnter) { this.gen++; this.joining = false; } // 진행 중인 방 들어가기는 버림
     const r = this.room;
     if (!r) return;
     if (!silent || this.slot >= 0) r.emit('bye', {}).catch(() => {});
