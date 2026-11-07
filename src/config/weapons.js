@@ -254,7 +254,7 @@ const DEFS = {
       hits: [singleHit({
         startup: 6, active: 3, recovery: 17,             // 밸런스: 발생 7→6 (근접 견제력 보강)
         box: { x: 10, y: 30, w: 92, h: 70 },
-        damage: 50, guardDamage: 19, hitstun: 9, blockstun: 11, push: 7,   // 가드 70 기준: 약공 콤보만으로는 가드 브레이크 안 됨 (22→19)
+        damage: 50, guardDamage: 16, hitstun: 9, blockstun: 11, push: 7,   // 가드 70 기준: 약공 콤보만으로는 가드 브레이크 안 됨 (22→19→16: 막을 때 가드 감소 ×1.3 반영)
       })],
     }),
     heavy: attack({

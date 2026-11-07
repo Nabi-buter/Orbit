@@ -202,7 +202,7 @@ function resolve(A, D, hit, kind, frame) {
   if (guarding && !isUlt) {
     const dmg = Math.round(hit.damage * G.normalParryDamageRate);
     damage(D, dmg);
-    D.guard -= hit.guardDamage * gTaken;
+    D.guard -= hit.guardDamage * gTaken * (G.blockGuardScale ?? 1); // 막을 때 줄어드는 양 (전체 배율)
     D.lastGuardUse = frame;
     D.state = S.BLOCKSTUN;
     D.timer = hit.blockstun + late;

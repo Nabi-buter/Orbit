@@ -81,8 +81,9 @@ export const BALANCE = {
     perfectDamageRatio: 1 / 50,   // [TEMP] 완벽패링 피해 = 최대 체력의 1/50
     perfectGuardCost: 6,          // [TEMP] 완벽패링 시 가드 게이지 소모
     perfectStun: 38,              // [TEMP] 완벽패링당한 공격자의 행동 불가 시간 (느려진 반격에 맞춰 28→42)
-    regenDelay: 100,              // [TEMP] 마지막 패링 후 회복 시작까지 (밸런스: 80→100)
-    regenPerFrame: 1.0,           // [TEMP] 초당 60 회복 (비교적 빠름, 밸런스: 72→60)
+    regenDelay: 50,               // [TEMP] 마지막 막기 후 회복 시작까지 (80→100→50: 더 빨리 회복이 시작됨)
+    regenPerFrame: 0.45,          // [TEMP] 초당 27 회복 (60→27: 차오르는 속도는 느리게, 0→가득 약 2.6초)
+    blockGuardScale: 1.3,         // [TEMP] 막을 때 줄어드는 가드 게이지 배율 (공격별 가드 피해 × 이 값 × 무기별 guardTaken)
   },
 
   guardBreak: {

@@ -50,7 +50,7 @@ test('가드 감소량 배율: 같은 공격을 막아도 무기에 따라 가�
     run(m, 20, I(), I({ guard: true }));
     return g0 - b.guard;
   };
-  const base = WEAPONS.axe.light.hits[0].guardDamage;
+  const base = WEAPONS.axe.light.hits[0].guardDamage * BALANCE.guard.blockGuardScale;
   assert.ok(Math.abs(loss('longsword') - base * KNOBS.longsword.guardTaken) < 0.01);
   assert.ok(Math.abs(loss('knuckle') - base * KNOBS.knuckle.guardTaken) < 0.01);
 });

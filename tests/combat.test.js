@@ -203,7 +203,7 @@ test('일반 패링: 피해 50%, 가드 게이지 소모, 공격권 유지', () 
   assert.ok(ev.some((e) => e.type === 'parry'));
   const L = a.weapon.light.hits[0];
   assert.equal(b.hp, b.maxHp - Math.round(L.damage * 0.5));
-  assert.equal(b.guard, guard0 - L.guardDamage);
+  assert.ok(Math.abs(b.guard - (guard0 - L.guardDamage * B.guard.blockGuardScale)) < 1e-9);
   assert.equal(a.attack.connected, true, '공격자는 연결 가능 (공격권 유지)');
   assert.notEqual(a.state, S.PARRIED);
 });
