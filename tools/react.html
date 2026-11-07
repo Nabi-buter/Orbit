@@ -1,0 +1,29 @@
+<!doctype html><html><head><meta charset="utf-8"><style>body{margin:0;background:#1b1f28}canvas{image-rendering:pixelated}</style></head><body>
+<canvas id="c"></canvas>
+<script type="module">
+// 반응 동작 점검 (피격 · 넉백 · 패링당함 · 가드 브레이크) — 무기 여러 개, 크게. ?w=a,b,c&s=3
+import { WEAPONS } from '../src/config/weapons.js';
+import { createFighter, S } from '../src/core/fighter.js';
+import { drawFighter } from '../src/render/fighterArt.js';
+import { TEAM } from '../src/render/renderer.js';
+const q = new URLSearchParams(location.search);
+const ids = (q.get('w') ?? 'longsword').split(','), step = Number(q.get('s') ?? 3);
+const R = [['피격', S.HITSTUN, 24], ['넉백', S.KNOCKBACK, 34], ['패링당함', S.PARRIED, 38], ['가드브레이크', S.GUARD_BREAK, 60]].filter(([n]) => !q.get('only') || q.get('only') === n);
+const CW = 52, CH = 56, cols = Math.max(...R.map(([, , L]) => Math.ceil(L / step) + 1));
+const c = document.getElementById('c'); c.width = CW * cols + 50; c.height = CH * R.length * ids.length;
+c.style.width = c.width * 3 + 'px'; c.style.height = c.height * 3 + 'px';
+const ctx = c.getContext('2d'); ctx.fillStyle = '#20242e'; ctx.fillRect(0, 0, c.width, c.height);
+let row = 0;
+for (const id of ids) for (const [name, st, len] of R) {
+  const f = createFighter({ id: 0, x: 0, facing: 1, weapon: WEAPONS[id] });
+  const y0 = row++ * CH;
+  ctx.fillStyle = '#8a909e'; ctx.font = '7px sans-serif'; ctx.fillText(id.slice(0, 6), 2, y0 + 24); ctx.fillText(name, 2, y0 + 34);
+  for (let k = 0; k * step <= len; k++) {
+    const frame = k * step, x0 = 50 + k * CW;
+    ctx.fillStyle = k % 2 ? '#262b36' : '#2b303b'; ctx.fillRect(x0, y0, CW, CH - 1);
+    f.state = st; f.timer = Math.max(0, len - frame);
+    drawFighter(ctx, f, x0 + 24, y0 + CH - 5, { ...TEAM[0], weapon: WEAPONS[id].color }, row * 1000 + frame, { smooth: false });
+  }
+}
+document.title = 'ready';
+</script></body></html>

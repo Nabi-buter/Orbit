@@ -26,6 +26,32 @@ function stateProgress(f, frame) {
   const el = frame - m.start;
   return { t: Math.max(0, Math.min(1, 1 - f.timer / m.timer0)), el };
 }
+/**
+ * 무기를 들지 않은 팔(빈손)의 반응: 몸보다 한 박자 늦게(따라 흔들림) 바깥으로 느슨하게 뻗었다가 제자리로.
+ * 목표점을 어깨에서 충분히 멀리 둬 팔이 거의 펴진 채 움직인다 (가까우면 팔꿈치가 꺾여 'ㄷ' 자로 보였음).
+ * from: 평소 빈손 자리, to: 반응 자세에서 빈손 자리, t: 진행도, peak: 가장 크게 벌어지는 시점
+ */
+/** 평소(서 있을 때) 빈손 자리: 지정 자세가 있으면 그것, 양손 무기는 자루 위 */
+function restHand2(weaponId, st, p) {
+  if (st?.h2) return st.h2;
+  return backHand(weaponId, { a: st?.a ?? p.wAngle, h: st?.h ?? p.hand });
+}
+function freeHand(from, to, t, peak) {
+  const lag = Math.max(0, t - 0.05);                      // 몸보다 살짝 늦게
+  const k = lag < peak ? smoothstep(lag / peak) : 1 - smoothstep((lag - peak) / (1 - peak));
+  // 어깨를 중심으로 호를 그리며 (거리는 팔 길이 가까이 유지) — 직선으로 옮기면 중간에 손이 어깨에 붙어 팔이 접혔음
+  const SH = [0, 96];
+  const a0 = Math.atan2(from[1] - SH[1], from[0] - SH[0]), a1 = Math.atan2(to[1] - SH[1], to[0] - SH[0]);
+  let da = a1 - a0;
+  if (da > Math.PI) da -= 2 * Math.PI; else if (da < -Math.PI) da += 2 * Math.PI;
+  const r0 = Math.hypot(from[0] - SH[0], from[1] - SH[1]), r1 = Math.hypot(to[0] - SH[0], to[1] - SH[1]);
+  const r = Math.max(lerp(r0, r1, k), Math.min(r0, r1, 30) + 6 * Math.sin(Math.PI * k));
+  const a = a0 + da * k;
+  return [SH[0] + Math.cos(a) * r, SH[1] + Math.sin(a) * r];
+}
+/** 빈손이 반응 자세로 갈 자리 (어깨 높이 96 기준, 월드 px) */
+const FREE = { hit: [-24, 74], knock: [-30, 94], parried: [-28, 86], fall: [16, 50] };
+
 /** 충격 곡선: 처음 몇 프레임에 확 젖혔다가 천천히 돌아옴 (0→1→0) */
 const shock = (t, peak = 0.15) => (t < peak ? t / peak : 1 - smoothstep((t - peak) / (1 - peak)));
 const smoothstep = (t) => { t = Math.max(0, Math.min(1, t)); return t * t * (3 - 2 * t); };
@@ -171,7 +197,8 @@ export function computePose(f, frame) {
       p.crouch = 2 + 6 * k;
       p.wAngle = lerp(p.wAngle, -0.25, k);
       p.hand = [lerp(p.hand[0], 4, k), lerp(p.hand[1], 76, k)];
-      p.hand2 = st?.h2 ? [lerp(st.h2[0], -8, k), lerp(st.h2[1], 84, k)] : backHand(weaponId, { a: p.wAngle, h: p.hand });
+      // 양손 무기는 맞아도 자루를 놓지 않는다(리그가 뒷손을 자루에 붙임). 빈손이면 몸보다 늦게 바깥으로 흔들림
+      p.hand2 = st?.h2 ? freeHand(st.h2, FREE.hit, t, 0.25) : backHand(weaponId, { a: p.wAngle, h: p.hand });
       break;
     }
     case S.PARRIED: {
@@ -183,7 +210,8 @@ export function computePose(f, frame) {
       p.crouch = 4 * k;
       p.wAngle = lerp(p.wAngle, 2.5, k);
       p.hand = [lerp(p.hand[0], -6, k), lerp(p.hand[1], 96, k)];
-      p.hand2 = weaponId === 'knuckle' || st?.h2 ? [lerp((st?.h2 ?? p.hand2)[0], -12, k), lerp((st?.h2 ?? p.hand2)[1], 84, k)] : backHand(weaponId, { a: p.wAngle, h: p.hand });
+      // 무기가 튕겨 나가며 자루를 놓친 손: 균형을 잡으려 뒤로 크게 벌렸다가 천천히 돌아옴
+      p.hand2 = freeHand(restHand2(weaponId, st, p), FREE.parried, t, 0.18);
       break;
     }
     case S.GUARD_BREAK: {
@@ -195,7 +223,8 @@ export function computePose(f, frame) {
       p.crouch = 24 * k + pant;
       p.wAngle = lerp(p.wAngle, -0.35, k);
       p.hand = [lerp(p.hand[0], 20, k), lerp(p.hand[1], 52 - pant, k)];
-      p.hand2 = weaponId === 'knuckle' || st?.h2 ? [lerp((st?.h2 ?? p.hand2)[0], 8, k), lerp((st?.h2 ?? p.hand2)[1], 54, k)] : backHand(weaponId, { a: p.wAngle, h: p.hand });
+      // 양손 무기는 자루를 쥔 채 처지고, 빈손은 무릎 쪽으로 늘어짐
+      p.hand2 = st?.h2 || weaponId === 'knuckle' ? [lerp((st?.h2 ?? p.hand2)[0], FREE.fall[0], k), lerp((st?.h2 ?? p.hand2)[1], FREE.fall[1] - pant, k)] : backHand(weaponId, { a: p.wAngle, h: p.hand });
       break;
     }
     case S.KNOCKBACK: {
@@ -206,7 +235,8 @@ export function computePose(f, frame) {
       p.crouch = 6 * k + 4 * Math.sin(Math.PI * t);
       p.wAngle = lerp(p.wAngle, 2.0, k);
       p.hand = [lerp(p.hand[0], -4, k), lerp(p.hand[1], 88, k)];
-      p.hand2 = st?.h2 ? st.h2 : backHand(weaponId, { a: p.wAngle, h: p.hand });
+      // 크게 밀려나며 놓친 손이 뒤로 휘청 (균형)
+      p.hand2 = freeHand(restHand2(weaponId, st, p), FREE.knock, t, 0.15);
       break;
     }
     case S.KO:

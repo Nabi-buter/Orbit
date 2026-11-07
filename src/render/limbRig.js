@@ -176,7 +176,8 @@ export function drawLimbRig(ctx, f, ax, ay, pal, P, core, pose, opts = {}) {
   const dir = [Math.cos(wa), -Math.sin(wa)];
   // 양손 무기: 뒷손은 실제 앞손 위치에서 자루를 따라 GRIP 만큼 뒤
   const grip = weaponId !== 'knuckle' && !f.unarmed ? GRIP_ART[weaponId] : null;
-  const twoHanded = grip != null && f.state !== S.HITSTUN && f.state !== S.KNOCKBACK && f.state !== S.PARRIED;
+  // 양손 무기: 가벼운 피격에는 자루를 놓지 않고, 크게 밀리거나 무기가 튕겨 나갈 때만 뒷손을 놓는다
+  const twoHanded = grip != null && f.state !== S.KNOCKBACK && f.state !== S.PARRIED;
   // 가드: 무기마다 뒷손이 잡는 곳이 다르다 (대검은 칼면을 받치고, 도끼·창은 자루를 넓게 잡음)
   const guarding = f.state === S.GUARD || f.state === S.BLOCKSTUN;
   const support = guarding ? GUARD_POSE[weaponId]?.support : undefined;
