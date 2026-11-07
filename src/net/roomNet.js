@@ -28,7 +28,7 @@ const FRAME_MS = 1000 / 60;
  * 배포 주소(GitHub Pages)에서는 빌드 번호(커밋)까지 같아야 함께 할 수 있다 — 같은 입력으로 같은 결과가 나와야 하므로
  * (기기 하나가 예전 버전을 캐시로 들고 있으면 준비·입력이 엇갈려 멈춘다).
  */
-export const PROTOCOL = 8; // 7: 라운드 시간 종료 → 연장전, 8: 가드 게이지 회복·감소량
+export const PROTOCOL = 9; // 7: 라운드 시간 종료 → 연장전, 8·9: 가드 게이지 회복·감소량
 export function buildVersion() {
   const b = typeof window !== 'undefined' ? window.ORBIT_VERSION : null;
   return b ? `${PROTOCOL}-${b}` : String(PROTOCOL);

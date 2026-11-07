@@ -78,11 +78,11 @@ export const KNOBS = {
   // 규칙: 모든 무기 강공 콤보 ≥ 2, 강공 콤보 < 약공 콤보
   longsword: { combo: { lightMax: 3, heavyMax: 2, maxTotal: 4 }, reach: 1.01, damage: 1.0, speed: 1.28, hp: 1.05, guardTaken: 1, windup: 1.25 },
   rapier: { combo: { lightMax: 3, heavyMax: 2, maxTotal: 4 }, reach: 1, damage: 0.84, speed: 1.4, hp: 0.98, guardTaken: 1.05 }, // 추가 시 64% → 데미지·속도 조정 50%
-  greatsword: { combo: { lightMax: 3, heavyMax: 2, maxTotal: 3 }, reach: 1, damage: 0.86, speed: 1.34, hp: 1.08, guardTaken: 1, windup: 1.3 },
-  dagger: { combo: { lightMax: 3, heavyMax: 2, maxTotal: 5 }, reach: 1.04, damage: 0.98, speed: 1.53, hp: 1, guardTaken: 1 },
-  axe: { combo: { lightMax: 3, heavyMax: 2, maxTotal: 3 }, reach: 1.05, damage: 1.03, speed: 1.44, hp: 1.18, guardTaken: 1, windup: 1.3 },
-  spear: { combo: { lightMax: 3, heavyMax: 2, maxTotal: 3 }, reach: 0.9, damage: 0.78, speed: 1.05, hp: 1.17, guardTaken: 1, windup: 1.1 },
-  knuckle: { combo: { lightMax: 5, heavyMax: 3, maxTotal: 8 }, reach: 1.15, damage: 1.05, speed: 1.52, hp: 1.03, guardTaken: 0.91 },
+  greatsword: { combo: { lightMax: 3, heavyMax: 2, maxTotal: 3 }, reach: 1, damage: 0.81, speed: 1.34, hp: 1.08, guardTaken: 1, windup: 1.3 },
+  dagger: { combo: { lightMax: 3, heavyMax: 2, maxTotal: 5 }, reach: 1.04, damage: 1.02, speed: 1.53, hp: 1, guardTaken: 0.8 },
+  axe: { combo: { lightMax: 3, heavyMax: 2, maxTotal: 3 }, reach: 1.05, damage: 0.96, speed: 1.44, hp: 1.18, guardTaken: 1, windup: 1.3 },
+  spear: { combo: { lightMax: 3, heavyMax: 2, maxTotal: 3 }, reach: 0.9, damage: 0.75, speed: 1.05, hp: 1.17, guardTaken: 1, windup: 1.1 },
+  knuckle: { combo: { lightMax: 5, heavyMax: 3, maxTotal: 8 }, reach: 1.15, damage: 1.1, speed: 1.52, hp: 1.03, guardTaken: 0.78 },
 };
 
 const DEFS = {
@@ -180,7 +180,7 @@ const DEFS = {
       hits: [singleHit({
         startup: 9, active: 4, recovery: 20,
         box: { x: 5, y: 25, w: 110, h: 80 },
-        damage: 60, guardDamage: 16, hitstun: 10, blockstun: 10, push: 12,
+        damage: 60, guardDamage: 14, hitstun: 10, blockstun: 10, push: 12,   // 16→14: 막을 때 가드 감소 ×1.5 에서도 약공 콤보만으로 가드 브레이크 안 됨
       })],
     }),
     heavy: attack({
@@ -254,7 +254,7 @@ const DEFS = {
       hits: [singleHit({
         startup: 6, active: 3, recovery: 17,             // 밸런스: 발생 7→6 (근접 견제력 보강)
         box: { x: 10, y: 30, w: 92, h: 70 },
-        damage: 50, guardDamage: 16, hitstun: 9, blockstun: 11, push: 7,   // 가드 70 기준: 약공 콤보만으로는 가드 브레이크 안 됨 (22→19→16: 막을 때 가드 감소 ×1.3 반영)
+        damage: 50, guardDamage: 14, hitstun: 9, blockstun: 11, push: 7,   // 가드 70 기준: 약공 콤보만으로는 가드 브레이크 안 됨 (22→19→16→14: 막을 때 가드 감소 ×1.5 반영)
       })],
     }),
     heavy: attack({
