@@ -52,8 +52,10 @@ const CSS = `
 .tbtn.guard { right: 25.5%; bottom: 5%; width: 9%; aspect-ratio: 1; }
 .tbtn.dash { right: 14.5%; bottom: 34%; width: 8%; aspect-ratio: 1; }
 .tbtn.ult { right: 3%; bottom: 49%; width: 7.5%; aspect-ratio: 1; }
-.tbtn.pause { left: 50%; top: 12%; transform: translateX(-50%); width: 5%; aspect-ratio: 1; border-radius: 8px; font-size: min(2.6vh, 1.6vw); }
-.tbtn.toggle { left: calc(50% + 3.5%); top: 12%; width: 5%; aspect-ratio: 1; border-radius: 8px; font-size: min(2.2vh, 1.3vw); }
+.tbtn.pause { left: 50%; top: 18%; transform: translateX(-50%); width: 5%; aspect-ratio: 1; border-radius: 8px; font-size: min(2.6vh, 1.6vw); }
+.tbtn.toggle { left: calc(50% + 3.5%); top: 18%; width: 5%; aspect-ratio: 1; border-radius: 8px; font-size: min(2.2vh, 1.3vw); }
+.tbtn.hitbox { left: calc(50% - 8.5%); top: 18%; width: 5%; aspect-ratio: 1; border-radius: 8px; font-size: min(2.2vh, 1.3vw); }
+.tbtn.hitbox.sel { background: rgba(255,90,90,.45); border-color: #ff7a7a; }
 /* 버튼 끔: 일시정지·켜기 버튼만 남김 (키보드를 연결해 할 때) */
 #touch.off .tpad, #touch.off .tbtn[data-k] { display: none; }
 /* 세로 화면: 게임 화면은 위, 버튼은 그 아래 빈 곳에 크게 */
@@ -121,6 +123,7 @@ export function setupTouch(stage, app) {
       <div class="tbtn ult" data-k="ult">궁</div>
     </div>
     <div class="ttop">
+      <div class="tbtn hitbox" data-tap="F2" aria-label="판정 보기">판정</div>
       <div class="tbtn pause" data-tap="Escape">II</div>
       <div class="tbtn toggle" data-toggle="1" aria-label="화면 버튼 끄기/켜기"></div>
     </div>`;
@@ -211,12 +214,14 @@ export function setupTouch(stage, app) {
 
   // --- 표시 여부: 대전 중(일시정지·결과 제외)에만, 세로면 회전 안내 -------------------
   const ultBtn = root.querySelector('.ult');
+  const hitboxBtn = root.querySelector('.hitbox');
   let shown = false;
   const tick = () => {
     const battle = app.scene === 'battle' && !app.paused && !app.match?.over && !app.onlineMenuOpen;
     if (battle !== shown) { shown = battle; root.classList.toggle('on', battle); if (!battle) releaseAll(); }
     const me = app.match?.fighters[app.mode === 'online' ? (app.slot ?? 0) : 0];
     ultBtn.classList.toggle('ready', !!me && me.ult >= BALANCE.ultimate.cost);
+    hitboxBtn.classList.toggle('sel', !!app.renderer?.showBoxes); // 판정 보기 켜짐 표시
     requestAnimationFrame(tick);
   };
   requestAnimationFrame(tick);

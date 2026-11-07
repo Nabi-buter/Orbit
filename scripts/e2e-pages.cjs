@@ -144,9 +144,8 @@ function assert(c, msg) { if (!c) throw new Error('E2E(Pages) 실패: ' + msg); 
     const sa2 = await st(A), sb2 = await st(B);
     assert(Math.abs(sa2.f - sb2.f) <= 12 && sa2.d === null && sb2.d === null, `돌아온 뒤 동기화 ${sa2.f}/${sb2.f}`);
     // 준비 버튼 (탭) — 결과 후 로비에서 확인
-    // 경기 종료(시간) → 양쪽 '로비로' → 같은 방에서 재대결 준비 상태여야 한다 (상대가 나갔다는 오류 없이)
-    await A.evaluate(() => { window.__game.match.timeLeft = 2; });
-    await B.evaluate(() => { window.__game.match.timeLeft = 2; });
+    // 경기 종료(연장전에서 쓰러짐) → 양쪽 '로비로' → 같은 방에서 재대결 준비 상태여야 한다 (상대가 나갔다는 오류 없이)
+    for (const p of [A, B]) await p.evaluate(() => { const m = window.__game.match; m.lives = [1, 1]; m.fighters[0].hp = 30; m.fighters[1].hp = 50; m.timeLeft = 2; });
     await A.waitForFunction(() => window.__game.scene === 'result', null, { timeout: 8000 });
     await B.waitForFunction(() => window.__game.scene === 'result', null, { timeout: 8000 });
     await key(A, 'Enter'); await key(B, 'Enter');

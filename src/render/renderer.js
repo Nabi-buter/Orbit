@@ -221,6 +221,10 @@ export class Renderer {
           // 다음 라운드: 남은 효과 정리
           fx.particles = []; fx.rings = []; fx.texts = []; fx.impacts = []; fx.flash = null;
           break;
+        case 'overtime':
+          fx.text('연장전', (this.camArt ?? 0) + PW / 2, 70, UI.red, 3, 80);
+          fx.screenFlash('#ff4040', 0.18);
+          break;
         case 'ko':
           fx.text('K.O.', (this.camArt ?? 0) + PW / 2, 80, UI.paper, 5, 90);
           fx.screenFlash('#ffffff', 0.35);
@@ -504,7 +508,11 @@ export class Renderer {
 
     // 시간
     if (match.unlimited) text(ctx, '∞', PW / 2, 9, UI.paper, { size: 18, align: 'center', shadow: UI.ink });
-    else {
+    else if (match.overtime) {
+      // 연장전: 00 이 깜빡이고, 양쪽 체력이 줄고 있음을 알림
+      if (Math.floor(this.time / 20) % 2 === 0) text(ctx, '00', PW / 2, 12, UI.red, { scale: 2, align: 'center', shadow: UI.ink });
+      if (!opts.net) text(ctx, '연장전 · 체력 감소', PW / 2, 31, UI.red, { size: 11, align: 'center', shadow: UI.ink });
+    } else {
       const t = Math.ceil(match.timeLeft / 60);
       text(ctx, String(t).padStart(2, '0'), PW / 2, 12, t <= 10 ? UI.red : UI.paper, { scale: 2, align: 'center', shadow: UI.ink });
     }

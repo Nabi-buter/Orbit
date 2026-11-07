@@ -33,6 +33,8 @@ export class Match {
     this.winner = null;    // 0 | 1 | 'draw'
     this.endReason = null; // 'ko' | 'time'
     this.koTimer = 0;
+    this.overtime = false;  // 라운드 시간이 다 된 뒤 (양쪽 체력이 계속 줄어듦)
+    this.overtimeFrames = 0;
   }
 
   /** @param {[object, object]} inputs 각 플레이어의 이번 프레임 버튼 상태 */
@@ -90,14 +92,29 @@ export class Match {
       return;
     }
     if (this.unlimited) return;
-    if (--this.timeLeft <= 0) {
-      this.timeLeft = 0;
-      this.endReason = 'time';
-      // 시간 종료: 남은 목숨 → 남은 체력 비율 순으로 판정 (무기별 체력이 다를 수 있음)
-      const ra = this.lives[0] + a.hp / a.maxHp, rb = this.lives[1] + b.hp / b.maxHp;
-      this.winner = ra === rb ? 'draw' : ra > rb ? 0 : 1;
-      this.over = true;
+    // 라운드 시간: 다 되면 경기를 끝내지 않고 연장전 (온라인에서 갑자기 끝나 흐름이 끊기지 않게)
+    if (this.timeLeft > 0) {
+      if (--this.timeLeft === 0) {
+        this.overtime = true;
+        this.events.push({ type: 'overtime', frame: this.frame });
+      }
+      return;
     }
+    this.overtimeTick();
+  }
+
+  /** 연장전: 0.1초마다 양쪽 모두 최대 체력 비율만큼 피해 (정수, 결정론적). 쓰러지면 평소처럼 다음 라운드 */
+  overtimeTick() {
+    if (++this.overtimeFrames % 6 !== 0) return;
+    this.fighters.forEach((f, i) => {
+      if (f.state === S.KO) return;
+      f.hp = Math.max(0, f.hp - Math.ceil((f.maxHp * BALANCE.round.overtimeRate) / 10));
+      if (f.hp <= 0) {
+        f.state = S.KO;
+        f.attack = null; f.dash = null; f.slide = null;
+        this.events.push({ type: 'ko', defender: i, attacker: 1 - i, frame: this.frame, overtime: true });
+      }
+    });
   }
 
   /** 다음 라운드: 처음 위치로. 쓰러진 쪽은 체력 회복, 버틴 쪽은 체력 유지. 궁극기 게이지와 기록은 이어진다. */
@@ -113,6 +130,8 @@ export class Match {
     this.winner = null;
     this.endReason = null;
     this.timeLeft = this.unlimited ? Infinity : this.roundSeconds * FPS;
+    this.overtime = false;
+    this.overtimeFrames = 0;
     this.roundIntro = BALANCE.round.introFrames;
     this.events.push({ type: 'round', round: this.round, lives: [...this.lives] });
   }

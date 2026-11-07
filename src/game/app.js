@@ -13,6 +13,7 @@ import { Keyboard } from '../input/keyboard.js';
 import { Renderer, hitstopFor, UI, TEAM } from '../render/renderer.js';
 import { sfx, playEvent } from '../render/sfx.js';
 import { NetClient } from '../net/client.js';
+import { isTouchDevice } from '../ui/touch.js';
 import { RoomNet, openRoom } from '../net/roomNet.js';
 import { PeerLobby, loadPeerJS } from '../net/peerLobby.js';
 import { Lockstep } from '../net/lockstep.js';
@@ -370,7 +371,7 @@ export class App {
         frozen: this.paused || this.hitstop > 0,
         intro: this.introText(),
         net: this.mode === 'online' && this.scene === 'battle' ? this.netInfo() : null,
-        note: this.mode === 'training' && this.scene === 'battle' ? '훈련장 · F2 판정 보기' : null,
+        note: this.mode === 'training' && this.scene === 'battle' ? (isTouchDevice() ? '훈련장' : '훈련장 · F2 판정 보기') : null,
         ai: this.ai ? this.aiInfo() : null,
       });
     }

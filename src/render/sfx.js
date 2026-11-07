@@ -51,6 +51,10 @@ export function playEvent(type, kind) {
     case 'parry':
       tone({ freq: 1200, to: 900, dur: 0.09, type: 'triangle', vol: 0.12 });
       break;
+    case 'overtime': // 연장전 경고음
+      tone({ freq: 440, dur: 0.18, type: 'square', vol: 0.1 });
+      tone({ freq: 330, dur: 0.3, type: 'square', vol: 0.08 });
+      break;
     case 'perfect':
       tone({ freq: 1568, dur: 0.25, type: 'triangle', vol: 0.14 });
       tone({ freq: 2349, dur: 0.35, type: 'sine', vol: 0.1 });

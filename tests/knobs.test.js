@@ -55,12 +55,12 @@ test('가드 감소량 배율: 같은 공격을 막아도 무기에 따라 가�
   assert.ok(Math.abs(loss('knuckle') - base * KNOBS.knuckle.guardTaken) < 0.01);
 });
 
-test('시간 종료 판정은 남은 체력 비율로 한다', () => {
+test('연장전 피해는 무기별 최대 체력의 같은 비율 (체력 비율이 낮은 쪽이 먼저 쓰러진다)', () => {
   const m = setup({ distance: 400, weapons: ['knuckle', 'longsword'] });
   const [a, b] = m.fighters;
-  a.hp = a.maxHp * 0.5 + 10; // 절대값은 더 많지만
-  b.hp = b.maxHp * 0.6;      // 비율은 b 가 높음
+  a.hp = Math.round(a.maxHp * 0.5) + 10; // 절대값은 더 많지만
+  b.hp = Math.round(b.maxHp * 0.6);      // 비율은 b 가 높음
   m.timeLeft = 2;
-  run(m, 5);
-  assert.equal(m.winner, 1);
+  for (let k = 0; k < 60 * 12 && a.state !== 'ko' && b.state !== 'ko'; k++) m.step([{}, {}]);
+  assert.ok(a.state === 'ko' && b.state !== 'ko', '비율이 낮은 a 가 먼저');
 });

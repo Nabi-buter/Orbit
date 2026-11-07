@@ -162,9 +162,14 @@ function assert(c, msg) { if (!c) throw new Error('E2E 실패: ' + msg); console
     await shot(page, '05-result');
     await key('Enter');
     assert(await scene() === 'battle', '다시 대전');
-    await page.evaluate(() => { window.__game.match.timeLeft = 2; window.__game.intro = 0; });
-    await wait(400);
-    assert(await scene() === 'result', '시간 종료 → 결과');
+    // 라운드 시간이 다 되면 끝나지 않고 연장전 → 양쪽 체력이 줄어 쓰러지면 (마지막 목숨이면) 결과
+    await page.evaluate(() => { const g = window.__game; g.ai = null; g.intro = 0; g.match.timeLeft = 2; });
+    await wait(500);
+    assert(await page.evaluate(() => window.__game.scene === 'battle' && window.__game.match.overtime), '시간이 다 되면 연장전 (경기는 계속)');
+    await shot(page, '05b-overtime');
+    await page.evaluate(() => { const m = window.__game.match; m.lives = [1, 1]; m.fighters[0].hp = 40; m.fighters[1].hp = 60; });
+    await wait(3500);
+    assert(await scene() === 'result', '연장전에서 쓰러짐 → 결과');
 
     // 훈련장: 내 무기만 고름, 더미는 맨손으로 움직이지 않고 쓰러지지 않음, 시간 제한 없음, 궁극기 무제한
     await page.evaluate(() => window.__game.toLoadout({ mode: 'training' }));

@@ -400,13 +400,26 @@ test('KO 및 시간 종료 판정 (목숨 2개)', () => {
   assert.equal(m.winner, 0);
   assert.equal(m.endReason, 'ko');
 
-  m = setup({ distance: 400 });
+});
+
+test('라운드 시간이 다 되면 경기가 끝나지 않고 연장전: 양쪽 체력이 줄어 먼저 쓰러진 쪽이 목숨을 잃고 다음 라운드', () => {
+  const m = setup({ distance: 400 });
+  const [a, b] = m.fighters;
   m.timeLeft = 5;
-  m.fighters[0].hp = 500;
-  run(m, 10);
-  assert.equal(m.over, true);
-  assert.equal(m.winner, 1);
-  assert.equal(m.endReason, 'time');
+  a.hp = 300;                         // 체력이 적은 쪽이 먼저 쓰러진다
+  const ev = run(m, 10);
+  assert.equal(m.over, false, '시간이 다 돼도 끝나지 않음');
+  assert.ok(m.overtime && ev.some((e) => e.type === 'overtime'), '연장전 시작');
+  const hb0 = b.hp;
+  run(m, 60);
+  const per = Math.ceil((b.maxHp * B.round.overtimeRate) / 10);
+  assert.equal(hb0 - b.hp, per * 10, '1초에 최대 체력의 overtimeRate 만큼');
+  const all = until(m, () => m.round === 2, I(), I(), 60 * 30);
+  assert.ok(all.some((e) => e.type === 'ko' && e.defender === 0), '체력이 적은 쪽이 쓰러짐');
+  assert.deepEqual(m.lives, [B.round.lives - 1, B.round.lives], '쓰러진 쪽만 목숨 하나 잃음');
+  assert.equal(m.overtime, false, '다음 라운드는 연장전 아님');
+  assert.equal(m.timeLeft, m.roundSeconds * 60, '라운드 시간 다시 처음부터');
+  assert.equal(m.over, false);
 });
 
 test('시간 제한 0 = 무제한: 시간이 지나도 끝나지 않고, 라운드가 바뀌어도 무제한', () => {
