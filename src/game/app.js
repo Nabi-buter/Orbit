@@ -11,6 +11,7 @@ import { AIController, DIFFICULTY } from '../ai/ai.js';
 import { STYLE_LABEL, PATTERN_LABEL } from '../ai/predictor.js';
 import { Keyboard } from '../input/keyboard.js';
 import { Renderer, hitstopFor, UI, TEAM } from '../render/renderer.js';
+import { pickBackground } from '../render/backgrounds.js';
 import { sfx, playEvent } from '../render/sfx.js';
 import { NetClient } from '../net/client.js';
 import { isTouchDevice } from '../ui/touch.js';
@@ -118,6 +119,9 @@ export class App {
     if (this.mode === 'training') this.match.fighters[1].unarmed = true;
     this.ai = this.mode === 'pve' ? new AIController(this.difficulty) : null;
     this.renderer.reset();
+    // 배경: 경기마다 무작위 (라운드는 같은 경기라 그대로). 온라인은 방 코드·경기 번호로 정해 두 사람이 같은 장소
+    const online = this.mode === 'online' && this.lockstep;
+    this.renderer.setStage(pickBackground(online ? this.lockstep.matchId * 31 + [...(this.netState?.code ?? '')].reduce((h, c) => h * 7 + c.charCodeAt(0), 0) : null));
     this.hitstop = 0;
     this.intro = INTRO_FRAMES;
     this.acc = 0;

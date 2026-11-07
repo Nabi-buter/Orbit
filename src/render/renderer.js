@@ -10,6 +10,8 @@ import { Effects } from './effects.js';
 import { playEvent } from './sfx.js';
 import { GUARD_POSE } from './motions.js';
 import { PX, PW, PH, createArtCanvas, rect, line, px, disc, text, panel, useHiResText, takeTextQueue, FONT_STACK } from './pixel.js';
+import { drawStageBackground, buildBackground } from './backgrounds.js';
+export { buildBackground };
 
 const GY = STAGE.groundY;
 export const GROUND = Math.round(GY / PX);
@@ -423,18 +425,19 @@ export class Renderer {
   // 배경 (도트)
   // ---------------------------------------------------------------------------
   drawBackground(ctx, camArt = 0) {
-    if (!this.bg) this.bg = buildBackground();
-    ctx.drawImage(this.bg, -camArt, 0);
-    // 천장 조명 미세한 깜빡임 + 홀로그램 표지 스캔선
-    if (this.time % 180 < 3) { ctx.globalAlpha = 0.25; rect(ctx, BW / 2 - 120 - camArt, 30, 22, 1, '#000'); ctx.globalAlpha = 1; }
-    const scan = (this.time >> 1) % 18;
-    ctx.globalAlpha = 0.5; rect(ctx, BW / 2 - 36 - camArt, 70 + scan, 72, 1, UI.cyan); ctx.globalAlpha = 1;
+    // 경기장 배경: 경기마다 고른 장소 (src/render/backgrounds.js), 라운드가 바뀌어도 그대로
+    drawStageBackground(ctx, this.stage ?? 'range', camArt, this.time);
   }
+  /** 이번 경기의 배경 장소 */
+  setStage(id) { this.stage = id; }
 
   // ---------------------------------------------------------------------------
   // HUD (도트)
   // ---------------------------------------------------------------------------
   drawHud(ctx, match, opts) {
+    // 위쪽 어두운 띠: 밝은 배경(숲·도장)에서도 이름·체력·시간이 잘 보이게 (아래로 갈수록 옅게)
+    for (let k = 0; k < 6; k++) { ctx.globalAlpha = 0.5 - k * 0.08; rect(ctx, 0, k * 7, PW, 7, '#0b0d12'); }
+    ctx.globalAlpha = 1;
     match.fighters.forEach((f, i) => {
       if (f.hp < this.hpTrail[i]) {
         if (this.hpTrailDelay[i] > 0) this.hpTrailDelay[i]--;
@@ -548,64 +551,3 @@ function bar(ctx, X, y, w, h, s, layers, segments = 0) {
   for (let i = 1; i < segments; i++) rect(ctx, x0 + Math.round((w * i) / segments), y, 1, h, UI.ink);
 }
 
-export function buildBackground() {
-  // 경기장 전체 폭으로 그린다 (카메라가 잘라서 보여 줌)
-  const W = BW;
-  const { canvas, ctx: g } = createArtCanvas(W, PH);
-  const mid = Math.round(W / 2);
-  // 천장
-  rect(g, 0, 0, W, 26, '#181b23');
-  for (let x = 0; x < W; x += 32) rect(g, x, 0, 2, 26, '#20242e');
-  // 매달린 조명 (가로 형광등) — 일정하지 않게 띄엄띄엄
-  for (let lx = 30, i = 0; lx < W - 20; lx += 64 + (i++ % 3) * 14) {
-    rect(g, lx + 10, 18, 1, 12, '#2a2f3a');
-    rect(g, lx, 30, 22, 2, '#dfe8f0');
-    g.globalAlpha = 0.08; rect(g, lx - 10, 32, 42, 40, '#dfe8f0'); g.globalAlpha = 1;
-  }
-  // 벽 패널
-  rect(g, 0, 26, W, GROUND - 26, '#3a404d');
-  for (let y = 26; y < GROUND; y += 38) rect(g, 0, y, W, 1, '#2d323d');
-  for (let x = 0; x < W; x += 48) { rect(g, x, 26, 1, GROUND - 26, '#2d323d'); rect(g, x + 1, 26, 1, GROUND - 26, '#454c5a'); }
-  for (let x = 0; x < W; x += 48) for (let y = 26; y < GROUND - 30; y += 38) { g.fillStyle = '#525a69'; g.fillRect(x + 4, y + 4, 1, 1); g.fillRect(x + 43, y + 4, 1, 1); }
-  // 환기구 · 사물함 · 소화기 (구역마다 다르게)
-  for (const vx of [60, 220, mid + 150, W - 120]) { rect(g, vx, 120, 30, 14, '#2b303a'); for (let k = 0; k < 5; k++) rect(g, vx + 2, 122 + k * 2, 26, 1, '#3f4552'); }
-  for (const lx of [mid - 230, mid + 260]) {
-    for (let k = 0; k < 3; k++) { rect(g, lx + k * 13, 110, 12, 38, '#323845'); rect(g, lx + k * 13, 110, 12, 1, '#4a5261'); rect(g, lx + k * 13 + 9, 126, 1, 4, '#7d838f'); }
-  }
-  for (const ex of [mid - 330, mid + 340]) { rect(g, ex, 128, 5, 12, '#a33a33'); rect(g, ex + 1, 125, 3, 3, '#2a2e37'); }
-  // 홀로그램 표지 (가운데) + 양옆 구역 표지
-  rect(g, mid - 38, 68, 76, 22, '#162a2c');
-  g.globalAlpha = 0.9; rect(g, mid - 38, 68, 76, 1, '#4fd1c1'); rect(g, mid - 38, 89, 76, 1, '#4fd1c1'); g.globalAlpha = 1;
-  bitTextBg(g, 'RANGE 01', mid, 72, '#4fd1c1');
-  bitTextBg(g, 'DUEL ZONE', mid, 81, '#2f8f86');
-  for (const [sx, label] of [[mid - 260, 'A'], [mid + 260, 'B']]) {
-    rect(g, sx - 9, 74, 18, 14, '#20242e'); rect(g, sx - 9, 74, 18, 1, '#e7b93c');
-    bitTextBg(g, label, sx, 78, '#e7b93c');
-  }
-  // 벽 아래 안전 줄무늬
-  for (let x = 0; x < W; x += 1) rect(g, x, GROUND - 8, 1, 6, Math.floor((x + 3) / 6) % 2 ? '#e7b93c' : '#1d1f25');
-  rect(g, 0, GROUND - 9, W, 1, '#22252d');
-  rect(g, 0, GROUND - 2, W, 2, '#2a2e37');
-  // 경기장 경계 기둥
-  for (const wx of [STAGE.leftWall - 40, STAGE.rightWall + 40]) {
-    const x = Math.round(wx / PX);
-    rect(g, x - 4, 26, 9, GROUND - 26, '#2a2f3a');
-    rect(g, x - 4, 26, 1, GROUND - 26, '#4a5261');
-    for (let y = 40; y < GROUND - 10; y += 12) rect(g, x - 3, y, 7, 2, '#e7b93c');
-  }
-  // 바닥 (콘크리트) + 레인 표시 + 거리 눈금 (가운데 0M 에서 10M 간격)
-  rect(g, 0, GROUND, W, PH - GROUND, '#565c68');
-  rect(g, 0, GROUND, W, 1, '#8a909e');
-  for (let x = 0; x < W; x += 3) for (let y = GROUND + 2; y < PH; y += 4) if ((x * 7 + y * 13) % 11 === 0) rect(g, x, y, 1, 1, '#4c525d');
-  for (let x = 8; x < W; x += 20) rect(g, x, GROUND + 14, 10, 1, '#e7b93c');
-  for (let k = -3; k <= 3; k++) {
-    const mx = mid + k * 100;
-    if (mx < 20 || mx > W - 20) continue;
-    rect(g, mx, GROUND + 2, 1, 8, '#c9ccd4');
-    bitTextBg(g, `${Math.abs(k) * 10}M`, mx, GROUND + 18, '#7d838f');
-  }
-  rect(g, 0, PH - 10, W, 10, '#3f444e');
-  return canvas;
-}
-
-function bitTextBg(g, str, cx, y, color) { text(g, str, cx, y, color, { align: 'center' }); }

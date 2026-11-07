@@ -121,6 +121,8 @@ function assert(c, msg) { if (!c) throw new Error('E2E(Pages) 실패: ' + msg); 
     await B.waitForFunction(() => window.__game.scene === 'battle', null, { timeout: 8000 });
     const wa = await A.evaluate(() => window.__game.match.fighters.map((f) => f.weapon.id).join());
     assert(wa === 'axe,knuckle', `온라인 대전 시작 ${wa}`);
+    const stages = await Promise.all([A, B].map((p) => p.evaluate(() => window.__game.renderer.stage)));
+    assert(stages[0] && stages[0] === stages[1], `두 사람이 같은 배경 (${stages})`);
     await A.waitForTimeout(1800);
     await A.keyboard.down('KeyD'); await B.keyboard.down('ArrowLeft');
     await A.waitForTimeout(600);
